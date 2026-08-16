@@ -11,6 +11,14 @@
     "746843897350848514"
   ],
   "events": [],
-  "bel": [],
+  "bel": [
+    {
+      "id": "bel_vio96j",
+      "role": "VPC",
+      "name": "Mohavii Goat",
+      "description": "L goat taa dnya lkol",
+      "photo": null
+    }
+  ],
   "partners": []
 }
