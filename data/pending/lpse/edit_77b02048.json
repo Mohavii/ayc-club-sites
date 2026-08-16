@@ -1,0 +1,19 @@
+{
+  "editId": "edit_77b02048",
+  "clubSlug": "lpse",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-16T23:05:27.088Z",
+  "type": "add",
+  "path": "bel",
+  "oldValue": null,
+  "newValue": {
+    "id": "bel_vio96j",
+    "role": "VPC",
+    "name": "Mohavii Goat",
+    "description": "L goat taa dnya lkol",
+    "photo": null
+  },
+  "label": "Nouveau membre BEL : Mohavii Goat (VPC)",
+  "status": "pending"
+}
