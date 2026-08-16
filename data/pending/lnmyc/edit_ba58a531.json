@@ -1,0 +1,21 @@
+{
+  "editId": "edit_ba58a531",
+  "clubSlug": "lnmyc",
+  "submittedBy": "766358788709417020",
+  "submittedByTag": "yassineborchani7994",
+  "submittedAt": "2026-08-16T23:17:37.490Z",
+  "type": "add",
+  "path": "events",
+  "oldValue": null,
+  "newValue": {
+    "id": "evt_2vq1vp",
+    "title": "youth impact",
+    "date": "2026 -03-23",
+    "location": "3anneba",
+    "description": "event behi barcha",
+    "axis": "Scolarité",
+    "image": null
+  },
+  "label": "Nouvel événement : youth impact",
+  "status": "pending"
+}
