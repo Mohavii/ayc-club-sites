@@ -131,14 +131,23 @@ async function handleCommand(interaction) {
   const userId = interaction.member?.user?.id || interaction.user?.id;
   const userTag = interaction.member?.user?.username || interaction.user?.username || "inconnu";
 
-  // Sub-command groups/names come nested: /club event add -> options[0].options[0]
+  // Discord sends two different shapes depending on whether "club" has a
+  // plain subcommand (type 1, e.g. /club create) or a subcommand GROUP
+  // (type 2, e.g. /club event add):
+  //   plain subcommand:  options[0] = { name: "create", type: 1, options: [...args] }
+  //   subcommand group:  options[0] = { name: "event", type: 2, options: [
+  //                         { name: "add", type: 1, options: [...args] }
+  //                       ]}
+  // top.type tells us which shape we're in — type 2 means top's own
+  // "options" are actually a nested subcommand, not arguments.
   const top = data.options && data.options[0];
-  const sub = top && top.options && top.options[0];
+  const isGroup = top && top.type === 2;
+  const sub = isGroup ? top.options && top.options[0] : null;
 
   const command = data.name; // "club"
   const group = top ? top.name : null; // "event" | "bel" | "partner" | "create" | "set-about" | ...
   const action = sub ? sub.name : null; // "add" | "remove" (only for grouped subcommands)
-  const opts = sub ? sub.options : top ? top.options : [];
+  const opts = isGroup ? (sub ? sub.options : []) : top ? top.options : [];
 
   if (command !== "club") return ephemeral("Commande inconnue.");
 
