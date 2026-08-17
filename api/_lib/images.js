@@ -25,8 +25,10 @@ function buildSignature(paramsToSign, apiSecret) {
   return crypto.createHash("sha1").update(sorted + apiSecret).digest("hex");
 }
 
-// kind: "bel" (member photo, 3:4) | "event" (event photo, 3:4) |
-//       "partner" (logo, 1:1 square) | "hero" (wide banner, no forced crop)
+// kind: "bel" (member photo, 3:4, resized not cropped) |
+//       "event" (event photo, 3:4, resized not cropped) |
+//       "partner" (logo, 1:1, resized not cropped) |
+//       "hero" (wide banner, no forced crop)
 async function uploadDiscordAttachment(attachmentUrl, { kind = "bel", folder = "ayc-clubs" } = {}) {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   const apiKey = process.env.CLOUDINARY_API_KEY;
@@ -63,11 +65,15 @@ async function uploadDiscordAttachment(attachmentUrl, { kind = "bel", folder = "
   //   event   -> 3:4 portrait (event photos)
   //   partner -> 1:1 square (logos)
   //   hero    -> wide, uncropped (just size-capped)
+  // Source photos are already delivered in the right shape (3:4 for
+  // bel/event, 1:1 for partners), so this just resizes them — c_pad only
+  // adds padding if an upload isn't exactly that ratio; it never crops.
+  // (b_auto picks a matching padding color automatically when needed.)
   const transformation =
     kind === "bel" || kind === "event"
-      ? "c_fill,g_auto,w_600,h_800,q_auto,f_auto" // 3:4
+      ? "c_pad,b_auto,w_600,h_800,q_auto,f_auto" // 3:4, no crop
       : kind === "partner"
-      ? "c_fill,g_auto,w_500,h_500,q_auto,f_auto" // 1:1
+      ? "c_pad,b_auto,w_500,h_500,q_auto,f_auto" // 1:1, no crop
       : "c_limit,w_1600,q_auto,f_auto"; // hero: no forced crop
 
   const paramsToSign = {
