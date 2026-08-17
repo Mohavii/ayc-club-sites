@@ -38,8 +38,8 @@ const commands = [
         description: "Proposer la création d'un nouveau club (attend approbation admin)",
         options: [
           { type: 3, name: "name", description: "Nom du club (ex: YOUTH CLUB Menzah 8)", required: true },
-          { type: 3, name: "school", description: "Nom de l'établissement", required: false },
           { type: 3, name: "city", description: "Ville", required: true },
+          { type: 3, name: "school", description: "Nom de l'établissement", required: false },
           { type: 4, name: "founded", description: "Année de fondation", required: false },
         ],
       },
@@ -63,6 +63,12 @@ const commands = [
         options: [clubAutocompleteOption, { type: 4, name: "members", description: "Nombre de membres actifs", required: true }],
       },
       {
+        type: 1,
+        name: "set-hero-image",
+        description: "Changer l'image d'en-tête du club",
+        options: [clubAutocompleteOption, { type: 11, name: "image", description: "Nouvelle image d'en-tête", required: true }],
+      },
+      {
         type: 2, // SUB_COMMAND_GROUP
         name: "event",
         description: "Gérer les événements du club",
@@ -78,6 +84,7 @@ const commands = [
               { type: 3, name: "location", description: "Lieu", required: false },
               { type: 3, name: "description", description: "Courte description", required: false },
               { type: 3, name: "axis", description: "Axe stratégique", required: false, choices: AXIS_CHOICES },
+              { type: 11, name: "photo", description: "Photo de l'événement (format portrait)", required: false },
             ],
           },
           {
@@ -102,6 +109,7 @@ const commands = [
               { type: 3, name: "role", description: "Rôle (ex: Président du club)", required: true },
               { type: 3, name: "name", description: "Nom complet", required: true },
               { type: 3, name: "description", description: "Courte description du rôle", required: false },
+              { type: 11, name: "photo", description: "Photo du membre (carrée de préférence)", required: false },
             ],
           },
           {
@@ -125,6 +133,7 @@ const commands = [
               clubAutocompleteOption,
               { type: 3, name: "name", description: "Nom du partenaire", required: true },
               { type: 3, name: "description", description: "Nature du soutien", required: false },
+              { type: 11, name: "logo", description: "Logo du partenaire (carré de préférence)", required: false },
             ],
           },
           {
