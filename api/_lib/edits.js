@@ -44,8 +44,31 @@ async function submitEdit({ clubSlug, submittedBy, submittedByTag, type, path, o
 
 function formatValue(v) {
   if (v === null || v === undefined || v === "") return "*(vide)*";
-  if (typeof v === "object") return "```json\n" + JSON.stringify(v, null, 2) + "\n```";
+  if (isImageUrl(v)) return "*(voir l'aperçu ci-dessous)*";
+  if (typeof v === "object") {
+    const clone = { ...v };
+    if (isImageUrl(clone.photo)) clone.photo = "(voir l'aperçu ci-dessous)";
+    if (isImageUrl(clone.logo)) clone.logo = "(voir l'aperçu ci-dessous)";
+    if (isImageUrl(clone.image)) clone.image = "(voir l'aperçu ci-dessous)";
+    return "```json\n" + JSON.stringify(clone, null, 2) + "\n```";
+  }
   return "`" + String(v) + "`";
+}
+
+function isImageUrl(v) {
+  return typeof v === "string" && /^https?:\/\/.*\.(png|jpe?g|webp|gif)(\?|$)/i.test(v);
+}
+
+function findImageUrl(edit) {
+  // Looks for an image URL either directly (heroImage update) or nested
+  // inside an added item (bel photo / partner logo / event image).
+  if (isImageUrl(edit.newValue)) return edit.newValue;
+  if (edit.newValue && typeof edit.newValue === "object") {
+    if (isImageUrl(edit.newValue.photo)) return edit.newValue.photo;
+    if (isImageUrl(edit.newValue.logo)) return edit.newValue.logo;
+    if (isImageUrl(edit.newValue.image)) return edit.newValue.image;
+  }
+  return null;
 }
 
 // Builds the Discord message payload (content + buttons) for a pending edit.
@@ -70,7 +93,8 @@ function buildReviewMessage(edit) {
     lines.push(`Contenu : ${formatValue(edit.newValue)}`);
   }
 
-  return {
+  const imageUrl = findImageUrl(edit);
+  const payload = {
     content: lines.join("\n"),
     components: [
       {
@@ -92,6 +116,12 @@ function buildReviewMessage(edit) {
       },
     ],
   };
+
+  if (imageUrl) {
+    payload.embeds = [{ image: { url: imageUrl } }];
+  }
+
+  return payload;
 }
 
 async function postToReviewChannel(payload) {
