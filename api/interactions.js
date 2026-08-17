@@ -14,6 +14,7 @@ const { submitEdit, buildReviewMessage, postToReviewChannel } = require("./_lib/
 const { applyEdit } = require("./_lib/apply-edit");
 const { slugify } = require("./_lib/slug");
 const { uploadDiscordAttachment } = require("./_lib/images");
+const { waitUntil } = require("@vercel/functions");
 
 const InteractionType = { PING: 1, APPLICATION_COMMAND: 2, MESSAGE_COMPONENT: 3, APPLICATION_COMMAND_AUTOCOMPLETE: 4 };
 const InteractionResponseType = {
@@ -187,27 +188,37 @@ async function handleCommand(interaction, res) {
   }
 
   if (needsDefer(group, action)) {
-    // Ack immediately so Discord doesn't time out, then keep working in
-    // this same function invocation — Vercel keeps a serverless function
-    // alive until it actually returns, so this is safe.
+    // Ack immediately so Discord doesn't time out (it requires a reply
+    // within 3 seconds). The actual upload + write work happens after
+    // that, registered via waitUntil so Vercel's runtime guarantees it
+    // actually finishes instead of possibly being cut off right after
+    // the response is sent.
     res.status(200).json({ type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, data: { flags: 64 } });
 
-    let finalMessage;
-    try {
-      if (group === "bel" && action === "add") {
-        finalMessage = await cmdBelAdd(opts, userId, userTag, data);
-      } else if (group === "partner" && action === "add") {
-        finalMessage = await cmdPartnerAdd(opts, userId, userTag, data);
-      } else if (group === "event" && action === "add") {
-        finalMessage = await cmdEventAdd(opts, userId, userTag, data);
-      } else if (group === "set-hero-image") {
-        finalMessage = await cmdSetHeroImage(opts, userId, userTag, data);
+    const backgroundWork = (async () => {
+      let finalMessage;
+      try {
+        if (group === "bel" && action === "add") {
+          finalMessage = await cmdBelAdd(opts, userId, userTag, data);
+        } else if (group === "partner" && action === "add") {
+          finalMessage = await cmdPartnerAdd(opts, userId, userTag, data);
+        } else if (group === "event" && action === "add") {
+          finalMessage = await cmdEventAdd(opts, userId, userTag, data);
+        } else if (group === "set-hero-image") {
+          finalMessage = await cmdSetHeroImage(opts, userId, userTag, data);
+        }
+      } catch (err) {
+        console.error("Background command work failed:", err);
+        finalMessage = { content: `❌ Une erreur est survenue : ${err.message}` };
       }
-    } catch (err) {
-      console.error(err);
-      finalMessage = { content: `❌ Une erreur est survenue : ${err.message}` };
-    }
-    await editOriginalResponse(interaction, finalMessage.content);
+      try {
+        await editOriginalResponse(interaction, finalMessage.content);
+      } catch (err) {
+        console.error("Failed to edit original Discord response:", err);
+      }
+    })();
+
+    waitUntil(backgroundWork);
     return;
   }
 
