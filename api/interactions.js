@@ -13,6 +13,7 @@ const { checkClubEditPermission, isNationalAdmin } = require("./_lib/permissions
 const { submitEdit, buildReviewMessage, postToReviewChannel } = require("./_lib/edits");
 const { applyEdit } = require("./_lib/apply-edit");
 const { slugify } = require("./_lib/slug");
+const { uploadDiscordAttachment } = require("./_lib/images");
 
 const InteractionType = { PING: 1, APPLICATION_COMMAND: 2, MESSAGE_COMPONENT: 3, APPLICATION_COMMAND_AUTOCOMPLETE: 4 };
 const InteractionResponseType = {
@@ -41,6 +42,29 @@ function ephemeral(content) {
 function getOpt(options, name) {
   const opt = (options || []).find((o) => o.name === name);
   return opt ? opt.value : undefined;
+}
+
+// Attachment options come back as an attachment ID in the option value —
+// the actual file info (including its temporary download URL) lives in
+// interaction.data.resolved.attachments, keyed by that ID.
+function getAttachmentUrl(interactionData, options, name) {
+  const opt = (options || []).find((o) => o.name === name);
+  if (!opt) return null;
+  const attachmentId = opt.value;
+  const attachment = interactionData.resolved?.attachments?.[attachmentId];
+  return attachment ? attachment.url : null;
+}
+
+// Edits the bot's original "thinking..." reply once a deferred command
+// (one involving an image upload) finishes its background work.
+async function editOriginalResponse(interaction, content) {
+  const appId = process.env.DISCORD_APP_ID;
+  const url = `https://discord.com/api/v10/webhooks/${appId}/${interaction.token}/messages/@original`;
+  await fetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
 }
 
 module.exports = async (req, res) => {
@@ -74,8 +98,7 @@ module.exports = async (req, res) => {
     }
 
     if (interaction.type === InteractionType.APPLICATION_COMMAND) {
-      const result = await handleCommand(interaction);
-      res.status(200).json(result);
+      await handleCommand(interaction, res);
       return;
     }
 
@@ -124,9 +147,18 @@ function findFocusedNested(options) {
   return null;
 }
 
-// ---------------- slash commands ----------------
+// Which (group, action) pairs involve a possible image attachment, and
+// therefore need to ack with "thinking..." immediately (Discord requires
+// a reply within 3 seconds) before doing the slower upload + write work.
+function needsDefer(group, action) {
+  if (group === "bel" && action === "add") return true;
+  if (group === "partner" && action === "add") return true;
+  if (group === "event" && action === "add") return true;
+  if (group === "set-hero-image") return true;
+  return false;
+}
 
-async function handleCommand(interaction) {
+async function handleCommand(interaction, res) {
   const data = interaction.data;
   const userId = interaction.member?.user?.id || interaction.user?.id;
   const userTag = interaction.member?.user?.username || interaction.user?.username || "inconnu";
@@ -149,28 +181,68 @@ async function handleCommand(interaction) {
   const action = sub ? sub.name : null; // "add" | "remove" (only for grouped subcommands)
   const opts = isGroup ? (sub ? sub.options : []) : top ? top.options : [];
 
-  if (command !== "club") return ephemeral("Commande inconnue.");
+  if (command !== "club") {
+    res.status(200).json(ephemeral("Commande inconnue."));
+    return;
+  }
 
+  if (needsDefer(group, action)) {
+    // Ack immediately so Discord doesn't time out, then keep working in
+    // this same function invocation — Vercel keeps a serverless function
+    // alive until it actually returns, so this is safe.
+    res.status(200).json({ type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, data: { flags: 64 } });
+
+    let finalMessage;
+    try {
+      if (group === "bel" && action === "add") {
+        finalMessage = await cmdBelAdd(opts, userId, userTag, data);
+      } else if (group === "partner" && action === "add") {
+        finalMessage = await cmdPartnerAdd(opts, userId, userTag, data);
+      } else if (group === "event" && action === "add") {
+        finalMessage = await cmdEventAdd(opts, userId, userTag, data);
+      } else if (group === "set-hero-image") {
+        finalMessage = await cmdSetHeroImage(opts, userId, userTag, data);
+      }
+    } catch (err) {
+      console.error(err);
+      finalMessage = { content: `❌ Une erreur est survenue : ${err.message}` };
+    }
+    await editOriginalResponse(interaction, finalMessage.content);
+    return;
+  }
+
+  let result;
   switch (group) {
     case "create":
-      return cmdCreate(opts, userId, userTag);
+      result = await cmdCreate(opts, userId, userTag);
+      break;
     case "list":
-      return cmdList();
+      result = await cmdList();
+      break;
     case "set-about":
-      return cmdSetSimpleField(opts, userId, userTag, "about", "text", "À propos");
+      result = await cmdSetSimpleField(opts, userId, userTag, "about", "text", "À propos");
+      break;
     case "set-stats":
-      return cmdSetStats(opts, userId, userTag);
+      result = await cmdSetStats(opts, userId, userTag);
+      break;
     case "publish":
-      return cmdPublish(opts, userId, userTag);
+      result = await cmdPublish(opts, userId, userTag);
+      break;
     case "event":
-      return action === "add" ? cmdEventAdd(opts, userId, userTag) : cmdEventRemove(opts, userId, userTag);
+      // "add" is handled above via the deferred path; only "remove" reaches here
+      result = await cmdEventRemove(opts, userId, userTag);
+      break;
     case "bel":
-      return action === "add" ? cmdBelAdd(opts, userId, userTag) : cmdBelRemove(opts, userId, userTag);
+      // "add" is handled above via the deferred path; only "remove" reaches here
+      result = await cmdBelRemove(opts, userId, userTag);
+      break;
     case "partner":
-      return action === "add" ? cmdPartnerAdd(opts, userId, userTag) : cmdPartnerRemove(opts, userId, userTag);
+      result = await cmdPartnerRemove(opts, userId, userTag);
+      break;
     default:
-      return ephemeral("Sous-commande inconnue.");
+      result = ephemeral("Sous-commande inconnue.");
   }
+  res.status(200).json(result);
 }
 
 async function requireClubAndPermission(interaction_userId, clubSlug, interactionForRoleCheck) {
@@ -273,6 +345,35 @@ async function cmdSetSimpleField(opts, userId, userTag, fieldPath, optName, labe
   return ephemeral(`✅ Modification envoyée en révision pour **${club.name}**.`);
 }
 
+async function cmdSetHeroImage(opts, userId, userTag, interactionData) {
+  const clubSlug = getOpt(opts, "club");
+  const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
+  if (error) return { content: error.data.content };
+
+  const attachmentUrl = getAttachmentUrl(interactionData, opts, "image");
+  if (!attachmentUrl) return { content: "❌ Joins une image avec l'option `image:`." };
+
+  let uploadedUrl;
+  try {
+    uploadedUrl = await uploadDiscordAttachment(attachmentUrl, { kind: "hero", folder: `ayc-clubs/${clubSlug}/hero` });
+  } catch (err) {
+    return { content: `❌ ${err.message}` };
+  }
+
+  const edit = await submitEdit({
+    clubSlug,
+    submittedBy: userId,
+    submittedByTag: userTag,
+    type: "update",
+    path: "heroImage",
+    oldValue: club.heroImage,
+    newValue: uploadedUrl,
+    label: "Image d'en-tête du club",
+  });
+  await postToReviewChannel(buildReviewMessage(edit));
+  return { content: `✅ Nouvelle image d'en-tête envoyée en révision pour **${club.name}**.` };
+}
+
 async function cmdPublish(opts, userId, userTag) {
   const clubSlug = getOpt(opts, "club");
   const club = await store.getClub(clubSlug);
@@ -283,10 +384,10 @@ async function cmdPublish(opts, userId, userTag) {
   );
 }
 
-async function cmdEventAdd(opts, userId, userTag) {
+async function cmdEventAdd(opts, userId, userTag, interactionData) {
   const clubSlug = getOpt(opts, "club");
   const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
-  if (error) return error;
+  if (error) return { content: error.data.content };
 
   const item = {
     id: "evt_" + Math.random().toString(36).slice(2, 8),
@@ -297,7 +398,16 @@ async function cmdEventAdd(opts, userId, userTag) {
     axis: getOpt(opts, "axis"),
     image: null,
   };
-  if (!item.title || !item.date) return ephemeral("❌ Le titre et la date sont obligatoires.");
+  if (!item.title || !item.date) return { content: "❌ Le titre et la date sont obligatoires." };
+
+  const attachmentUrl = getAttachmentUrl(interactionData, opts, "photo");
+  if (attachmentUrl) {
+    try {
+      item.image = await uploadDiscordAttachment(attachmentUrl, { kind: "event", folder: `ayc-clubs/${clubSlug}/events` });
+    } catch (err) {
+      return { content: `❌ ${err.message}` };
+    }
+  }
 
   const edit = await submitEdit({
     clubSlug,
@@ -309,7 +419,7 @@ async function cmdEventAdd(opts, userId, userTag) {
     label: `Nouvel événement : ${item.title}`,
   });
   await postToReviewChannel(buildReviewMessage(edit));
-  return ephemeral(`✅ Événement envoyé en révision pour **${club.name}**.`);
+  return { content: `✅ Événement envoyé en révision pour **${club.name}**${item.image ? " (avec photo)" : ""}.` };
 }
 
 async function cmdEventRemove(opts, userId, userTag) {
@@ -331,19 +441,28 @@ async function cmdEventRemove(opts, userId, userTag) {
   return ephemeral(`✅ Suppression envoyée en révision pour **${club.name}**.`);
 }
 
-async function cmdBelAdd(opts, userId, userTag) {
+async function cmdBelAdd(opts, userId, userTag, interactionData) {
   const clubSlug = getOpt(opts, "club");
   const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
-  if (error) return error;
+  if (error) return { content: error.data.content };
 
   const item = {
     id: "bel_" + Math.random().toString(36).slice(2, 8),
     role: getOpt(opts, "role"),
     name: getOpt(opts, "name"),
     description: getOpt(opts, "description"),
-    photo: null, // photo attachments handled as a documented follow-up step, see README
+    photo: null,
   };
-  if (!item.role || !item.name) return ephemeral("❌ Le rôle et le nom sont obligatoires.");
+  if (!item.role || !item.name) return { content: "❌ Le rôle et le nom sont obligatoires." };
+
+  const attachmentUrl = getAttachmentUrl(interactionData, opts, "photo");
+  if (attachmentUrl) {
+    try {
+      item.photo = await uploadDiscordAttachment(attachmentUrl, { kind: "bel", folder: `ayc-clubs/${clubSlug}/bel` });
+    } catch (err) {
+      return { content: `❌ ${err.message}` };
+    }
+  }
 
   const edit = await submitEdit({
     clubSlug,
@@ -355,7 +474,7 @@ async function cmdBelAdd(opts, userId, userTag) {
     label: `Nouveau membre BEL : ${item.name} (${item.role})`,
   });
   await postToReviewChannel(buildReviewMessage(edit));
-  return ephemeral(`✅ Membre BEL envoyé en révision pour **${club.name}**.`);
+  return { content: `✅ Membre BEL envoyé en révision pour **${club.name}**${item.photo ? " (avec photo)" : ""}.` };
 }
 
 async function cmdBelRemove(opts, userId, userTag) {
@@ -377,10 +496,10 @@ async function cmdBelRemove(opts, userId, userTag) {
   return ephemeral(`✅ Suppression envoyée en révision pour **${club.name}**.`);
 }
 
-async function cmdPartnerAdd(opts, userId, userTag) {
+async function cmdPartnerAdd(opts, userId, userTag, interactionData) {
   const clubSlug = getOpt(opts, "club");
   const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
-  if (error) return error;
+  if (error) return { content: error.data.content };
 
   const item = {
     id: "ptn_" + Math.random().toString(36).slice(2, 8),
@@ -388,7 +507,16 @@ async function cmdPartnerAdd(opts, userId, userTag) {
     description: getOpt(opts, "description"),
     logo: null,
   };
-  if (!item.name) return ephemeral("❌ Le nom du partenaire est obligatoire.");
+  if (!item.name) return { content: "❌ Le nom du partenaire est obligatoire." };
+
+  const attachmentUrl = getAttachmentUrl(interactionData, opts, "logo");
+  if (attachmentUrl) {
+    try {
+      item.logo = await uploadDiscordAttachment(attachmentUrl, { kind: "partner", folder: `ayc-clubs/${clubSlug}/partners` });
+    } catch (err) {
+      return { content: `❌ ${err.message}` };
+    }
+  }
 
   const edit = await submitEdit({
     clubSlug,
@@ -400,7 +528,7 @@ async function cmdPartnerAdd(opts, userId, userTag) {
     label: `Nouveau partenaire : ${item.name}`,
   });
   await postToReviewChannel(buildReviewMessage(edit));
-  return ephemeral(`✅ Partenaire envoyé en révision pour **${club.name}**.`);
+  return { content: `✅ Partenaire envoyé en révision pour **${club.name}**${item.logo ? " (avec logo)" : ""}.` };
 }
 
 async function cmdPartnerRemove(opts, userId, userTag) {
