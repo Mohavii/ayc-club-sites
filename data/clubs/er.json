@@ -10,7 +10,17 @@
   "officers": [
     "746843897350848514"
   ],
-  "events": [],
+  "events": [
+    {
+      "id": "evt_lfnq9f",
+      "title": "sds",
+      "date": "2025-09-08",
+      "location": "sds",
+      "description": "qsdqs",
+      "axis": "Santé",
+      "image": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787005241/ayc-clubs/er/events/event_b8a5ccae.jpg"
+    }
+  ],
   "bel": [],
   "partners": []
 }
