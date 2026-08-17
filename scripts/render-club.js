@@ -439,4 +439,14 @@ function renderClubPage(club) {
 `;
 }
 
-module.exports = { renderClubPage };
+function renderSchoolCard(club) {
+  return `      <a href="clubs/${escapeHtml(club.slug)}/" class="school-card">
+        <div class="school-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M6 10v6c0 1.5 2.7 3 6 3s6-1.5 6-3v-6"/></svg>
+        </div>
+        <h3>${escapeHtml(club.name)}</h3>
+        <p>${escapeHtml(club.city)}</p>
+      </a>`;
+}
+
+module.exports = { renderClubPage, renderSchoolCard };
