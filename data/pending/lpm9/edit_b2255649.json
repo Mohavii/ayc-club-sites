@@ -1,0 +1,19 @@
+{
+  "editId": "edit_b2255649",
+  "clubSlug": "lpm9",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-17T22:22:46.510Z",
+  "type": "add",
+  "path": "events",
+  "oldValue": null,
+  "newValue": {
+    "id": "evt_q0x3k1",
+    "title": "sd",
+    "date": "2026-09-08",
+    "location": "sd",
+    "image": null
+  },
+  "label": "Nouvel événement : sd",
+  "status": "pending"
+}
