@@ -1,0 +1,21 @@
+{
+  "editId": "edit_9b3c47b5",
+  "clubSlug": "lpse",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-17T21:36:52.487Z",
+  "type": "add",
+  "path": "events",
+  "oldValue": null,
+  "newValue": {
+    "id": "evt_9356zf",
+    "title": "Formation Secourisme",
+    "date": "2026-08-21",
+    "location": "Sfax",
+    "description": "Akwa formation secourisme",
+    "axis": "Santé",
+    "image": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787002611/ayc-clubs/lpse/events/event_94b97823.jpg"
+  },
+  "label": "Nouvel événement : Formation Secourisme",
+  "status": "pending"
+}
