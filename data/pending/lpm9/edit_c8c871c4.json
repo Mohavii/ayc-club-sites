@@ -1,0 +1,28 @@
+{
+  "editId": "edit_c8c871c4",
+  "clubSlug": "lpm9",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-17T21:54:40.329Z",
+  "type": "create",
+  "path": "*",
+  "oldValue": null,
+  "newValue": {
+    "slug": "lpm9",
+    "status": "draft",
+    "name": "YOUTH CLUB MENZAH 9",
+    "city": "TUNIS",
+    "founded": 2019,
+    "memberCount": 0,
+    "about": "",
+    "heroImage": null,
+    "officers": [
+      "746843897350848514"
+    ],
+    "events": [],
+    "bel": [],
+    "partners": []
+  },
+  "label": "création du club \"YOUTH CLUB MENZAH 9\"",
+  "status": "pending"
+}
