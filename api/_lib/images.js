@@ -69,12 +69,16 @@ async function uploadDiscordAttachment(attachmentUrl, { kind = "bel", folder = "
   // bel/event, 1:1 for partners), so this just resizes them — c_pad only
   // adds padding if an upload isn't exactly that ratio; it never crops.
   // (b_auto picks a matching padding color automatically when needed.)
+  // q_auto:good instead of plain q_auto — plain q_auto can compress more
+  // aggressively than needed at these small file sizes, which can read as
+  // slightly darker/lower-contrast; q_auto:good keeps visual quality closer
+  // to the original while still avoiding huge file sizes.
   const transformation =
     kind === "bel" || kind === "event"
-      ? "c_pad,b_auto,w_600,h_800,q_auto,f_auto" // 3:4, no crop
+      ? "c_pad,b_auto,w_600,h_800,q_auto:good,f_auto" // 3:4, no crop
       : kind === "partner"
-      ? "c_pad,b_auto,w_500,h_500,q_auto,f_auto" // 1:1, no crop
-      : "c_limit,w_1600,q_auto,f_auto"; // hero: no forced crop
+      ? "c_pad,b_auto,w_500,h_500,q_auto:good,f_auto" // 1:1, no crop
+      : "c_limit,w_1600,q_auto:good,f_auto"; // hero: no forced crop
 
   const paramsToSign = {
     folder,
