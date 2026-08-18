@@ -247,6 +247,11 @@
   background:var(--grad-side);
   display:flex; align-items:flex-end; justify-content:center;
 }
+.team-photo-img{
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit:contain; object-position:center;
+  display:block; z-index:0;
+}
 .team-photo::before{
   content:""; position:absolute; inset:0;
   background-image:var(--team-photo, none); background-size:cover; background-position:center;
@@ -341,6 +346,11 @@
 .event-media{
   position:relative; width:100%; aspect-ratio:3/4; overflow:hidden;
   background:var(--grad-side);
+}
+.event-media-img{
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit:contain; object-position:center;
+  display:block;
 }
 .event-media-ph{
   position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
