@@ -36,5 +36,12 @@
       "photo": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787053191/ayc-clubs/lpse/bel/bel_53da767f.jpg"
     }
   ],
-  "partners": []
+  "partners": [
+    {
+      "id": "ptn_vw3p2d",
+      "name": "Instagram Inc.",
+      "description": "L'Instagram wla partner !",
+      "logo": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787054830/ayc-clubs/lpse/partners/partner_0b7bd648.jpg"
+    }
+  ]
 }
