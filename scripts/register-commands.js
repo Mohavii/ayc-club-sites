@@ -80,7 +80,7 @@ const commands = [
             options: [
               clubAutocompleteOption,
               { type: 3, name: "title", description: "Titre de l'événement", required: true },
-              { type: 3, name: "date", description: "Date (AAAA-MM-JJ)", required: true },
+              { type: 3, name: "date", description: "Date (AAAA-MM-JJ) — optionnel, peut être ajoutée plus tard", required: false },
               { type: 3, name: "location", description: "Lieu", required: false },
               { type: 3, name: "description", description: "Courte description", required: false },
               { type: 3, name: "axis", description: "Axe stratégique", required: false, choices: AXIS_CHOICES },

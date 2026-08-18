@@ -33,7 +33,7 @@ function formatDateBadge(isoDate) {
 }
 
 function renderEventCard(evt) {
-  const badge = formatDateBadge(evt.date);
+  const badge = evt.date ? formatDateBadge(evt.date) : null;
   const photoBlock = evt.image
     ? `<img src="${escapeHtml(evt.image)}" alt="${escapeHtml(evt.title)}" class="event-media-img">`
     : `<div class="event-media-ph">
@@ -45,7 +45,7 @@ function renderEventCard(evt) {
           <article class="event-card rail-card">
             <div class="event-media">
               ${photoBlock}
-              <div class="event-date-badge"><b>${escapeHtml(badge.day)}</b><span>${escapeHtml(badge.month)}</span></div>
+              ${badge ? `<div class="event-date-badge"><b>${escapeHtml(badge.day)}</b><span>${escapeHtml(badge.month)}</span></div>` : ""}
             </div>
             <div class="event-body">
               <span class="event-axis">${escapeHtml(evt.axis || "")}</span>
@@ -61,7 +61,9 @@ function renderEventCard(evt) {
 
 function renderTeamCard(member) {
   const photoBlock = member.photo
-    ? `<img src="${escapeHtml(member.photo)}" alt="${escapeHtml(member.name)}" class="team-photo-img">`
+    ? `<div class="team-photo">
+         <img src="${escapeHtml(member.photo)}" alt="${escapeHtml(member.name)}" class="team-photo-img">
+       </div>`
     : `<div class="team-photo" role="img" aria-label="Photo à venir — ${escapeHtml(member.role)}">
          <svg class="team-photo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
          <span class="team-photo-label">Photo à venir</span>
