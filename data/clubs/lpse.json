@@ -10,7 +10,16 @@
   "officers": [
     "746843897350848514"
   ],
-  "events": [],
+  "events": [
+    {
+      "id": "evt_epxddq",
+      "title": "YouthExpo",
+      "location": "Sousse",
+      "description": "YouthExpo event",
+      "axis": "Vie active",
+      "image": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787054403/ayc-clubs/lpse/events/event_6b78c16b.jpg"
+    }
+  ],
   "bel": [
     {
       "id": "bel_vio96j",
