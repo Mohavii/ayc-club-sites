@@ -199,13 +199,13 @@ async function handleCommand(interaction, res) {
       let finalMessage;
       try {
         if (group === "bel" && action === "add") {
-          finalMessage = await cmdBelAdd(opts, userId, userTag, data);
+          finalMessage = await cmdBelAdd(opts, userTag, interaction);
         } else if (group === "partner" && action === "add") {
-          finalMessage = await cmdPartnerAdd(opts, userId, userTag, data);
+          finalMessage = await cmdPartnerAdd(opts, userTag, interaction);
         } else if (group === "event" && action === "add") {
-          finalMessage = await cmdEventAdd(opts, userId, userTag, data);
+          finalMessage = await cmdEventAdd(opts, userTag, interaction);
         } else if (group === "set-hero-image") {
-          finalMessage = await cmdSetHeroImage(opts, userId, userTag, data);
+          finalMessage = await cmdSetHeroImage(opts, userTag, interaction);
         }
       } catch (err) {
         console.error("Background command work failed:", err);
@@ -231,24 +231,24 @@ async function handleCommand(interaction, res) {
       result = await cmdList();
       break;
     case "set-about":
-      result = await cmdSetSimpleField(opts, userId, userTag, "about", "text", "À propos");
+      result = await cmdSetSimpleField(opts, userTag, interaction, "about", "text", "À propos");
       break;
     case "set-stats":
-      result = await cmdSetStats(opts, userId, userTag);
+      result = await cmdSetStats(opts, userTag, interaction);
       break;
     case "publish":
       result = await cmdPublish(opts, userId, userTag);
       break;
     case "event":
       // "add" is handled above via the deferred path; only "remove" reaches here
-      result = await cmdEventRemove(opts, userId, userTag);
+      result = await cmdEventRemove(opts, userTag, interaction);
       break;
     case "bel":
       // "add" is handled above via the deferred path; only "remove" reaches here
-      result = await cmdBelRemove(opts, userId, userTag);
+      result = await cmdBelRemove(opts, userTag, interaction);
       break;
     case "partner":
-      result = await cmdPartnerRemove(opts, userId, userTag);
+      result = await cmdPartnerRemove(opts, userTag, interaction);
       break;
     default:
       result = ephemeral("Sous-commande inconnue.");
@@ -256,10 +256,10 @@ async function handleCommand(interaction, res) {
   res.status(200).json(result);
 }
 
-async function requireClubAndPermission(interaction_userId, clubSlug, interactionForRoleCheck) {
+async function requireClubAndPermission(clubSlug, interaction) {
   const club = await store.getClub(clubSlug);
   if (!club) return { error: ephemeral(`❌ Aucun club trouvé avec l'identifiant \`${clubSlug}\`.`) };
-  const perm = checkClubEditPermission(interactionForRoleCheck, club);
+  const perm = checkClubEditPermission(interaction, club);
   if (!perm.allowed) return { error: ephemeral(`❌ ${perm.reason}`) };
   return { club, isAdmin: perm.isAdmin };
 }
@@ -314,10 +314,11 @@ async function cmdList() {
   return ephemeral(lines.join("\n"));
 }
 
-async function cmdSetStats(opts, userId, userTag) {
+async function cmdSetStats(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
   const clubSlug = getOpt(opts, "club");
   const members = getOpt(opts, "members");
-  const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
   if (error) return error;
   if (members === undefined) return ephemeral("❌ Précise le nombre de membres avec `members:`.");
 
@@ -335,10 +336,11 @@ async function cmdSetStats(opts, userId, userTag) {
   return ephemeral(`✅ Modification envoyée en révision pour **${club.name}**.`);
 }
 
-async function cmdSetSimpleField(opts, userId, userTag, fieldPath, optName, label) {
+async function cmdSetSimpleField(opts, userTag, interaction, fieldPath, optName, label) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
   const clubSlug = getOpt(opts, "club");
   const value = getOpt(opts, optName);
-  const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
   if (error) return error;
   if (value === undefined) return ephemeral("❌ Le champ texte est obligatoire.");
 
@@ -356,12 +358,13 @@ async function cmdSetSimpleField(opts, userId, userTag, fieldPath, optName, labe
   return ephemeral(`✅ Modification envoyée en révision pour **${club.name}**.`);
 }
 
-async function cmdSetHeroImage(opts, userId, userTag, interactionData) {
+async function cmdSetHeroImage(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
   const clubSlug = getOpt(opts, "club");
-  const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
   if (error) return { content: error.data.content };
 
-  const attachmentUrl = getAttachmentUrl(interactionData, opts, "image");
+  const attachmentUrl = getAttachmentUrl(interaction.data, opts, "image");
   if (!attachmentUrl) return { content: "❌ Joins une image avec l'option `image:`." };
 
   let uploadedUrl;
@@ -395,9 +398,10 @@ async function cmdPublish(opts, userId, userTag) {
   );
 }
 
-async function cmdEventAdd(opts, userId, userTag, interactionData) {
+async function cmdEventAdd(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
   const clubSlug = getOpt(opts, "club");
-  const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
   if (error) return { content: error.data.content };
 
   const item = {
@@ -409,9 +413,9 @@ async function cmdEventAdd(opts, userId, userTag, interactionData) {
     axis: getOpt(opts, "axis"),
     image: null,
   };
-  if (!item.title || !item.date) return { content: "❌ Le titre et la date sont obligatoires." };
+  if (!item.title) return { content: "❌ Le titre est obligatoire." };
 
-  const attachmentUrl = getAttachmentUrl(interactionData, opts, "photo");
+  const attachmentUrl = getAttachmentUrl(interaction.data, opts, "photo");
   if (attachmentUrl) {
     try {
       item.image = await uploadDiscordAttachment(attachmentUrl, { kind: "event", folder: `ayc-clubs/${clubSlug}/events` });
@@ -433,10 +437,11 @@ async function cmdEventAdd(opts, userId, userTag, interactionData) {
   return { content: `✅ Événement envoyé en révision pour **${club.name}**${item.image ? " (avec photo)" : ""}.` };
 }
 
-async function cmdEventRemove(opts, userId, userTag) {
+async function cmdEventRemove(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
   const clubSlug = getOpt(opts, "club");
   const eventId = getOpt(opts, "event");
-  const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
   if (error) return error;
 
   const edit = await submitEdit({
@@ -452,9 +457,10 @@ async function cmdEventRemove(opts, userId, userTag) {
   return ephemeral(`✅ Suppression envoyée en révision pour **${club.name}**.`);
 }
 
-async function cmdBelAdd(opts, userId, userTag, interactionData) {
+async function cmdBelAdd(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
   const clubSlug = getOpt(opts, "club");
-  const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
   if (error) return { content: error.data.content };
 
   const item = {
@@ -466,7 +472,7 @@ async function cmdBelAdd(opts, userId, userTag, interactionData) {
   };
   if (!item.role || !item.name) return { content: "❌ Le rôle et le nom sont obligatoires." };
 
-  const attachmentUrl = getAttachmentUrl(interactionData, opts, "photo");
+  const attachmentUrl = getAttachmentUrl(interaction.data, opts, "photo");
   if (attachmentUrl) {
     try {
       item.photo = await uploadDiscordAttachment(attachmentUrl, { kind: "bel", folder: `ayc-clubs/${clubSlug}/bel` });
@@ -488,10 +494,11 @@ async function cmdBelAdd(opts, userId, userTag, interactionData) {
   return { content: `✅ Membre BEL envoyé en révision pour **${club.name}**${item.photo ? " (avec photo)" : ""}.` };
 }
 
-async function cmdBelRemove(opts, userId, userTag) {
+async function cmdBelRemove(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
   const clubSlug = getOpt(opts, "club");
   const memberId = getOpt(opts, "member");
-  const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
   if (error) return error;
 
   const edit = await submitEdit({
@@ -507,9 +514,10 @@ async function cmdBelRemove(opts, userId, userTag) {
   return ephemeral(`✅ Suppression envoyée en révision pour **${club.name}**.`);
 }
 
-async function cmdPartnerAdd(opts, userId, userTag, interactionData) {
+async function cmdPartnerAdd(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
   const clubSlug = getOpt(opts, "club");
-  const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
   if (error) return { content: error.data.content };
 
   const item = {
@@ -520,7 +528,7 @@ async function cmdPartnerAdd(opts, userId, userTag, interactionData) {
   };
   if (!item.name) return { content: "❌ Le nom du partenaire est obligatoire." };
 
-  const attachmentUrl = getAttachmentUrl(interactionData, opts, "logo");
+  const attachmentUrl = getAttachmentUrl(interaction.data, opts, "logo");
   if (attachmentUrl) {
     try {
       item.logo = await uploadDiscordAttachment(attachmentUrl, { kind: "partner", folder: `ayc-clubs/${clubSlug}/partners` });
@@ -542,10 +550,11 @@ async function cmdPartnerAdd(opts, userId, userTag, interactionData) {
   return { content: `✅ Partenaire envoyé en révision pour **${club.name}**${item.logo ? " (avec logo)" : ""}.` };
 }
 
-async function cmdPartnerRemove(opts, userId, userTag) {
+async function cmdPartnerRemove(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
   const clubSlug = getOpt(opts, "club");
   const partnerId = getOpt(opts, "partner");
-  const { error, club } = await requireClubAndPermission(userId, clubSlug, { member: { user: { id: userId } } });
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
   if (error) return error;
 
   const edit = await submitEdit({
