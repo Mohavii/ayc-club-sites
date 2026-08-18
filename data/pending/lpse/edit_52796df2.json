@@ -1,0 +1,19 @@
+{
+  "editId": "edit_52796df2",
+  "clubSlug": "lpse",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-18T11:39:52.199Z",
+  "type": "add",
+  "path": "bel",
+  "oldValue": null,
+  "newValue": {
+    "id": "bel_34v39e",
+    "role": "VPC",
+    "name": "Eslem",
+    "description": "Eslem Vpc",
+    "photo": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787053191/ayc-clubs/lpse/bel/bel_53da767f.jpg"
+  },
+  "label": "Nouveau membre BEL : Eslem (VPC)",
+  "status": "pending"
+}
