@@ -232,7 +232,7 @@
 
 /* ===================== BEN (national executive team) — carousel ===================== */
 .team-card{
-  width:270px;
+  width:300px;
   background:var(--white); border:1px solid var(--line); border-radius:var(--radius-lg);
   overflow:hidden; box-shadow:var(--shadow-card); text-align:left;
   transition:transform .3s var(--ease-spring), box-shadow .3s var(--ease), border-color .3s var(--ease);
@@ -252,11 +252,11 @@
   object-fit:contain; object-position:center;
   display:block; z-index:0;
 }
-.team-photo::before{
+.team-photo:not(:has(.team-photo-img))::before{
   content:""; position:absolute; inset:0;
   background-image:var(--team-photo, none); background-size:cover; background-position:center;
 }
-.team-photo::after{
+.team-photo:not(:has(.team-photo-img))::after{
   content:""; position:absolute; inset:0;
   background:linear-gradient(200deg, rgba(39,40,99,0.08), rgba(39,40,99,0.38));
 }
@@ -336,7 +336,7 @@
 
 /* ===================== EVENTS — carousel ===================== */
 .event-card{
-  width:340px;
+  width:300px;
   background:var(--white); border:1px solid var(--line); border-radius:var(--radius-lg);
   overflow:hidden; box-shadow:var(--shadow-card);
   transition:transform .35s var(--ease-spring), box-shadow .35s var(--ease);
@@ -501,8 +501,8 @@
   .rail-viewport{ margin:0 -18px; padding:6px 18px 24px; }
   .value-card{ width:220px; }
   .axis-card{ width:230px; }
-  .team-card{ width:240px; }
-  .event-card{ width:290px; }
+  .team-card{ width:260px; }
+  .event-card{ width:260px; }
   .school-grid{ grid-template-columns:1fr; }
   .form-grid{ grid-template-columns:1fr; }
   .notfound-band{ padding:32px 24px; }
