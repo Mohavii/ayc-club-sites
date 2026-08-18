@@ -1,0 +1,18 @@
+{
+  "editId": "edit_1a7aad56",
+  "clubSlug": "lpse",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-18T12:06:37.685Z",
+  "type": "add",
+  "path": "partners",
+  "oldValue": null,
+  "newValue": {
+    "id": "ptn_e8l54m",
+    "name": "Instagram",
+    "description": "L'instagram wla partner",
+    "logo": null
+  },
+  "label": "Nouveau partenaire : Instagram",
+  "status": "pending"
+}
