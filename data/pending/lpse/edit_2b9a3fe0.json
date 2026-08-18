@@ -1,0 +1,20 @@
+{
+  "editId": "edit_2b9a3fe0",
+  "clubSlug": "lpse",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-18T12:00:04.478Z",
+  "type": "add",
+  "path": "events",
+  "oldValue": null,
+  "newValue": {
+    "id": "evt_epxddq",
+    "title": "YouthExpo",
+    "location": "Sousse",
+    "description": "YouthExpo event",
+    "axis": "Vie active",
+    "image": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787054403/ayc-clubs/lpse/events/event_6b78c16b.jpg"
+  },
+  "label": "Nouvel événement : YouthExpo",
+  "status": "pending"
+}
