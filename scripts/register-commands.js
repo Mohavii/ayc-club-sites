@@ -19,6 +19,23 @@ const AXIS_CHOICES = [
   { name: "Vie active", value: "Vie active" },
 ];
 
+// Must match FORM_IDS / FORM_LABELS in api/interactions.js exactly —
+// these are the 4 forms every club has: general join + 3 team-specific.
+const FORM_CHOICES = [
+  { name: "Rejoindre le club", value: "join" },
+  { name: "Équipe Communication", value: "team_communication" },
+  { name: "Équipe Logistique", value: "team_logistique" },
+  { name: "Équipe Sponsoring", value: "team_sponsoring" },
+];
+
+// Must match FIELD_TYPE_LABELS in api/interactions.js exactly.
+const FIELD_TYPE_CHOICES = [
+  { name: "Texte court", value: "short_text" },
+  { name: "Date", value: "date" },
+  { name: "Case à cocher", value: "checkbox" },
+  { name: "Lien Google Drive", value: "drive_link" },
+];
+
 const clubAutocompleteOption = {
   type: 3, // STRING
   name: "club",
@@ -46,6 +63,21 @@ const commands = [
       { type: 1, name: "list", description: "Lister tous les clubs et leur statut" },
       {
         type: 1,
+        name: "delete",
+        description: "Supprimer définitivement un club (admin uniquement, action irréversible)",
+        options: [
+          clubAutocompleteOption,
+          { type: 3, name: "confirm", description: "Retape exactement le nom du club pour confirmer", required: true },
+        ],
+      },
+      {
+        type: 1,
+        name: "set-logo",
+        description: "Changer le logo du club (affiché en haut à gauche de la page)",
+        options: [clubAutocompleteOption, { type: 11, name: "image", description: "Nouveau logo", required: true }],
+      },
+      {
+        type: 1,
         name: "publish",
         description: "Vérifier si un club en brouillon est prêt à être publié",
         options: [clubAutocompleteOption],
@@ -67,6 +99,12 @@ const commands = [
         name: "set-hero-image",
         description: "Changer l'image d'en-tête du club",
         options: [clubAutocompleteOption, { type: 11, name: "image", description: "Nouvelle image d'en-tête", required: true }],
+      },
+      {
+        type: 1,
+        name: "remove-hero-image",
+        description: "Retirer l'image d'en-tête du club",
+        options: [clubAutocompleteOption],
       },
       {
         type: 2, // SUB_COMMAND_GROUP
@@ -91,7 +129,13 @@ const commands = [
             type: 1,
             name: "remove",
             description: "Retirer un événement",
-            options: [clubAutocompleteOption, { type: 3, name: "event", description: "ID de l'événement (voir /club list détails)", required: true }],
+            options: [clubAutocompleteOption, { type: 3, name: "event", description: "Choisis l'événement à retirer", required: true, autocomplete: true }],
+          },
+          {
+            type: 1,
+            name: "remove-photo",
+            description: "Retirer uniquement la photo d'un événement (garde l'événement)",
+            options: [clubAutocompleteOption, { type: 3, name: "event", description: "Choisis l'événement", required: true, autocomplete: true }],
           },
         ],
       },
@@ -106,7 +150,14 @@ const commands = [
             description: "Ajouter un membre du BEL",
             options: [
               clubAutocompleteOption,
-              { type: 3, name: "role", description: "Rôle (ex: Président du club)", required: true },
+              { type: 3, name: "role", description: "Rôle au sein du BEL", required: true, choices: [
+                { name: "Président", value: "Président" },
+                { name: "Trésorier", value: "Trésorier" },
+                { name: "Secrétaire", value: "Secrétaire" },
+                { name: "Vice-Président Internes", value: "Vice-Président Internes" },
+                { name: "Vice-Président Externes", value: "Vice-Président Externes" },
+                { name: "Vice-Président Communication", value: "Vice-Président Communication" },
+              ] },
               { type: 3, name: "name", description: "Nom complet", required: true },
               { type: 3, name: "description", description: "Courte description du rôle", required: false },
               { type: 11, name: "photo", description: "Photo du membre (carrée de préférence)", required: false },
@@ -116,7 +167,13 @@ const commands = [
             type: 1,
             name: "remove",
             description: "Retirer un membre du BEL",
-            options: [clubAutocompleteOption, { type: 3, name: "member", description: "ID du membre", required: true }],
+            options: [clubAutocompleteOption, { type: 3, name: "member", description: "Choisis le membre à retirer", required: true, autocomplete: true }],
+          },
+          {
+            type: 1,
+            name: "remove-photo",
+            description: "Retirer uniquement la photo d'un membre (garde le membre)",
+            options: [clubAutocompleteOption, { type: 3, name: "member", description: "Choisis le membre", required: true, autocomplete: true }],
           },
         ],
       },
@@ -140,7 +197,58 @@ const commands = [
             type: 1,
             name: "remove",
             description: "Retirer un partenaire",
-            options: [clubAutocompleteOption, { type: 3, name: "partner", description: "ID du partenaire", required: true }],
+            options: [clubAutocompleteOption, { type: 3, name: "partner", description: "Choisis le partenaire à retirer", required: true, autocomplete: true }],
+          },
+          {
+            type: 1,
+            name: "remove-logo",
+            description: "Retirer uniquement le logo d'un partenaire (garde le partenaire)",
+            options: [clubAutocompleteOption, { type: 3, name: "partner", description: "Choisis le partenaire", required: true, autocomplete: true }],
+          },
+        ],
+      },
+      {
+        type: 2,
+        name: "form",
+        description: "Gérer les formulaires du club (adhésion et équipes)",
+        options: [
+          {
+            type: 1,
+            name: "add-field",
+            description: "Ajouter une question à un formulaire",
+            options: [
+              clubAutocompleteOption,
+              { type: 3, name: "form", description: "Quel formulaire", required: true, choices: FORM_CHOICES },
+              { type: 3, name: "type", description: "Type de question", required: true, choices: FIELD_TYPE_CHOICES },
+              { type: 3, name: "label", description: "Texte de la question", required: true },
+              { type: 5, name: "required", description: "Réponse obligatoire ?", required: true },
+            ],
+          },
+          {
+            type: 1,
+            name: "remove-field",
+            description: "Retirer une question d'un formulaire",
+            options: [
+              clubAutocompleteOption,
+              { type: 3, name: "form", description: "Quel formulaire", required: true, choices: FORM_CHOICES },
+              { type: 3, name: "field", description: "Quelle question", required: true, autocomplete: true },
+            ],
+          },
+          {
+            type: 1,
+            name: "toggle",
+            description: "Activer ou désactiver un formulaire",
+            options: [
+              clubAutocompleteOption,
+              { type: 3, name: "form", description: "Quel formulaire", required: true, choices: FORM_CHOICES },
+              { type: 5, name: "enabled", description: "Activer ?", required: true },
+            ],
+          },
+          {
+            type: 1,
+            name: "list",
+            description: "Voir tous les formulaires d'un club et leurs questions",
+            options: [clubAutocompleteOption],
           },
         ],
       },

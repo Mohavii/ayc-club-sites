@@ -8,16 +8,34 @@
 
 const fs = require("fs");
 const path = require("path");
-const { renderClubPage, renderSchoolCard } = require("./render-club");
+const { renderClubPage, renderSchoolCard, renderFormPage } = require("./render-club");
 
 const CLUBS_DIR = path.join(__dirname, "..", "data", "clubs");
 const OUTPUT_DIR = path.join(__dirname, "..", "public", "clubs");
 const REJOINDRE_FILE = path.join(__dirname, "..", "public", "rejoindre.html");
 
+// The bot's own Vercel URL — form pages need this to know where to POST
+// submissions (GitHub Pages only serves static files, it can't receive
+// form data itself). Set BOT_API_BASE_URL as a build-time env var
+// (GitHub Actions secret / repo variable) once the bot is deployed.
+const API_BASE_URL = process.env.BOT_API_BASE_URL || "";
+
+// URL path (not folder name) for each form, under a club's own folder.
+const FORM_PATHS = {
+  join: "rejoindre",
+  team_communication: "equipes/communication",
+  team_logistique: "equipes/logistique",
+  team_sponsoring: "equipes/sponsoring",
+};
+
 function main() {
   if (!fs.existsSync(CLUBS_DIR)) {
     console.log("No data/clubs directory found — nothing to build.");
     return;
+  }
+
+  if (!API_BASE_URL) {
+    console.log("Warning: BOT_API_BASE_URL is not set — form pages will be built but submissions won't work until it's configured.");
   }
 
   const files = fs.readdirSync(CLUBS_DIR).filter((f) => f.endsWith(".json"));
@@ -57,6 +75,20 @@ function main() {
     built++;
     liveClubs.push(club);
     console.log(`Built: /clubs/${club.slug}/`);
+
+    // Build each of the club's 4 form pages (join + 3 team forms), even
+    // when disabled — the page itself shows a "not open" message rather
+    // than 404ing, so a link someone bookmarked doesn't just break.
+    if (club.forms) {
+      for (const [formId, formPath] of Object.entries(FORM_PATHS)) {
+        const form = club.forms[formId];
+        const formHtml = renderFormPage(club, formId, form, API_BASE_URL);
+        const formOutDir = path.join(outDir, formPath);
+        fs.mkdirSync(formOutDir, { recursive: true });
+        fs.writeFileSync(path.join(formOutDir, "index.html"), formHtml, "utf8");
+      }
+      console.log(`  + 4 form pages for /clubs/${club.slug}/`);
+    }
   }
 
   updateRejoindrePage(liveClubs);
