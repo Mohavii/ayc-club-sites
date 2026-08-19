@@ -318,6 +318,12 @@
   transition:transform .3s var(--ease-spring), box-shadow .3s var(--ease);
 }
 .gov-card:hover{ transform:translateY(-4px); box-shadow:0 18px 32px -18px rgba(39,40,99,0.25); }
+.gov-card-logo{
+  width:56px; height:56px; border-radius:12px; overflow:hidden;
+  background:var(--paper-2); margin-bottom:14px;
+  display:flex; align-items:center; justify-content:center;
+}
+.gov-card-logo-img{ width:100%; height:100%; object-fit:contain; object-position:center; display:block; }
 .gov-tag{
   display:inline-block; font-family:var(--font-body); font-weight:700; font-size:0.66rem;
   letter-spacing:0.1em; text-transform:uppercase; color:var(--blue-1);
@@ -444,6 +450,34 @@
 .form-field input:focus, .form-field select:focus{
   outline:none; border-color:var(--blue-2); box-shadow:0 0 0 3px rgba(58,184,234,0.18);
 }
+.form-field-checkbox{ flex-direction:row; align-items:flex-start; gap:10px; }
+.form-field-checkbox input[type="checkbox"]{ width:auto; margin-top:3px; accent-color:var(--blue-2); }
+.form-field-checkbox label{ font-weight:500; }
+.form-field-hint{ font-size:0.74rem; color:var(--ink-soft); margin:2px 0 0; }
+.form-submit-state{
+  grid-column:1 / -1; padding:14px 16px; border-radius:12px; font-size:0.88rem;
+  display:none;
+}
+.form-submit-state.is-success{ display:block; background:rgba(34,197,94,0.12); color:#166534; }
+.form-submit-state.is-error{ display:block; background:rgba(239,68,68,0.12); color:#991b1b; }
+.form-closed-note{
+  grid-column:1 / -1; padding:16px; border-radius:12px; background:var(--paper-2);
+  color:var(--ink-soft); font-size:0.9rem; text-align:center;
+}
+.join-banner{
+  background:linear-gradient(90deg, rgba(58,184,234,0.12), rgba(39,40,99,0.08));
+  border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+}
+.join-banner-content{
+  max-width:1180px; margin:0 auto; padding:14px 24px;
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+}
+.join-banner-dot{
+  width:9px; height:9px; border-radius:50%; background:#22c55e; flex-shrink:0;
+  box-shadow:0 0 0 4px rgba(34,197,94,0.18);
+}
+.join-banner-content p{ margin:0; font-weight:600; color:var(--navy-1); flex:1; min-width:200px; }
+.btn-sm{ padding:8px 16px; font-size:0.85rem; }
 .form-actions{ grid-column:1 / -1; display:flex; align-items:center; gap:14px; margin-top:6px; flex-wrap:wrap; }
 .form-note{ font-size:0.78rem; color:var(--ink-soft); margin:0; }
 
