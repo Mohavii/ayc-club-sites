@@ -116,25 +116,83 @@ module.exports = async (req, res) => {
   }
 };
 
-// ---------------- autocomplete (club: <autocomplete>) ----------------
+// ---------------- autocomplete (club: <autocomplete>, and item pickers) ----------------
 
 async function handleAutocomplete(interaction) {
-  const focused = (interaction.data.options || []).find((o) => o.focused) ||
-    findFocusedNested(interaction.data.options);
+  const data = interaction.data;
+  const top = data.options && data.options[0];
+  const isGroup = top && top.type === 2;
+  const sub = isGroup ? top.options && top.options[0] : null;
+  const opts = isGroup ? (sub ? sub.options : []) : top ? top.options : [];
+
+  const focused = findFocusedNested(data.options);
+  const focusedName = focused ? focused.name : null;
   const query = (focused?.value || "").toLowerCase();
 
   const userId = interaction.member?.user?.id || interaction.user?.id;
   const admin = isNationalAdmin(interaction);
 
-  const clubs = await store.listClubs();
-  const visible = admin ? clubs : clubs.filter((c) => Array.isArray(c.officers) && c.officers.includes(userId));
+  // The "club" field itself — list clubs the person can act on.
+  if (focusedName === "club") {
+    const memberRoles = interaction.member && interaction.member.roles;
+    const hasRole = (c) => Array.isArray(memberRoles) && c.vpcRoleId && memberRoles.includes(c.vpcRoleId);
+    const isOfficer = (c) => Array.isArray(c.officers) && c.officers.includes(userId);
+    const clubs = await store.listClubs();
+    const visible = admin ? clubs : clubs.filter((c) => hasRole(c) || isOfficer(c));
+    const choices = visible
+      .filter((c) => c.name.toLowerCase().includes(query) || c.slug.includes(query))
+      .slice(0, 25)
+      .map((c) => ({ name: `${c.name} (${c.slug})`, value: c.slug }));
+    return { type: InteractionResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT, data: { choices } };
+  }
 
-  const choices = visible
-    .filter((c) => c.name.toLowerCase().includes(query) || c.slug.includes(query))
-    .slice(0, 25)
-    .map((c) => ({ name: `${c.name} (${c.slug})`, value: c.slug }));
+  // Item pickers: "event", "member", "partner" — these list the ALREADY
+  // selected club's real items by name, so the person picks from a list
+  // instead of copy-pasting a raw id out of a JSON file.
+  if (["event", "member", "partner"].includes(focusedName)) {
+    const clubSlug = getOpt(opts, "club");
+    if (!clubSlug) {
+      return { type: InteractionResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT, data: { choices: [] } };
+    }
+    const club = await store.getClub(clubSlug);
+    if (!club) {
+      return { type: InteractionResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT, data: { choices: [] } };
+    }
+    const listKey = focusedName === "event" ? "events" : focusedName === "member" ? "bel" : "partners";
+    const items = Array.isArray(club[listKey]) ? club[listKey] : [];
+    const labelFor = (item) =>
+      focusedName === "event"
+        ? `${item.title}${item.date ? " — " + item.date : ""}`
+        : focusedName === "member"
+        ? `${item.name} (${item.role})`
+        : item.name;
 
-  return { type: InteractionResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT, data: { choices } };
+    const choices = items
+      .filter((item) => labelFor(item).toLowerCase().includes(query))
+      .slice(0, 25)
+      .map((item) => ({ name: labelFor(item).slice(0, 100), value: item.id }));
+    return { type: InteractionResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT, data: { choices } };
+  }
+
+  // "field" picker for /club form remove-field — depends on BOTH the
+  // already-selected club AND the already-selected form.
+  if (focusedName === "field") {
+    const clubSlug = getOpt(opts, "club");
+    const formId = getOpt(opts, "form");
+    if (!clubSlug || !formId) {
+      return { type: InteractionResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT, data: { choices: [] } };
+    }
+    const club = await store.getClub(clubSlug);
+    const form = club && club.forms && club.forms[formId];
+    const fields = form && Array.isArray(form.fields) ? form.fields : [];
+    const choices = fields
+      .filter((f) => f.label.toLowerCase().includes(query))
+      .slice(0, 25)
+      .map((f) => ({ name: f.label.slice(0, 100), value: f.id }));
+    return { type: InteractionResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT, data: { choices } };
+  }
+
+  return { type: InteractionResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT, data: { choices: [] } };
 }
 
 function findFocusedNested(options) {
@@ -156,6 +214,7 @@ function needsDefer(group, action) {
   if (group === "partner" && action === "add") return true;
   if (group === "event" && action === "add") return true;
   if (group === "set-hero-image") return true;
+  if (group === "set-logo") return true;
   return false;
 }
 
@@ -206,6 +265,8 @@ async function handleCommand(interaction, res) {
           finalMessage = await cmdEventAdd(opts, userTag, interaction);
         } else if (group === "set-hero-image") {
           finalMessage = await cmdSetHeroImage(opts, userTag, interaction);
+        } else if (group === "set-logo") {
+          finalMessage = await cmdSetLogo(opts, userTag, interaction);
         }
       } catch (err) {
         console.error("Background command work failed:", err);
@@ -230,25 +291,47 @@ async function handleCommand(interaction, res) {
     case "list":
       result = await cmdList();
       break;
+    case "delete":
+      result = await cmdDelete(opts, userTag, interaction);
+      break;
     case "set-about":
       result = await cmdSetSimpleField(opts, userTag, interaction, "about", "text", "À propos");
       break;
     case "set-stats":
       result = await cmdSetStats(opts, userTag, interaction);
       break;
+    case "remove-hero-image":
+      result = await cmdRemoveHeroImage(opts, userTag, interaction);
+      break;
     case "publish":
       result = await cmdPublish(opts, userId, userTag);
       break;
     case "event":
-      // "add" is handled above via the deferred path; only "remove" reaches here
-      result = await cmdEventRemove(opts, userTag, interaction);
+      // "add" is handled above via the deferred path
+      result =
+        action === "remove-photo"
+          ? await cmdEventRemovePhoto(opts, userTag, interaction)
+          : await cmdEventRemove(opts, userTag, interaction);
       break;
     case "bel":
-      // "add" is handled above via the deferred path; only "remove" reaches here
-      result = await cmdBelRemove(opts, userTag, interaction);
+      // "add" is handled above via the deferred path
+      result =
+        action === "remove-photo"
+          ? await cmdBelRemovePhoto(opts, userTag, interaction)
+          : await cmdBelRemove(opts, userTag, interaction);
       break;
     case "partner":
-      result = await cmdPartnerRemove(opts, userTag, interaction);
+      result =
+        action === "remove-logo"
+          ? await cmdPartnerRemoveLogo(opts, userTag, interaction)
+          : await cmdPartnerRemove(opts, userTag, interaction);
+      break;
+    case "form":
+      if (action === "add-field") result = await cmdFormAddField(opts, userTag, interaction);
+      else if (action === "remove-field") result = await cmdFormRemoveField(opts, userTag, interaction);
+      else if (action === "toggle") result = await cmdFormToggle(opts, userTag, interaction);
+      else if (action === "list") result = await cmdFormList(opts, userId, userTag);
+      else result = ephemeral("Sous-commande de formulaire inconnue.");
       break;
     default:
       result = ephemeral("Sous-commande inconnue.");
@@ -285,10 +368,17 @@ async function cmdCreate(opts, userId, userTag) {
     memberCount: 0,
     about: "",
     heroImage: null,
+    logo: null,
     officers: [userId],
     events: [],
     bel: [],
     partners: [],
+    forms: {
+      join: { enabled: false, title: "Rejoindre le club", fields: [] },
+      team_communication: { enabled: false, title: "Équipe Communication", fields: [] },
+      team_logistique: { enabled: false, title: "Équipe Logistique", fields: [] },
+      team_sponsoring: { enabled: false, title: "Équipe Sponsoring", fields: [] },
+    },
   };
 
   const edit = await submitEdit({
@@ -386,6 +476,176 @@ async function cmdSetHeroImage(opts, userTag, interaction) {
   });
   await postToReviewChannel(buildReviewMessage(edit));
   return { content: `✅ Nouvelle image d'en-tête envoyée en révision pour **${club.name}**.` };
+}
+
+async function cmdDelete(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
+  const clubSlug = getOpt(opts, "club");
+  const confirmText = getOpt(opts, "confirm");
+
+  // Deletion is admin-only — a VPC being able to delete their own club's
+  // entire page (even after review) is a much bigger foot-gun than any
+  // other edit, so this deliberately does NOT use the normal VPC-allowed
+  // requireClubAndPermission check.
+  if (!isNationalAdmin(interaction)) {
+    return ephemeral("❌ Seul·e un·e admin national·e peut supprimer un club.");
+  }
+
+  const club = await store.getClub(clubSlug);
+  if (!club) return ephemeral(`❌ Aucun club trouvé avec l'identifiant \`${clubSlug}\`.`);
+
+  if (confirmText !== club.name) {
+    return ephemeral(
+      `❌ Le texte de confirmation ne correspond pas exactement au nom du club. Retape exactement : \`${club.name}\``
+    );
+  }
+
+  const edit = await submitEdit({
+    clubSlug,
+    submittedBy: userId,
+    submittedByTag: userTag,
+    type: "delete-club",
+    path: "*",
+    newValue: null,
+    label: `Suppression du club "${club.name}"`,
+  });
+  await postToReviewChannel(buildReviewMessage(edit));
+  return ephemeral(
+    `⚠️ Demande de suppression envoyée en révision pour **${club.name}**. Elle est irréversible une fois approuvée.`
+  );
+}
+
+async function cmdRemoveHeroImage(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
+  const clubSlug = getOpt(opts, "club");
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
+  if (error) return error;
+
+  if (!club.heroImage) return ephemeral(`ℹ️ **${club.name}** n'a pas d'image d'en-tête à retirer.`);
+
+  const edit = await submitEdit({
+    clubSlug,
+    submittedBy: userId,
+    submittedByTag: userTag,
+    type: "update",
+    path: "heroImage",
+    oldValue: club.heroImage,
+    newValue: null,
+    label: "Retrait de l'image d'en-tête",
+  });
+  await postToReviewChannel(buildReviewMessage(edit));
+  return ephemeral(`✅ Retrait de l'image d'en-tête envoyé en révision pour **${club.name}**.`);
+}
+
+async function cmdEventRemovePhoto(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
+  const clubSlug = getOpt(opts, "club");
+  const eventId = getOpt(opts, "event");
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
+  if (error) return error;
+
+  const evt = (club.events || []).find((e) => e.id === eventId);
+  if (!evt) return ephemeral("❌ Événement introuvable.");
+  if (!evt.image) return ephemeral("ℹ️ Cet événement n'a pas de photo à retirer.");
+
+  const updatedEvt = { ...evt, image: null };
+  const edit = await submitEdit({
+    clubSlug,
+    submittedBy: userId,
+    submittedByTag: userTag,
+    type: "update-item",
+    path: "events",
+    itemId: eventId,
+    oldValue: evt,
+    newValue: updatedEvt,
+    label: `Retrait de la photo de l'événement "${evt.title}"`,
+  });
+  await postToReviewChannel(buildReviewMessage(edit));
+  return ephemeral(`✅ Retrait de la photo envoyé en révision pour **${club.name}**.`);
+}
+
+async function cmdBelRemovePhoto(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
+  const clubSlug = getOpt(opts, "club");
+  const memberId = getOpt(opts, "member");
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
+  if (error) return error;
+
+  const member = (club.bel || []).find((m) => m.id === memberId);
+  if (!member) return ephemeral("❌ Membre introuvable.");
+  if (!member.photo) return ephemeral("ℹ️ Ce membre n'a pas de photo à retirer.");
+
+  const updatedMember = { ...member, photo: null };
+  const edit = await submitEdit({
+    clubSlug,
+    submittedBy: userId,
+    submittedByTag: userTag,
+    type: "update-item",
+    path: "bel",
+    itemId: memberId,
+    oldValue: member,
+    newValue: updatedMember,
+    label: `Retrait de la photo de "${member.name}"`,
+  });
+  await postToReviewChannel(buildReviewMessage(edit));
+  return ephemeral(`✅ Retrait de la photo envoyé en révision pour **${club.name}**.`);
+}
+
+async function cmdPartnerRemoveLogo(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
+  const clubSlug = getOpt(opts, "club");
+  const partnerId = getOpt(opts, "partner");
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
+  if (error) return error;
+
+  const partner = (club.partners || []).find((p) => p.id === partnerId);
+  if (!partner) return ephemeral("❌ Partenaire introuvable.");
+  if (!partner.logo) return ephemeral("ℹ️ Ce partenaire n'a pas de logo à retirer.");
+
+  const updatedPartner = { ...partner, logo: null };
+  const edit = await submitEdit({
+    clubSlug,
+    submittedBy: userId,
+    submittedByTag: userTag,
+    type: "update-item",
+    path: "partners",
+    itemId: partnerId,
+    oldValue: partner,
+    newValue: updatedPartner,
+    label: `Retrait du logo de "${partner.name}"`,
+  });
+  await postToReviewChannel(buildReviewMessage(edit));
+  return ephemeral(`✅ Retrait du logo envoyé en révision pour **${club.name}**.`);
+}
+
+async function cmdSetLogo(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
+  const clubSlug = getOpt(opts, "club");
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
+  if (error) return { content: error.data.content };
+
+  const attachmentUrl = getAttachmentUrl(interaction.data, opts, "image");
+  if (!attachmentUrl) return { content: "❌ Joins une image avec l'option `image:`." };
+
+  let uploadedUrl;
+  try {
+    uploadedUrl = await uploadDiscordAttachment(attachmentUrl, { kind: "partner", folder: `ayc-clubs/${clubSlug}/logo` });
+  } catch (err) {
+    return { content: `❌ ${err.message}` };
+  }
+
+  const edit = await submitEdit({
+    clubSlug,
+    submittedBy: userId,
+    submittedByTag: userTag,
+    type: "update",
+    path: "logo",
+    oldValue: club.logo,
+    newValue: uploadedUrl,
+    label: "Logo du club",
+  });
+  await postToReviewChannel(buildReviewMessage(edit));
+  return { content: `✅ Nouveau logo envoyé en révision pour **${club.name}**.` };
 }
 
 async function cmdPublish(opts, userId, userTag) {
@@ -570,7 +830,138 @@ async function cmdPartnerRemove(opts, userTag, interaction) {
   return ephemeral(`✅ Suppression envoyée en révision pour **${club.name}**.`);
 }
 
-// ---------------- button clicks (Approve / Reject) ----------------
+// ---------------- form builder commands ----------------
+
+const FORM_IDS = ["join", "team_communication", "team_logistique", "team_sponsoring"];
+const FORM_LABELS = {
+  join: "Rejoindre le club",
+  team_communication: "Équipe Communication",
+  team_logistique: "Équipe Logistique",
+  team_sponsoring: "Équipe Sponsoring",
+};
+const FIELD_TYPE_LABELS = {
+  short_text: "Texte court",
+  date: "Date",
+  checkbox: "Case à cocher",
+  drive_link: "Lien Google Drive",
+};
+
+function ensureForms(club) {
+  // Defensive: clubs created before the forms feature existed won't have
+  // this object yet — fill in a safe empty default rather than crash.
+  if (!club.forms) {
+    club.forms = {};
+    for (const id of FORM_IDS) club.forms[id] = { enabled: false, title: FORM_LABELS[id], fields: [] };
+  }
+  return club.forms;
+}
+
+async function cmdFormAddField(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
+  const clubSlug = getOpt(opts, "club");
+  const formId = getOpt(opts, "form");
+  const type = getOpt(opts, "type");
+  const label = getOpt(opts, "label");
+  const required = getOpt(opts, "required");
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
+  if (error) return error;
+
+  const forms = ensureForms(club);
+  const form = forms[formId];
+  if (!form) return ephemeral("❌ Formulaire inconnu.");
+
+  const newField = { id: "fld_" + Math.random().toString(36).slice(2, 8), type, label, required: !!required };
+  const updatedForm = { ...form, fields: [...form.fields, newField] };
+
+  const edit = await submitEdit({
+    clubSlug,
+    submittedBy: userId,
+    submittedByTag: userTag,
+    type: "update",
+    path: `forms.${formId}`,
+    oldValue: form,
+    newValue: updatedForm,
+    label: `Nouvelle question (${FORM_LABELS[formId]}) : "${label}" [${FIELD_TYPE_LABELS[type] || type}]`,
+  });
+  await postToReviewChannel(buildReviewMessage(edit));
+  return ephemeral(`✅ Question envoyée en révision pour **${club.name}** — ${FORM_LABELS[formId]}.`);
+}
+
+async function cmdFormRemoveField(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
+  const clubSlug = getOpt(opts, "club");
+  const formId = getOpt(opts, "form");
+  const fieldId = getOpt(opts, "field");
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
+  if (error) return error;
+
+  const forms = ensureForms(club);
+  const form = forms[formId];
+  if (!form) return ephemeral("❌ Formulaire inconnu.");
+
+  const target = form.fields.find((f) => f.id === fieldId);
+  if (!target) return ephemeral("❌ Question introuvable.");
+
+  const updatedForm = { ...form, fields: form.fields.filter((f) => f.id !== fieldId) };
+
+  const edit = await submitEdit({
+    clubSlug,
+    submittedBy: userId,
+    submittedByTag: userTag,
+    type: "update",
+    path: `forms.${formId}`,
+    oldValue: form,
+    newValue: updatedForm,
+    label: `Retrait d'une question (${FORM_LABELS[formId]}) : "${target.label}"`,
+  });
+  await postToReviewChannel(buildReviewMessage(edit));
+  return ephemeral(`✅ Retrait envoyé en révision pour **${club.name}** — ${FORM_LABELS[formId]}.`);
+}
+
+// Toggling a form on/off is reversible and low-risk (unlike adding/removing
+// questions, which changes what data gets collected), so this applies
+// immediately — no review queue — matching "each VPC can enable or
+// disable a form" from the brief.
+async function cmdFormToggle(opts, userTag, interaction) {
+  const clubSlug = getOpt(opts, "club");
+  const formId = getOpt(opts, "form");
+  const enabled = getOpt(opts, "enabled");
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
+  if (error) return error;
+
+  const forms = ensureForms(club);
+  const form = forms[formId];
+  if (!form) return ephemeral("❌ Formulaire inconnu.");
+
+  if (form.fields.length === 0 && enabled) {
+    return ephemeral(
+      `❌ Impossible d'activer **${FORM_LABELS[formId]}** : ce formulaire n'a encore aucune question. Ajoute-en avec \`/club form add-field\` d'abord.`
+    );
+  }
+
+  const updatedForm = { ...form, enabled: !!enabled };
+  const updatedClub = { ...club, forms: { ...forms, [formId]: updatedForm } };
+  await store.saveClub(updatedClub, `${enabled ? "Activation" : "Désactivation"} du formulaire ${formId} — ${clubSlug}`);
+
+  return ephemeral(`✅ **${FORM_LABELS[formId]}** est maintenant ${enabled ? "**activé**" : "**désactivé**"} pour **${club.name}**.`);
+}
+
+async function cmdFormList(opts, userId, userTag) {
+  const clubSlug = getOpt(opts, "club");
+  const club = await store.getClub(clubSlug);
+  if (!club) return ephemeral(`❌ Aucun club trouvé avec l'identifiant \`${clubSlug}\`.`);
+
+  const forms = ensureForms(club);
+  const lines = [`**Formulaires — ${club.name}**`];
+  for (const id of FORM_IDS) {
+    const form = forms[id];
+    lines.push(`\n**${FORM_LABELS[id]}** — ${form.enabled ? "🟢 activé" : "⚪ désactivé"} (${form.fields.length} question${form.fields.length === 1 ? "" : "s"})`);
+    for (const f of form.fields) {
+      lines.push(`• ${f.label} — ${FIELD_TYPE_LABELS[f.type] || f.type}${f.required ? " (obligatoire)" : ""}`);
+    }
+  }
+  return ephemeral(lines.join("\n"));
+}
 
 async function handleComponent(interaction) {
   const customId = interaction.data.custom_id; // "approve:<slug>:<editId>" | "reject:<slug>:<editId>"
@@ -596,10 +987,11 @@ async function handleComponent(interaction) {
   if (action === "approve") {
     const club = await applyEdit(edit);
     await store.deletePendingEdit(clubSlug, editId, sha, `approved by ${reviewerId}`);
+    const clubLabel = club ? `**${club.name}**` : `\`${clubSlug}\` (club supprimé)`;
     return {
       type: InteractionResponseType.UPDATE_MESSAGE,
       data: {
-        content: `✅ **Approuvé** par <@${reviewerId}>\n${edit.label || edit.path} — **${club.name}**\n\n_Le site se met à jour automatiquement (1 à 2 minutes)._`,
+        content: `✅ **Approuvé** par <@${reviewerId}>\n${edit.label || edit.path} — ${clubLabel}\n\n_Le site se met à jour automatiquement (1 à 2 minutes)._`,
         components: [],
       },
     };
