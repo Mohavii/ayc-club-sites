@@ -40,7 +40,12 @@ async function discordRequest(method, path, body) {
 // treat null as "skip the rest of provisioning, not a hard failure."
 async function createClubRole(slug) {
   const guildId = process.env.DISCORD_GUILD_ID;
-  if (!guildId) return null;
+  if (!guildId) {
+    console.error(
+      "Cannot provision Discord role/channels: DISCORD_GUILD_ID is not set in Vercel's environment variables."
+    );
+    return null;
+  }
   try {
     const role = await discordRequest("POST", `/guilds/${guildId}/roles`, {
       name: `VPC - ${slug.toUpperCase()}`,
