@@ -1,0 +1,41 @@
+{
+  "slug": "lpm",
+  "status": "live",
+  "name": "Lycée Pilote Mannouba",
+  "city": "Mannouba",
+  "founded": 2025,
+  "memberCount": 0,
+  "about": "",
+  "heroImage": null,
+  "logo": null,
+  "officers": [
+    "746843897350848514"
+  ],
+  "events": [],
+  "bel": [],
+  "partners": [],
+  "forms": {
+    "join": {
+      "enabled": false,
+      "title": "Rejoindre le club",
+      "fields": []
+    },
+    "team_communication": {
+      "enabled": false,
+      "title": "Équipe Communication",
+      "fields": []
+    },
+    "team_logistique": {
+      "enabled": false,
+      "title": "Équipe Logistique",
+      "fields": []
+    },
+    "team_sponsoring": {
+      "enabled": false,
+      "title": "Équipe Sponsoring",
+      "fields": []
+    }
+  },
+  "vpcRoleId": "1539750714669146163",
+  "formWebhooks": {}
+}
