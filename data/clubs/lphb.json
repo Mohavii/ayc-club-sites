@@ -18,7 +18,14 @@
     "join": {
       "enabled": false,
       "title": "Rejoindre le club",
-      "fields": []
+      "fields": [
+        {
+          "id": "fld_r2uyza",
+          "type": "short_text",
+          "label": "Nom et préno",
+          "required": true
+        }
+      ]
     },
     "team_communication": {
       "enabled": false,
