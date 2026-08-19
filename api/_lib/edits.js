@@ -23,8 +23,10 @@ function randomEditId() {
   return "edit_" + crypto.randomBytes(4).toString("hex");
 }
 
-// type: "update" (single field) | "add" (push to a list) | "remove" (delete from a list) | "create" (whole new club)
-async function submitEdit({ clubSlug, submittedBy, submittedByTag, type, path, oldValue, newValue, label }) {
+// type: "update" (single field) | "add" (push to a list) | "remove" (delete from a list)
+//     | "update-item" (replace one item within a list, e.g. clearing just its photo)
+//     | "create" (whole new club) | "delete-club" (remove a club entirely)
+async function submitEdit({ clubSlug, submittedBy, submittedByTag, type, path, itemId, oldValue, newValue, label }) {
   const edit = {
     editId: randomEditId(),
     clubSlug,
@@ -33,6 +35,7 @@ async function submitEdit({ clubSlug, submittedBy, submittedByTag, type, path, o
     submittedAt: new Date().toISOString(),
     type,
     path,
+    itemId: itemId || null,
     oldValue: oldValue === undefined ? null : oldValue,
     newValue,
     label, // human-readable one-liner for the review message
@@ -76,17 +79,21 @@ function buildReviewMessage(edit) {
   const title =
     edit.type === "create"
       ? `🆕 Nouveau club : **${edit.clubSlug}**`
+      : edit.type === "delete-club"
+      ? `🗑️ SUPPRESSION DE CLUB — **${edit.clubSlug}** (irréversible)`
       : edit.type === "add"
       ? `➕ Ajout — **${edit.clubSlug}** / ${edit.label || edit.path}`
       : edit.type === "remove"
       ? `➖ Suppression — **${edit.clubSlug}** / ${edit.label || edit.path}`
+      : edit.type === "update-item"
+      ? `✏️ Modification d'un élément — **${edit.clubSlug}** / ${edit.label || edit.path}`
       : `✏️ Modification — **${edit.clubSlug}** / ${edit.label || edit.path}`;
 
   const lines = [
     title,
     `Proposé par <@${edit.submittedBy}>`,
   ];
-  if (edit.type === "update") {
+  if (edit.type === "update" || edit.type === "update-item") {
     lines.push(`Avant : ${formatValue(edit.oldValue)}`);
     lines.push(`Après : ${formatValue(edit.newValue)}`);
   } else {

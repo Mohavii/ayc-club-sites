@@ -109,6 +109,12 @@ async function saveClub(club, commitMessage) {
   await writeJsonFile(clubPath(club.slug), club, commitMessage, sha);
 }
 
+async function deleteClub(slug, commitMessage) {
+  const { sha } = await readJsonFile(clubPath(slug));
+  if (!sha) return; // already gone
+  await deleteFile(clubPath(slug), commitMessage, sha);
+}
+
 // ---------- pending edits ----------
 
 function pendingPath(slug, editId) {
@@ -148,6 +154,7 @@ module.exports = {
   getClub,
   listClubs,
   saveClub,
+  deleteClub,
   savePendingEdit,
   getPendingEdit,
   deletePendingEdit,
