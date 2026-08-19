@@ -509,9 +509,19 @@ function renderFormField(field) {
 function renderFormPage(club, formId, form, apiBaseUrl) {
   const displayName = `${club.name} Youth Club`;
   const isOpen = form && form.enabled && form.fields && form.fields.length > 0;
+  // One localStorage key per club+form — so blocking a repeat submission
+  // on the join form doesn't also block that same visitor from a team
+  // form, and vice versa. Cleared if the person clears browser data or
+  // uses a different browser/device (cookie/localStorage-level block, as
+  // requested — not IP-based, to avoid blocking multiple real students
+  // on the same school wifi).
+  const storageKey = `ayc_submitted_${club.slug}_${formId}`;
 
   const body = isOpen
     ? `
+    <div class="form-already-submitted" id="alreadySubmittedNote" style="display:none;">
+      <p class="form-closed-note">Tu as déjà soumis ce formulaire depuis cet appareil. Si c'est une erreur, contacte le Bureau Exécutif Local.</p>
+    </div>
     <form id="applyForm" class="form-grid" novalidate>
       ${form.fields.map(renderFormField).join("")}
       <div class="form-submit-state" id="formState"></div>
@@ -522,11 +532,32 @@ function renderFormPage(club, formId, form, apiBaseUrl) {
     </form>
     <script>
       (function(){
+        var STORAGE_KEY = ${JSON.stringify(storageKey)};
         var form = document.getElementById('applyForm');
+        var alreadyNote = document.getElementById('alreadySubmittedNote');
         var stateEl = document.getElementById('formState');
         var btn = document.getElementById('formSubmitBtn');
+
+        function alreadySubmitted(){
+          try { return window.localStorage.getItem(STORAGE_KEY) === '1'; }
+          catch (e) { return false; } // localStorage unavailable (private mode etc.) — fail open, don't block
+        }
+        function markSubmitted(){
+          try { window.localStorage.setItem(STORAGE_KEY, '1'); } catch (e) {}
+        }
+
+        if (alreadySubmitted()){
+          form.style.display = 'none';
+          alreadyNote.style.display = 'block';
+        }
+
         form.addEventListener('submit', function(e){
           e.preventDefault();
+          if (alreadySubmitted()){
+            form.style.display = 'none';
+            alreadyNote.style.display = 'block';
+            return;
+          }
           stateEl.className = 'form-submit-state';
           stateEl.textContent = '';
           btn.disabled = true;
@@ -546,6 +577,7 @@ function renderFormPage(club, formId, form, apiBaseUrl) {
           .then(function(res){ return res.json().then(function(json){ return { ok: res.ok, json: json }; }); })
           .then(function(result){
             if (!result.ok) throw new Error((result.json && result.json.error) || 'Erreur');
+            markSubmitted();
             stateEl.className = 'form-submit-state is-success';
             stateEl.textContent = 'Merci ! Ta candidature a bien été envoyée.';
             form.reset();
@@ -568,11 +600,26 @@ function renderFormPage(club, formId, form, apiBaseUrl) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(form ? form.title : "Formulaire")} · ${escapeHtml(displayName)}</title>
+<meta name="description" content="${escapeHtml(form ? form.title : "Formulaire")} — ${escapeHtml(displayName)}.">
+<link rel="icon" type="image/png" href="../../../assets/favicon-32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="../../../assets/favicon-16.png" sizes="16x16">
+<link rel="icon" type="image/png" href="../../../assets/favicon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="../../../assets/apple-touch-icon.png">
+<link rel="shortcut icon" href="../../../assets/favicon.ico">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Association YOUTH CLUBs">
+<meta property="og:title" content="${escapeHtml(form ? form.title : "Formulaire")} · ${escapeHtml(displayName)}">
+<meta property="og:locale" content="fr_FR">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../../../theme.css">
 <link rel="stylesheet" href="../../../home.css">
 </head>
 <body>
+
 <div class="pattern-veil"></div>
+
 <header class="topbar">
   <div class="topbar-inner">
     <div class="brand">
@@ -580,10 +627,24 @@ function renderFormPage(club, formId, form, apiBaseUrl) {
       <div class="brand-divider"></div>
       <div class="brand-tag">${escapeHtml(displayName)}</div>
     </div>
+    <div class="menu" data-menu>
+      <button type="button" class="menu-btn" data-menu-btn aria-haspopup="true" aria-expanded="false">
+        <span class="menu-btn-label">Ce club</span>
+        <span class="menu-btn-icon">
+          <svg class="icon-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          <svg class="icon-close" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </span>
+      </button>
+      <nav class="menu-panel" data-menu-panel aria-label="Navigation du club">
+      <a href="../">Retour au club</a>
+      <a href="../../../index.html">Site national AYCs</a>
+      </nav>
+    </div>
   </div>
 </header>
+
 <main class="stage">
-  <section class="section">
+  <section class="section reveal-on-scroll">
     <div class="section-head">
       <div class="section-head-copy">
         <h2>${escapeHtml(form ? form.title : "Formulaire")}</h2>
@@ -593,9 +654,43 @@ function renderFormPage(club, formId, form, apiBaseUrl) {
     ${body}
   </section>
 </main>
+
 <footer class="page-footer">
+  <div class="footer-affiliation">
+    <span class="footer-affiliation-label">Association</span>
+    <img src="../../../assets/logo-secondary-color.png" alt="Association YOUTH CLUBs" class="footer-logo">
+  </div>
   <span class="footer-meta">${escapeHtml(displayName)}</span>
 </footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- Header menu (button + dropdown panel) ---------- */
+  var menuRoot = document.querySelector('[data-menu]');
+  if (menuRoot){
+    var menuBtn = menuRoot.querySelector('[data-menu-btn]');
+    var menuPanel = menuRoot.querySelector('[data-menu-panel]');
+    function closeMenu(){ menuRoot.classList.remove('is-open'); menuBtn.setAttribute('aria-expanded', 'false'); }
+    function openMenu(){ menuRoot.classList.add('is-open'); menuBtn.setAttribute('aria-expanded', 'true'); }
+    menuBtn.addEventListener('click', function(e){ e.stopPropagation(); menuRoot.classList.contains('is-open') ? closeMenu() : openMenu(); });
+    document.addEventListener('click', function(e){ if (!menuRoot.contains(e.target)) closeMenu(); });
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeMenu(); });
+    menuPanel.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', closeMenu); });
+  }
+
+  /* ---------- Scroll reveal (fade in on load + on scroll) ---------- */
+  var revealTargets = document.querySelectorAll('.reveal-on-scroll');
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if (entry.isIntersecting){ entry.target.classList.add('is-visible'); io.unobserve(entry.target); }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -60px 0px' });
+  revealTargets.forEach(function(el){ io.observe(el); });
+})();
+</script>
+
 </body>
 </html>
 `;
