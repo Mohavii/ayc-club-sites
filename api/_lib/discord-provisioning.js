@@ -75,12 +75,19 @@ const CHANNEL_DEFS = [
 async function provisionClubChannels(slug, vpcRoleId) {
   const guildId = process.env.DISCORD_GUILD_ID;
   const adminRoleId = process.env.NATIONAL_ADMIN_ROLE_ID;
+  const botUserId = process.env.DISCORD_APP_ID; // a bot's user ID is the same as its application ID
   if (!guildId || !vpcRoleId) return {};
 
+  // Critical: @everyone denies VIEW_CHANNEL below, and the bot is a
+  // member of @everyone too — without an explicit allow for the bot
+  // itself, Discord silently blocks the bot from managing (or even
+  // seeing) the very category/channels it just created, which is what
+  // caused "403 Missing Permissions" even with Manage Channels granted.
   const everyoneDeny = { id: guildId, type: 0, deny: "1024" }; // VIEW_CHANNEL denied for @everyone
   const vpcAllow = { id: vpcRoleId, type: 0, allow: "1024" }; // VIEW_CHANNEL allowed for this club's VPC role
   const permissionOverwrites = [everyoneDeny, vpcAllow];
   if (adminRoleId) permissionOverwrites.push({ id: adminRoleId, type: 0, allow: "1024" });
+  if (botUserId) permissionOverwrites.push({ id: botUserId, type: 1, allow: "1024" }); // type 1 = member overwrite, for the bot itself
 
   let category;
   try {
