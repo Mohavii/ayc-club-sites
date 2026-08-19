@@ -33,6 +33,8 @@ jobs:
           node-version: "20"
 
       - name: Build club pages
+        env:
+          BOT_API_BASE_URL: ${{ vars.BOT_API_BASE_URL }}
         run: node scripts/build.js
 
       - name: Upload site as Pages artifact
