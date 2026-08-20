@@ -325,8 +325,12 @@ async function handlePanelComponent(interaction) {
 
   if (action === "add") {
     const [, , section, clubSlug] = parts;
-    const { error } = await requirePermission(clubSlug, interaction);
-    if (error) return { type: 7, data: error };
+    // No permission check here on purpose — showing an empty popup form
+    // is harmless, and checking it here (a network round-trip) was
+    // pushing modal responses past Discord's strict 3-second window for
+    // this specific response type (modals can't be deferred at all).
+    // handleAddModalSubmit below still fully checks permission before
+    // anything is actually written.
     return { type: 9, data: buildAddModal(section, clubSlug) };
   }
 
@@ -351,8 +355,9 @@ async function handlePanelComponent(interaction) {
 
   if (action === "editfield") {
     const [, , field, clubSlug] = parts;
-    const { error } = await requirePermission(clubSlug, interaction);
-    if (error) return { type: 7, data: error };
+    // Same reasoning as "add" above — no permission check before showing
+    // the modal, to stay well under Discord's strict timing for modals.
+    // handleInfoModalSubmit checks permission before writing anything.
     return { type: 9, data: buildInfoModal(field, clubSlug) };
   }
 

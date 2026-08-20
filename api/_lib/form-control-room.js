@@ -150,6 +150,16 @@ async function handleFormControlComponent(interaction) {
   const parts = interaction.data.custom_id.split(":");
   const [, action, clubSlug, formId, extra] = parts;
 
+  if (action === "addfield") {
+    // No permission check here on purpose — showing an empty popup form
+    // is harmless, and the check itself (a network round-trip) was
+    // pushing modal responses past Discord's strict 3-second window,
+    // which modals can't recover from (no deferring possible for them).
+    // handleFieldModalSubmit below still fully checks permission before
+    // anything is actually written.
+    return { type: 9, data: buildAddFieldModal(clubSlug, formId) };
+  }
+
   const { error, club } = await requirePermission(clubSlug, interaction);
   if (error) return { type: 7, data: error };
 
@@ -173,10 +183,6 @@ async function handleFormControlComponent(interaction) {
     await store.saveClub({ ...club, forms }, `${enabled ? "Activation" : "Désactivation"} du formulaire ${formId} — ${clubSlug}`);
     const freshClub = await store.getClub(clubSlug);
     return { type: 7, data: buildFormPanel(freshClub, formId) };
-  }
-
-  if (action === "addfield") {
-    return { type: 9, data: buildAddFieldModal(clubSlug, formId) };
   }
 
   if (action === "removefield") {
