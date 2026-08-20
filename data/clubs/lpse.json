@@ -11,7 +11,16 @@
   "officers": [
     "746843897350848514"
   ],
-  "events": [],
+  "events": [
+    {
+      "id": "evt_7y55in",
+      "title": "AGOFM",
+      "location": "Sousse",
+      "description": "assemblee generale de fin mandat",
+      "axis": "Citoyenneté",
+      "image": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787189060/ayc-clubs/lpse/events/event_946ce4a2.jpg"
+    }
+  ],
   "bel": [],
   "partners": [],
   "forms": {
