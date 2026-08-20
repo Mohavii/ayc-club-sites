@@ -21,7 +21,15 @@
       "image": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787189060/ayc-clubs/lpse/events/event_946ce4a2.jpg"
     }
   ],
-  "bel": [],
+  "bel": [
+    {
+      "id": "bel_2pmtaw",
+      "role": "Président",
+      "name": "Farah Deriouch",
+      "description": "Akwa prezza fi mannouba",
+      "photo": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787189164/ayc-clubs/lpse/bel/bel_2f997348.jpg"
+    }
+  ],
   "partners": [],
   "forms": {
     "join": {
