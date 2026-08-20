@@ -24,6 +24,26 @@ const BEL_ROLES = [
   "Vice-Président Externes",
   "Vice-Président Communication",
 ];
+// Short forms shown in the modal's placeholder (which has a 100-char
+// limit, too tight for the full role names) — accepted as equivalent
+// input so what the placeholder suggests actually works when typed.
+const BEL_ROLE_ALIASES = {
+  "vp int.": "Vice-Président Internes",
+  "vp interne": "Vice-Président Internes",
+  "vp internes": "Vice-Président Internes",
+  "vp ext.": "Vice-Président Externes",
+  "vp externe": "Vice-Président Externes",
+  "vp externes": "Vice-Président Externes",
+  "vp comm.": "Vice-Président Communication",
+  "vp communication": "Vice-Président Communication",
+};
+
+function normalizeBelRole(input) {
+  const trimmed = input.trim();
+  if (BEL_ROLES.includes(trimmed)) return trimmed;
+  const alias = BEL_ROLE_ALIASES[trimmed.toLowerCase()];
+  return alias || null;
+}
 
 async function requirePermission(clubSlug, interaction) {
   const club = await store.getClub(clubSlug);
@@ -130,7 +150,15 @@ function buildAddModal(section, clubSlug) {
         {
           type: 1,
           components: [
-            { type: 4, custom_id: "axis", style: 1, label: `Axe : ${AXIS_CHOICES.join(" / ")}`, required: false, max_length: 30 },
+            {
+              type: 4,
+              custom_id: "axis",
+              style: 1,
+              label: "Axe stratégique",
+              placeholder: AXIS_CHOICES.join(" / ").slice(0, 100),
+              required: false,
+              max_length: 30,
+            },
           ],
         },
       ],
@@ -144,7 +172,17 @@ function buildAddModal(section, clubSlug) {
         { type: 1, components: [{ type: 4, custom_id: "name", style: 1, label: "Nom complet", required: true, max_length: 100 }] },
         {
           type: 1,
-          components: [{ type: 4, custom_id: "role", style: 1, label: `Rôle : ${BEL_ROLES.join(" / ")}`, required: true, max_length: 40 }],
+          components: [
+            {
+              type: 4,
+              custom_id: "role",
+              style: 1,
+              label: "Rôle",
+              placeholder: "Président / Trésorier / Secrétaire / VP Int. / VP Ext. / VP Comm.",
+              required: true,
+              max_length: 40,
+            },
+          ],
         },
         { type: 1, components: [{ type: 4, custom_id: "description", style: 2, label: "Description", required: false, max_length: 300 }] },
       ],
@@ -193,9 +231,10 @@ async function handleAddModalSubmit(section, clubSlug, interaction) {
     label = `Nouvel événement : ${item.title}`;
   } else if (section === "bel") {
     const name = (getModalValue(interaction, "name") || "").trim();
-    const role = (getModalValue(interaction, "role") || "").trim();
-    if (!name || !role) return { type: 4, data: { content: "❌ Le nom et le rôle sont obligatoires.", flags: 64 } };
-    if (!BEL_ROLES.includes(role)) {
+    const roleRaw = (getModalValue(interaction, "role") || "").trim();
+    if (!name || !roleRaw) return { type: 4, data: { content: "❌ Le nom et le rôle sont obligatoires.", flags: 64 } };
+    const role = normalizeBelRole(roleRaw);
+    if (!role) {
       return {
         type: 4,
         data: { content: `❌ Rôle invalide. Utilise exactement l'un de : ${BEL_ROLES.join(", ")}.`, flags: 64 },
