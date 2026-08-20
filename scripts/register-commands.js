@@ -254,6 +254,16 @@ const commands = [
       },
     ],
   },
+  {
+    name: "form",
+    description: "Ouvrir le constructeur de formulaires (interface avec boutons)",
+    options: [clubAutocompleteOption],
+  },
+  {
+    name: "panel",
+    description: "Ouvrir le panneau de contrôle du club (interface avec boutons)",
+    options: [clubAutocompleteOption],
+  },
 ];
 
 async function main() {
