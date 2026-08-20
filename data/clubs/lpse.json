@@ -30,7 +30,14 @@
       "photo": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787189164/ayc-clubs/lpse/bel/bel_2f997348.jpg"
     }
   ],
-  "partners": [],
+  "partners": [
+    {
+      "id": "ptn_8q9o9n",
+      "name": "AG",
+      "description": "L ag wla partenaire",
+      "logo": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787189294/ayc-clubs/lpse/partners/partner_22dfd099.png"
+    }
+  ],
   "forms": {
     "join": {
       "enabled": false,
