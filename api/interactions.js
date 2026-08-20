@@ -225,9 +225,9 @@ function findFocusedNested(options) {
 // therefore need to ack with "thinking..." immediately (Discord requires
 // a reply within 3 seconds) before doing the slower upload + write work.
 function needsDefer(group, action) {
-  if (group === "bel" && action === "add") return true;
-  if (group === "partner" && action === "add") return true;
-  if (group === "event" && action === "add") return true;
+  if (group === "bel" && (action === "add" || action === "set-photo")) return true;
+  if (group === "partner" && (action === "add" || action === "set-logo")) return true;
+  if (group === "event" && (action === "add" || action === "set-photo")) return true;
   if (group === "set-hero-image") return true;
   if (group === "set-logo") return true;
   return false;
@@ -288,10 +288,16 @@ async function handleCommand(interaction, res) {
       try {
         if (group === "bel" && action === "add") {
           finalMessage = await cmdBelAdd(opts, userTag, interaction);
+        } else if (group === "bel" && action === "set-photo") {
+          finalMessage = await cmdBelSetPhoto(opts, userTag, interaction);
         } else if (group === "partner" && action === "add") {
           finalMessage = await cmdPartnerAdd(opts, userTag, interaction);
+        } else if (group === "partner" && action === "set-logo") {
+          finalMessage = await cmdPartnerSetLogo(opts, userTag, interaction);
         } else if (group === "event" && action === "add") {
           finalMessage = await cmdEventAdd(opts, userTag, interaction);
+        } else if (group === "event" && action === "set-photo") {
+          finalMessage = await cmdEventSetPhoto(opts, userTag, interaction);
         } else if (group === "set-hero-image") {
           finalMessage = await cmdSetHeroImage(opts, userTag, interaction);
         } else if (group === "set-logo") {
@@ -593,6 +599,42 @@ async function cmdEventRemovePhoto(opts, userTag, interaction) {
   return ephemeral(`✅ Retrait de la photo envoyé en révision pour **${club.name}**.`);
 }
 
+async function cmdEventSetPhoto(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
+  const clubSlug = getOpt(opts, "club");
+  const eventId = getOpt(opts, "event");
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
+  if (error) return { content: error.data.content };
+
+  const evt = (club.events || []).find((e) => e.id === eventId);
+  if (!evt) return { content: "❌ Événement introuvable." };
+
+  const attachmentUrl = getAttachmentUrl(interaction.data, opts, "photo");
+  if (!attachmentUrl) return { content: "❌ Joins une image avec l'option `photo:`." };
+
+  let uploadedUrl;
+  try {
+    uploadedUrl = await uploadDiscordAttachment(attachmentUrl, { kind: "event", folder: `ayc-clubs/${clubSlug}/events` });
+  } catch (err) {
+    return { content: `❌ ${err.message}` };
+  }
+
+  const updatedEvt = { ...evt, image: uploadedUrl };
+  const edit = await submitEdit({
+    clubSlug,
+    submittedBy: userId,
+    submittedByTag: userTag,
+    type: "update-item",
+    path: "events",
+    itemId: eventId,
+    oldValue: evt,
+    newValue: updatedEvt,
+    label: `Nouvelle photo pour l'événement "${evt.title}"`,
+  });
+  await postToReviewChannel(buildReviewMessage(edit));
+  return { content: `✅ Photo envoyée en révision pour **${club.name}**.` };
+}
+
 async function cmdBelRemovePhoto(opts, userTag, interaction) {
   const userId = interaction.member?.user?.id || interaction.user?.id;
   const clubSlug = getOpt(opts, "club");
@@ -620,6 +662,42 @@ async function cmdBelRemovePhoto(opts, userTag, interaction) {
   return ephemeral(`✅ Retrait de la photo envoyé en révision pour **${club.name}**.`);
 }
 
+async function cmdBelSetPhoto(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
+  const clubSlug = getOpt(opts, "club");
+  const memberId = getOpt(opts, "member");
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
+  if (error) return { content: error.data.content };
+
+  const member = (club.bel || []).find((m) => m.id === memberId);
+  if (!member) return { content: "❌ Membre introuvable." };
+
+  const attachmentUrl = getAttachmentUrl(interaction.data, opts, "photo");
+  if (!attachmentUrl) return { content: "❌ Joins une image avec l'option `photo:`." };
+
+  let uploadedUrl;
+  try {
+    uploadedUrl = await uploadDiscordAttachment(attachmentUrl, { kind: "bel", folder: `ayc-clubs/${clubSlug}/bel` });
+  } catch (err) {
+    return { content: `❌ ${err.message}` };
+  }
+
+  const updatedMember = { ...member, photo: uploadedUrl };
+  const edit = await submitEdit({
+    clubSlug,
+    submittedBy: userId,
+    submittedByTag: userTag,
+    type: "update-item",
+    path: "bel",
+    itemId: memberId,
+    oldValue: member,
+    newValue: updatedMember,
+    label: `Nouvelle photo pour "${member.name}"`,
+  });
+  await postToReviewChannel(buildReviewMessage(edit));
+  return { content: `✅ Photo envoyée en révision pour **${club.name}**.` };
+}
+
 async function cmdPartnerRemoveLogo(opts, userTag, interaction) {
   const userId = interaction.member?.user?.id || interaction.user?.id;
   const clubSlug = getOpt(opts, "club");
@@ -645,6 +723,42 @@ async function cmdPartnerRemoveLogo(opts, userTag, interaction) {
   });
   await postToReviewChannel(buildReviewMessage(edit));
   return ephemeral(`✅ Retrait du logo envoyé en révision pour **${club.name}**.`);
+}
+
+async function cmdPartnerSetLogo(opts, userTag, interaction) {
+  const userId = interaction.member?.user?.id || interaction.user?.id;
+  const clubSlug = getOpt(opts, "club");
+  const partnerId = getOpt(opts, "partner");
+  const { error, club } = await requireClubAndPermission(clubSlug, interaction);
+  if (error) return { content: error.data.content };
+
+  const partner = (club.partners || []).find((p) => p.id === partnerId);
+  if (!partner) return { content: "❌ Partenaire introuvable." };
+
+  const attachmentUrl = getAttachmentUrl(interaction.data, opts, "logo");
+  if (!attachmentUrl) return { content: "❌ Joins une image avec l'option `logo:`." };
+
+  let uploadedUrl;
+  try {
+    uploadedUrl = await uploadDiscordAttachment(attachmentUrl, { kind: "partner", folder: `ayc-clubs/${clubSlug}/partners` });
+  } catch (err) {
+    return { content: `❌ ${err.message}` };
+  }
+
+  const updatedPartner = { ...partner, logo: uploadedUrl };
+  const edit = await submitEdit({
+    clubSlug,
+    submittedBy: userId,
+    submittedByTag: userTag,
+    type: "update-item",
+    path: "partners",
+    itemId: partnerId,
+    oldValue: partner,
+    newValue: updatedPartner,
+    label: `Nouveau logo pour "${partner.name}"`,
+  });
+  await postToReviewChannel(buildReviewMessage(edit));
+  return { content: `✅ Logo envoyé en révision pour **${club.name}**.` };
 }
 
 async function cmdSetLogo(opts, userTag, interaction) {
