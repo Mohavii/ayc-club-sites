@@ -15,8 +15,10 @@ const { applyEdit } = require("./_lib/apply-edit");
 const { slugify } = require("./_lib/slug");
 const { uploadDiscordAttachment } = require("./_lib/images");
 const { waitUntil } = require("@vercel/functions");
+const formControlRoom = require("./_lib/form-control-room");
+const controlPanel = require("./_lib/control-panel");
 
-const InteractionType = { PING: 1, APPLICATION_COMMAND: 2, MESSAGE_COMPONENT: 3, APPLICATION_COMMAND_AUTOCOMPLETE: 4 };
+const InteractionType = { PING: 1, APPLICATION_COMMAND: 2, MESSAGE_COMPONENT: 3, APPLICATION_COMMAND_AUTOCOMPLETE: 4, MODAL_SUBMIT: 5 };
 const InteractionResponseType = {
   PONG: 1,
   CHANNEL_MESSAGE_WITH_SOURCE: 4,
@@ -24,6 +26,7 @@ const InteractionResponseType = {
   DEFERRED_UPDATE_MESSAGE: 6,
   UPDATE_MESSAGE: 7,
   APPLICATION_COMMAND_AUTOCOMPLETE_RESULT: 8,
+  MODAL: 9,
 };
 
 // Vercel needs the raw request body (not pre-parsed) to verify Discord's
@@ -109,6 +112,12 @@ module.exports = async (req, res) => {
       return;
     }
 
+    if (interaction.type === InteractionType.MODAL_SUBMIT) {
+      const result = await handleModalSubmit(interaction);
+      res.status(200).json(result);
+      return;
+    }
+
     res.status(400).send("Unhandled interaction type");
   } catch (err) {
     console.error(err);
@@ -121,9 +130,15 @@ module.exports = async (req, res) => {
 async function handleAutocomplete(interaction) {
   const data = interaction.data;
   const top = data.options && data.options[0];
+  // "top" is only a subcommand/group wrapper if its type says so (1 or 2).
+  // A flat command like /form has its real options directly on data.options
+  // instead — top would actually BE one of those options (e.g. type 3 for
+  // a string), not a subcommand wrapper, so treat that case as "no group,
+  // no subcommand, options are data.options itself."
+  const topIsSubcommandLayer = top && (top.type === 1 || top.type === 2);
   const isGroup = top && top.type === 2;
   const sub = isGroup ? top.options && top.options[0] : null;
-  const opts = isGroup ? (sub ? sub.options : []) : top ? top.options : [];
+  const opts = !topIsSubcommandLayer ? data.options : isGroup ? (sub ? sub.options : []) : top ? top.options : [];
 
   const focused = findFocusedNested(data.options);
   const focusedName = focused ? focused.name : null;
@@ -240,6 +255,20 @@ async function handleCommand(interaction, res) {
   const group = top ? top.name : null; // "event" | "bel" | "partner" | "create" | "set-about" | ...
   const action = sub ? sub.name : null; // "add" | "remove" (only for grouped subcommands)
   const opts = isGroup ? (sub ? sub.options : []) : top ? top.options : [];
+
+  if (command === "form") {
+    const clubSlug = getOpt(data.options, "club");
+    const result = await formControlRoom.cmdFormRoot(clubSlug, interaction);
+    res.status(200).json(result);
+    return;
+  }
+
+  if (command === "panel") {
+    const clubSlug = getOpt(data.options, "club");
+    const result = await controlPanel.cmdPanelRoot(clubSlug, interaction);
+    res.status(200).json(result);
+    return;
+  }
 
   if (command !== "club") {
     res.status(200).json(ephemeral("Commande inconnue."));
@@ -964,7 +993,16 @@ async function cmdFormList(opts, userId, userTag) {
 }
 
 async function handleComponent(interaction) {
-  const customId = interaction.data.custom_id; // "approve:<slug>:<editId>" | "reject:<slug>:<editId>"
+  const customId = interaction.data.custom_id; // "approve:<slug>:<editId>" | "reject:<slug>:<editId>" | "formctl:..."
+
+  if (customId.startsWith("formctl:")) {
+    return formControlRoom.handleFormControlComponent(interaction);
+  }
+
+  if (customId.startsWith("panel:")) {
+    return controlPanel.handlePanelComponent(interaction);
+  }
+
   const [action, clubSlug, editId] = customId.split(":");
 
   if (!isNationalAdmin(interaction)) {
@@ -1009,4 +1047,17 @@ async function handleComponent(interaction) {
   }
 
   return ephemeral("Action inconnue.");
+}
+
+// ---------------- modal submissions ----------------
+
+async function handleModalSubmit(interaction) {
+  const customId = interaction.data.custom_id; // "formctl:submitfield:<slug>:<formId>" | "panel:submitadd:..." | "panel:submitinfo:..."
+  if (customId.startsWith("formctl:submitfield:")) {
+    return formControlRoom.handleFieldModalSubmit(interaction);
+  }
+  if (customId.startsWith("panel:")) {
+    return controlPanel.handlePanelModalSubmit(interaction);
+  }
+  return ephemeral("Formulaire inconnu.");
 }
