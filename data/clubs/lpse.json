@@ -42,7 +42,14 @@
     "join": {
       "enabled": false,
       "title": "Rejoindre le club",
-      "fields": []
+      "fields": [
+        {
+          "id": "fld_oe33a9",
+          "type": "short_text",
+          "label": "Chno esmk",
+          "required": true
+        }
+      ]
     },
     "team_communication": {
       "enabled": false,
