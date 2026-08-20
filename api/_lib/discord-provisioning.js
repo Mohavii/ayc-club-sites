@@ -60,6 +60,7 @@ async function createClubRole(slug) {
 }
 
 const CHANNEL_DEFS = [
+  { key: "control_room", name: "control-room", noWebhook: true },
   { key: "join", name: "candidatures" },
   { key: "team_communication", name: "candidatures-communication" },
   { key: "team_logistique", name: "candidatures-logistique" },
@@ -102,6 +103,7 @@ async function provisionClubChannels(slug, vpcRoleId) {
   }
 
   const formWebhooks = {};
+  let controlRoomChannelId = null;
   for (const def of CHANNEL_DEFS) {
     try {
       const channel = await discordRequest("POST", `/guilds/${guildId}/channels`, {
@@ -110,6 +112,10 @@ async function provisionClubChannels(slug, vpcRoleId) {
         parent_id: category.id,
         permission_overwrites: permissionOverwrites,
       });
+      if (def.noWebhook) {
+        controlRoomChannelId = channel.id;
+        continue;
+      }
       const webhook = await discordRequest("POST", `/channels/${channel.id}/webhooks`, {
         name: `Candidatures ${def.key}`,
       });
@@ -120,19 +126,64 @@ async function provisionClubChannels(slug, vpcRoleId) {
       // partial provisioning is better than none.
     }
   }
-  return formWebhooks;
+  return { formWebhooks, controlRoomChannelId };
 }
 
 // Full provisioning flow for a newly-approved club. Never throws — club
 // creation must succeed even if Discord-side setup partially or fully
 // fails (e.g. bot not yet re-authorized with the new permissions).
-async function provisionClubDiscordResources(slug) {
+async function provisionClubDiscordResources(slug, clubName) {
   const vpcRoleId = await createClubRole(slug);
   if (!vpcRoleId) {
-    return { vpcRoleId: null, formWebhooks: {} };
+    return { vpcRoleId: null, formWebhooks: {}, controlRoomChannelId: null };
   }
-  const formWebhooks = await provisionClubChannels(slug, vpcRoleId);
-  return { vpcRoleId, formWebhooks };
+  const { formWebhooks, controlRoomChannelId } = await provisionClubChannels(slug, vpcRoleId);
+
+  if (controlRoomChannelId) {
+    try {
+      await discordRequest("POST", `/channels/${controlRoomChannelId}/messages`, {
+        embeds: [
+          {
+            title: "🎛️ Bienvenue dans votre salle de contrôle",
+            description:
+              "Toutes les commandes `/club ...` fonctionnent ici (et partout ailleurs). " +
+              "Pour construire vos formulaires facilement, tape `/form` et choisis un formulaire dans le menu.",
+            color: 0x273263,
+          },
+        ],
+      });
+      // The actual button-driven control panel — kept as its own message
+      // so it can be freely clicked/updated without disturbing the
+      // welcome text above it.
+      await discordRequest("POST", `/channels/${controlRoomChannelId}/messages`, {
+        embeds: [
+          {
+            title: `🎛️ Panneau de contrôle — ${clubName}`,
+            description: "Choisis une section à gérer.",
+            color: 0x273263,
+          },
+        ],
+        components: [
+          {
+            type: 1,
+            components: [
+              { type: 2, style: 1, label: "Événements", custom_id: `panel:events:${slug}` },
+              { type: 2, style: 1, label: "BEL", custom_id: `panel:bel:${slug}` },
+              { type: 2, style: 1, label: "Partenaires", custom_id: `panel:partners:${slug}` },
+            ],
+          },
+          {
+            type: 1,
+            components: [{ type: 2, style: 1, label: "Infos du club", custom_id: `panel:info:${slug}` }],
+          },
+        ],
+      });
+    } catch (err) {
+      console.error(`Failed to post welcome/panel message for ${slug}:`, err.message);
+    }
+  }
+
+  return { vpcRoleId, formWebhooks, controlRoomChannelId };
 }
 
 module.exports = { provisionClubDiscordResources };

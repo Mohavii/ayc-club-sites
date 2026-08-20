@@ -24,12 +24,16 @@ async function applyEdit(edit) {
     // private channels + webhooks) happens here, at approval time — not
     // at submission time — matching how nothing else in this system
     // becomes real until an admin approves it.
-    const { vpcRoleId, formWebhooks } = await provisionClubDiscordResources(edit.newValue.slug);
+    const { vpcRoleId, formWebhooks, controlRoomChannelId } = await provisionClubDiscordResources(
+      edit.newValue.slug,
+      edit.newValue.name
+    );
     const club = {
       ...edit.newValue,
       status: "live",
       vpcRoleId: vpcRoleId || null,
       formWebhooks: formWebhooks || {},
+      controlRoomChannelId: controlRoomChannelId || null,
     };
     await store.saveClub(club, `Publish new club: ${club.slug} (approved edit ${edit.editId})`);
     return club;
