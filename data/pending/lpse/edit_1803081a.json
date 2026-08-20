@@ -1,0 +1,19 @@
+{
+  "editId": "edit_1803081a",
+  "clubSlug": "lpse",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-20T22:31:57.553Z",
+  "type": "add",
+  "path": "partners",
+  "itemId": null,
+  "oldValue": null,
+  "newValue": {
+    "id": "ptn_fxypbf",
+    "name": "sd",
+    "description": "sqsdqs",
+    "logo": null
+  },
+  "label": "Nouveau partenaire : sd",
+  "status": "pending"
+}
