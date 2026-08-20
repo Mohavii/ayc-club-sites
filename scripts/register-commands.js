@@ -137,6 +137,16 @@ const commands = [
             description: "Retirer uniquement la photo d'un événement (garde l'événement)",
             options: [clubAutocompleteOption, { type: 3, name: "event", description: "Choisis l'événement", required: true, autocomplete: true }],
           },
+          {
+            type: 1,
+            name: "set-photo",
+            description: "Ajouter ou remplacer la photo d'un événement existant",
+            options: [
+              clubAutocompleteOption,
+              { type: 3, name: "event", description: "Choisis l'événement", required: true, autocomplete: true },
+              { type: 11, name: "photo", description: "Photo de l'événement (format portrait)", required: true },
+            ],
+          },
         ],
       },
       {
@@ -175,6 +185,16 @@ const commands = [
             description: "Retirer uniquement la photo d'un membre (garde le membre)",
             options: [clubAutocompleteOption, { type: 3, name: "member", description: "Choisis le membre", required: true, autocomplete: true }],
           },
+          {
+            type: 1,
+            name: "set-photo",
+            description: "Ajouter ou remplacer la photo d'un membre existant",
+            options: [
+              clubAutocompleteOption,
+              { type: 3, name: "member", description: "Choisis le membre", required: true, autocomplete: true },
+              { type: 11, name: "photo", description: "Photo du membre (format portrait)", required: true },
+            ],
+          },
         ],
       },
       {
@@ -204,6 +224,16 @@ const commands = [
             name: "remove-logo",
             description: "Retirer uniquement le logo d'un partenaire (garde le partenaire)",
             options: [clubAutocompleteOption, { type: 3, name: "partner", description: "Choisis le partenaire", required: true, autocomplete: true }],
+          },
+          {
+            type: 1,
+            name: "set-logo",
+            description: "Ajouter ou remplacer le logo d'un partenaire existant",
+            options: [
+              clubAutocompleteOption,
+              { type: 3, name: "partner", description: "Choisis le partenaire", required: true, autocomplete: true },
+              { type: 11, name: "logo", description: "Logo du partenaire (carré de préférence)", required: true },
+            ],
           },
         ],
       },
