@@ -1,0 +1,14 @@
+{
+  "editId": "edit_8df4d8cc",
+  "clubSlug": "lh2",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-21T23:52:34.038Z",
+  "type": "update",
+  "path": "memberCount",
+  "itemId": null,
+  "oldValue": 0,
+  "newValue": 15,
+  "label": "Nombre de membres actifs",
+  "status": "pending"
+}
