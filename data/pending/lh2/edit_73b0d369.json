@@ -1,0 +1,22 @@
+{
+  "editId": "edit_73b0d369",
+  "clubSlug": "lh2",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-21T23:54:10.627Z",
+  "type": "add",
+  "path": "events",
+  "itemId": null,
+  "oldValue": null,
+  "newValue": {
+    "id": "evt_tivrg0",
+    "title": "Agofm",
+    "date": "2026-08-30",
+    "location": "Sousse",
+    "description": "Agofm kesah brcha",
+    "axis": "Citoyenneté",
+    "image": null
+  },
+  "label": "Nouvel événement : Agofm",
+  "status": "pending"
+}
