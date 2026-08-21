@@ -1,0 +1,47 @@
+{
+  "slug": "lh2",
+  "status": "live",
+  "name": "Lycée Hrairia 2",
+  "city": "Tunis",
+  "founded": 2025,
+  "memberCount": 0,
+  "about": "",
+  "heroImage": null,
+  "logo": null,
+  "officers": [
+    "746843897350848514"
+  ],
+  "events": [],
+  "bel": [],
+  "partners": [],
+  "forms": {
+    "join": {
+      "enabled": false,
+      "title": "Rejoindre le club",
+      "fields": []
+    },
+    "team_communication": {
+      "enabled": false,
+      "title": "Équipe Communication",
+      "fields": []
+    },
+    "team_logistique": {
+      "enabled": false,
+      "title": "Équipe Logistique",
+      "fields": []
+    },
+    "team_sponsoring": {
+      "enabled": false,
+      "title": "Équipe Sponsoring",
+      "fields": []
+    }
+  },
+  "vpcRoleId": "1540508645433802854",
+  "formWebhooks": {
+    "join": "https://discord.com/api/webhooks/1540508650408251506/nw3F9td6M_zDiULUefFWK0JrzNAgAqN0MJBR3qniLlCoEMo6Ife5j2G9JAnPhIbR2-lI",
+    "team_communication": "https://discord.com/api/webhooks/1540508651612020779/iQEkS6fHBIcssr0QTswwnA_Hi8e3KNSECBx6dyIyIyW88ec-CfB_UVPw2I0fhRPevdh_",
+    "team_logistique": "https://discord.com/api/webhooks/1540508659136856155/yGQcOd53JDiRdebx-VmftIpPzsAqtqjXb35xzxCB4PC-JLQDTb9pt1ZaQctscPmtUnYN",
+    "team_sponsoring": "https://discord.com/api/webhooks/1540508660596342885/Xt9SEHPJycKdd8XkJuIEcWeg1wymHj3ADsdUeK4Z95K4nf_xoaCPiHEjEkvuM4qUBIl8"
+  },
+  "controlRoomChannelId": "1540508647606587422"
+}
