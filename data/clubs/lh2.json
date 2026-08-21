@@ -11,7 +11,17 @@
   "officers": [
     "746843897350848514"
   ],
-  "events": [],
+  "events": [
+    {
+      "id": "evt_tivrg0",
+      "title": "Agofm",
+      "date": "2026-08-30",
+      "location": "Sousse",
+      "description": "Agofm kesah brcha",
+      "axis": "Citoyenneté",
+      "image": null
+    }
+  ],
   "bel": [],
   "partners": [],
   "forms": {
