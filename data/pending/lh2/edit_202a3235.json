@@ -1,0 +1,29 @@
+{
+  "editId": "edit_202a3235",
+  "clubSlug": "lh2",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-22T00:04:42.972Z",
+  "type": "update",
+  "path": "forms.join",
+  "itemId": null,
+  "oldValue": {
+    "enabled": false,
+    "title": "Rejoindre le club",
+    "fields": []
+  },
+  "newValue": {
+    "enabled": false,
+    "title": "Rejoindre le club",
+    "fields": [
+      {
+        "id": "fld_51vm2b",
+        "type": "short_text",
+        "label": "Chno esmk",
+        "required": true
+      }
+    ]
+  },
+  "label": "Nouvelle question (Rejoindre le club) : \"Chno esmk\" [Texte court]",
+  "status": "pending"
+}
