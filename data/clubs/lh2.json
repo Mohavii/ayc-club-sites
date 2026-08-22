@@ -36,7 +36,14 @@
     "join": {
       "enabled": false,
       "title": "Rejoindre le club",
-      "fields": []
+      "fields": [
+        {
+          "id": "fld_51vm2b",
+          "type": "short_text",
+          "label": "Chno esmk",
+          "required": true
+        }
+      ]
     },
     "team_communication": {
       "enabled": false,
