@@ -42,6 +42,12 @@
           "type": "short_text",
           "label": "Chno esmk",
           "required": true
+        },
+        {
+          "id": "fld_xo7wxh",
+          "type": "date",
+          "label": "Date de naissance",
+          "required": true
         }
       ]
     },
