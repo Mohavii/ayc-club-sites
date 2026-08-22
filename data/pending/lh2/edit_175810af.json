@@ -1,0 +1,14 @@
+{
+  "editId": "edit_175810af",
+  "clubSlug": "lh2",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-22T00:12:20.471Z",
+  "type": "update",
+  "path": "heroImage",
+  "itemId": null,
+  "oldValue": null,
+  "newValue": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787357539/ayc-clubs/lh2/hero/hero_6cc538d6.png",
+  "label": "Image d'en-tête du club",
+  "status": "pending"
+}
