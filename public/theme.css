@@ -46,7 +46,10 @@
 }
 
 *{ box-sizing:border-box; }
-html{ scroll-behavior:smooth; scroll-padding-top:116px; }
+/* scroll-behavior is set to smooth via JS override in smooth-scroll.js so we
+   can use a real cubic-bezier easing curve; scroll-padding-top stays here so
+   the offset is still available to that script. */
+html{ scroll-padding-top:116px; }
 section[id]{ scroll-margin-top:116px; }
 body{
   margin:0;
