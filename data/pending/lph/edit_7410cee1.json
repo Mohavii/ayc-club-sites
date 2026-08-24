@@ -1,0 +1,36 @@
+{
+  "editId": "edit_7410cee1",
+  "clubSlug": "lph",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-24T00:56:06.912Z",
+  "type": "update",
+  "path": "forms.join",
+  "itemId": null,
+  "oldValue": {
+    "enabled": false,
+    "title": "Rejoindre le club",
+    "fields": []
+  },
+  "newValue": {
+    "enabled": false,
+    "title": "Rejoindre le club",
+    "fields": [
+      {
+        "id": "fld_91rdr1",
+        "type": "checkbox_group",
+        "label": "Ech lebedech",
+        "required": true,
+        "options": [
+          "Yes",
+          "no",
+          "hamhoum",
+          "himhem"
+        ],
+        "multiSelect": true
+      }
+    ]
+  },
+  "label": "Nouvelle question (Rejoindre le club) : \"Ech lebedech\" [Cases à cocher]",
+  "status": "pending"
+}
