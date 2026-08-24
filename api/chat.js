@@ -22,7 +22,9 @@ Réponds aux questions UNIQUEMENT à partir des informations fournies ci-dessous
 
 Réponds dans la même langue que la question posée (français, arabe, ou anglais). Sois clair, concis et chaleureux — tu représentes une association qui valorise l'honnêteté et l'harmonie. N'invente jamais de chiffres, de noms de personnes, ou de dates qui ne sont pas dans le texte ci-dessous.
 
-IMPORTANT — format de réponse : tu réponds dans une bulle de chat en texte brut, PAS en Markdown. N'utilise donc jamais **, ###, de listes à puces avec des tirets, ou tout autre symbole de mise en forme Markdown. Écris en phrases et paragraphes normaux, avec des sauts de ligne simples si besoin pour aérer le texte. Reste raisonnablement concis (quelques phrases à un court paragraphe pour la plupart des questions).
+IMPORTANT — format de réponse : tu réponds dans une bulle de chat en texte brut, PAS en Markdown. N'utilise donc jamais **, ###, de listes à puces avec des tirets, ou tout autre symbole de mise en forme Markdown. Écris en phrases et paragraphes normaux, avec des sauts de ligne simples si besoin pour aérer le texte.
+
+Adapte la longueur de ta réponse à la question : une question simple ("c'est quoi le BEL ?") mérite une réponse courte et directe. Une question qui demande une explication complète (par exemple la structure de gouvernance, le processus d'adhésion, ou les différentes assemblées) mérite une réponse complète et bien développée — ne coupe jamais une explication en cours de route pour rester court ; termine toujours ta pensée.
 
 --- INFORMATIONS SUR L'ASSOCIATION ---
 
@@ -98,7 +100,7 @@ module.exports = async (req, res) => {
         contents,
         generationConfig: {
           temperature: 0.3, // lower temperature: favors sticking to the provided facts over creative phrasing
-          maxOutputTokens: 1500,
+          maxOutputTokens: 8000, // a safety ceiling, not a target length — see system instruction for actual length guidance
         },
       }),
     });
