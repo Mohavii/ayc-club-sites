@@ -20,15 +20,15 @@
       "title": "Rejoindre le club",
       "fields": [
         {
-          "id": "fld_91rdr1",
+          "id": "fld_wkner0",
           "type": "checkbox_group",
-          "label": "Ech lebedech",
+          "label": "Yo",
           "required": true,
           "options": [
-            "Yes",
-            "no",
-            "hamhoum",
-            "himhem"
+            "Meumeu",
+            "mimi",
+            "oui",
+            "non"
           ],
           "multiSelect": true
         }
