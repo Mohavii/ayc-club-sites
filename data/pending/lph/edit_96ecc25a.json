@@ -1,0 +1,14 @@
+{
+  "editId": "edit_96ecc25a",
+  "clubSlug": "lph",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-24T00:53:28.384Z",
+  "type": "update",
+  "path": "memberCount",
+  "itemId": null,
+  "oldValue": 0,
+  "newValue": 67,
+  "label": "Nombre de membres actifs",
+  "status": "pending"
+}
