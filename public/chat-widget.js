@@ -91,10 +91,21 @@
     isOpen ? closePanel() : openPanel();
   });
 
+  // Safety net: the system prompt asks Gemini for plain text, but models
+  // sometimes slip into Markdown anyway — strip the common symbols rather
+  // than show raw "**bold**" or "### Heading" syntax in the chat bubble.
+  function stripMarkdown(text) {
+    return text
+      .replace(/^#{1,6}\s*/gm, "") // headers
+      .replace(/\*\*(.*?)\*\*/g, "$1") // bold
+      .replace(/\*(.*?)\*/g, "$1") // italic
+      .replace(/^[-*]\s+/gm, "• "); // bullet lists -> a plain bullet character
+  }
+
   function renderMessage(role, text) {
     const bubble = document.createElement("div");
     bubble.className = "ayc-chat-bubble ayc-chat-bubble-" + (role === "user" ? "user" : "model");
-    bubble.textContent = text;
+    bubble.textContent = role === "model" ? stripMarkdown(text) : text;
     messagesEl.appendChild(bubble);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return bubble;
