@@ -1,0 +1,52 @@
+{
+  "editId": "edit_a4ff5a76",
+  "clubSlug": "labc",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-25T22:03:53.825Z",
+  "type": "create",
+  "path": "*",
+  "itemId": null,
+  "oldValue": null,
+  "newValue": {
+    "slug": "labc",
+    "status": "draft",
+    "name": "Lycée Belgesm",
+    "city": "Sfax",
+    "founded": 2025,
+    "memberCount": 0,
+    "about": "",
+    "heroImage": null,
+    "logo": null,
+    "officers": [
+      "746843897350848514"
+    ],
+    "events": [],
+    "bel": [],
+    "partners": [],
+    "forms": {
+      "join": {
+        "enabled": false,
+        "title": "Rejoindre le club",
+        "fields": []
+      },
+      "team_communication": {
+        "enabled": false,
+        "title": "Équipe Communication",
+        "fields": []
+      },
+      "team_logistique": {
+        "enabled": false,
+        "title": "Équipe Logistique",
+        "fields": []
+      },
+      "team_sponsoring": {
+        "enabled": false,
+        "title": "Équipe Sponsoring",
+        "fields": []
+      }
+    }
+  },
+  "label": "création du club \"Lycée Belgesm\"",
+  "status": "pending"
+}
