@@ -1,0 +1,22 @@
+{
+  "editId": "edit_b6d90b29",
+  "clubSlug": "lph",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-08-25T01:39:55.307Z",
+  "type": "add",
+  "path": "events",
+  "itemId": null,
+  "oldValue": null,
+  "newValue": {
+    "id": "evt_ov8otv",
+    "title": "aaaaa",
+    "date": null,
+    "location": "aa",
+    "description": "aa",
+    "axis": "aa",
+    "image": null
+  },
+  "label": "Nouvel événement : aaaaa",
+  "status": "pending"
+}
