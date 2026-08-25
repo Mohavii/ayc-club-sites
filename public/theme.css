@@ -69,7 +69,7 @@ a{ color:inherit; }
 .pattern-veil{
   position:fixed; inset:0; z-index:0; pointer-events:none;
   background-image:url('assets/Pattern.png');
-  background-size:640px; opacity:0.03;
+  background-size:640px; opacity:0.4;
 }
 
 @media (prefers-reduced-motion: reduce){
@@ -179,6 +179,14 @@ a{ color:inherit; }
 .btn-primary{
   background:var(--grad-brand); background-size:160% 160%; background-position:0% 50%;
   color:#fff; box-shadow:0 12px 24px -10px rgba(57,118,187,0.55);
+}
+.btn-secondary{
+  background:var(--grad-brand); background-size:160% 160%; background-position:0% 50%;
+  color:#fff; box-shadow:0 12px 24px -10px rgba(57,118,187,0.55);
+}
+.btn-third{
+  background:var(--white); background-size:160% 160%; background-position:0% 50%;
+  color:#3976BB; box-shadow:0 12px 24px -10px rgba(57,118,187,0.55);
 }
 .btn-primary:hover{ background-position:100% 50%; box-shadow:0 16px 30px -10px rgba(57,118,187,0.65); transform:translateY(-1px); }
 .btn-ghost{ background:transparent; color:var(--ink-soft); }
