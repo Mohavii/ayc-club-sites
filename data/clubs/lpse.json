@@ -40,7 +40,7 @@
   ],
   "forms": {
     "join": {
-      "enabled": true,
+      "enabled": false,
       "title": "Rejoindre le club",
       "fields": [
         {
