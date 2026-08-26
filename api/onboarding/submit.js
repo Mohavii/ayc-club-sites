@@ -13,6 +13,7 @@ const {
 } = require("../_lib/members-store");
 const { createSession } = require("../_lib/sessions");
 const { sendNewRequestNotice } = require("../_lib/mailer");
+const { getCapabilityHolders } = require("../_lib/roles");
 
 function isTrustedBlobUrl(url) {
   if (typeof url !== "string") return false;
@@ -99,10 +100,12 @@ module.exports = async (req, res) => {
     await createSession(res, member.id, req.headers["user-agent"]);
 
     if (member.status === "pending") {
-      const adminEmails = await listNationalAdminEmails();
-      if (adminEmails.length > 0) {
-        await sendNewRequestNotice(adminEmails, member, school.name);
-      }
+      const approvers = await getCapabilityHolders(school.id, "membership_approver");
+      const emails = approvers.map((approver) => approver.email).filter(Boolean);
+      // Keep the first-admin/bootstrap path safe if a club has not yet been
+      // assigned a membership approver.
+      const recipients = emails.length > 0 ? emails : await listNationalAdminEmails();
+      if (recipients.length > 0) await sendNewRequestNotice(recipients, member, school.name);
     }
 
     res.status(200).json({ ok: true, status: member.status });
