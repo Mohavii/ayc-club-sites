@@ -1,0 +1,14 @@
+{
+  "name": "ayc-club-sites",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Discord-driven club website generator for Association YOUTH CLUBs",
+  "scripts": {
+    "build": "node scripts/build.js"
+  },
+  "dependencies": {
+    "discord-interactions": "^3.4.0",
+    "@octokit/rest": "^20.1.1",
+    "@vercel/functions": "^1.5.0"
+  }
+}

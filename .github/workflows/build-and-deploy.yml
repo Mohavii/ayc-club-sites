@@ -1,0 +1,54 @@
+name: Build and deploy club pages
+
+# Runs automatically every time data changes (i.e. every time the bot
+# commits a club edit), and can also be triggered manually.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/clubs/**"
+      - "scripts/**"
+      - "public/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build club pages
+        env:
+          BOT_API_BASE_URL: ${{ vars.BOT_API_BASE_URL }}
+        run: node scripts/build.js
+
+      - name: Upload site as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,223 @@
+/* ==========================================================================
+   Association YOUTH CLUBs — Shared design system
+   Navy/blue/gold civic identity. Fjalla One (Druk Wide–style condensed
+   display) for headings and numerals, Inter for body/UI. Rail-carousel
+   motif echoes the enumerated 5H / 5 Axes / BEN structures of the org.
+   ========================================================================== */
+
+@font-face{ font-family:'Inter'; font-weight:300; font-style:normal; src:url('assets/fonts/inter-latin-300-normal.woff2') format('woff2'); font-display:swap; }
+@font-face{ font-family:'Inter'; font-weight:400; font-style:normal; src:url('assets/fonts/inter-latin-400-normal.woff2') format('woff2'); font-display:swap; }
+@font-face{ font-family:'Inter'; font-weight:500; font-style:normal; src:url('assets/fonts/inter-latin-500-normal.woff2') format('woff2'); font-display:swap; }
+@font-face{ font-family:'Inter'; font-weight:600; font-style:normal; src:url('assets/fonts/inter-latin-600-normal.woff2') format('woff2'); font-display:swap; }
+@font-face{ font-family:'Inter'; font-weight:700; font-style:normal; src:url('assets/fonts/inter-latin-700-normal.woff2') format('woff2'); font-display:swap; }
+
+:root{
+  /* Core palette — civic navy/blue, gold as a true accent */
+  --navy-1:   #272863;
+  --navy-2:   #005D8C;
+  --blue-1:   #3976BB;
+  --blue-2:   #3AB8EA;
+  --gold:     #F7A420;
+  --gold-2:   #FFC96B;
+
+  --ink:      #1C2038;
+  --ink-soft: #5B6480;
+  --paper:    #F6F8FB;
+  --paper-2:  #EEF2F8;
+  --line:     #E1E7F0;
+  --white:    #FFFFFF;
+
+  --grad-brand: linear-gradient(135deg, var(--navy-1) 0%, var(--blue-1) 55%, var(--blue-2) 100%);
+  --grad-side:  linear-gradient(165deg, var(--navy-1), var(--blue-1));
+  --grad-gold:  linear-gradient(120deg, var(--gold) 0%, var(--gold-2) 100%);
+
+  --font-display: 'Fjalla One', 'Archivo Expanded', 'Arial Narrow', sans-serif;
+  --font-body: 'Inter', Arial, sans-serif;
+
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 22px;
+
+  --shadow-soft: 0 20px 50px -25px rgba(39,40,99,0.35);
+  --shadow-card: 0 1px 2px rgba(28,32,56,0.04), 0 8px 24px -12px rgba(39,40,99,0.12);
+
+  --ease: cubic-bezier(.22,1,.36,1);
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
+}
+
+*{ box-sizing:border-box; }
+/* scroll-behavior is set to smooth via JS override in smooth-scroll.js so we
+   can use a real cubic-bezier easing curve; scroll-padding-top stays here so
+   the offset is still available to that script. */
+html{ scroll-padding-top:116px; }
+section[id]{ scroll-margin-top:116px; }
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-body);
+  -webkit-font-smoothing:antialiased;
+  position:relative;
+  overflow-x:hidden;
+}
+
+::selection{ background:var(--blue-2); color:var(--navy-1); }
+
+a{ color:inherit; }
+
+/* Subtle ambient pattern layer, echoing the CV's main-pattern texture */
+.pattern-veil{
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image:url('assets/Pattern.png');
+  background-size:640px; opacity:0.4;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; scroll-behavior:auto !important; }
+}
+
+/* ===================== SCROLL REVEAL (IntersectionObserver-driven) ===================== */
+.reveal-on-scroll{
+  opacity:0; transform:translateY(28px);
+  transition:opacity .75s var(--ease), transform .75s var(--ease);
+  will-change:opacity, transform;
+}
+.reveal-on-scroll.is-visible{ opacity:1; transform:translateY(0); }
+.reveal-on-scroll.stagger.is-visible{ transition-delay:var(--stagger-delay, 0s); }
+
+/* Display type rhythm: Fjalla One reads best slightly tracked-out at small
+   sizes and tight at large display sizes. */
+.font-display{ font-family:var(--font-display); text-transform:none; }
+
+/* ===================== TOPBAR ===================== */
+.topbar{
+  position:sticky; top:0; z-index:40;
+  background:rgba(246,248,251,0.86);
+  backdrop-filter:blur(14px) saturate(160%);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);
+  border-bottom:1px solid var(--line);
+}
+.topbar-inner{
+  max-width:1180px; margin:0 auto; padding:10px 32px;
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+}
+.brand{ display:flex; align-items:center; gap:14px; min-width:0; }
+.brand-logo{ height:76px; width:auto; display:block; flex:none; opacity:0; animation:brandIn .6s var(--ease) forwards; }
+@keyframes brandIn{ from{ opacity:0; transform:translateY(-6px); } to{ opacity:1; transform:translateY(0); } }
+.brand-divider{ width:1px; height:36px; background:var(--line); flex:none; }
+.brand-tag{
+  font-family:var(--font-display); font-weight:400; font-size:0.8rem;
+  color:var(--navy-1); letter-spacing:0.08em; text-transform:uppercase;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+/* ===================== MENU (button + dropdown) ===================== */
+.menu{ position:relative; flex:none; }
+.menu-btn{
+  display:flex; align-items:center; gap:10px;
+  font-family:var(--font-body); font-weight:600; font-size:0.85rem;
+  color:var(--navy-1); background:var(--paper-2); border:1px solid var(--line);
+  padding:9px 10px 9px 18px; border-radius:100px; cursor:pointer;
+  transition:background .2s var(--ease), border-color .2s var(--ease);
+  white-space:nowrap;
+}
+.menu-btn:hover{ background:#E4E9F3; }
+.menu-btn-label{ display:inline; }
+.menu-btn-icon{
+  display:flex; align-items:center; justify-content:center;
+  width:28px; height:28px; border-radius:50%; background:var(--navy-1); color:var(--white);
+  flex:none;
+}
+.menu-btn-icon svg{ display:block; transition:transform .3s var(--ease); }
+.menu.is-open .menu-btn-icon svg{ transform:rotate(90deg); }
+.menu-btn-icon .icon-close{ display:none; }
+.menu.is-open .menu-btn-icon .icon-open{ display:none; }
+.menu.is-open .menu-btn-icon .icon-close{ display:block; }
+
+.menu-panel{
+  position:absolute; top:calc(100% + 10px); right:0; z-index:50;
+  min-width:240px; background:var(--white); border:1px solid var(--line);
+  border-radius:20px; padding:8px; box-shadow:0 18px 44px rgba(20,26,56,0.16);
+  display:flex; flex-direction:column; gap:2px;
+  opacity:0; visibility:hidden; transform:translateY(-8px) scale(0.98);
+  transition:opacity .22s var(--ease), transform .22s var(--ease), visibility .22s;
+}
+.menu.is-open .menu-panel{ opacity:1; visibility:visible; transform:translateY(0) scale(1); }
+.menu-panel a{
+  font-family:var(--font-body); font-weight:600; font-size:0.9rem;
+  color:var(--ink-soft); text-decoration:none; padding:11px 16px;
+  border-radius:12px; transition:color .2s var(--ease), background .2s var(--ease);
+}
+.menu-panel a:hover{ color:var(--navy-1); background:var(--paper-2); }
+.menu-panel a.is-active{ color:var(--white); background:var(--navy-1); }
+
+@media (max-width:520px){
+  .menu-btn{ padding:7px 8px 7px 14px; }
+  .menu-btn-label{ font-size:0.78rem; }
+  .menu-btn-icon{ width:24px; height:24px; }
+  .menu-panel{ min-width:210px; }
+  .topbar-inner{ padding:8px 18px; gap:8px; }
+  .brand-divider, .brand-tag{ display:none; }
+  .brand-logo{ height:56px; }
+}
+
+/* ===================== BUTTONS ===================== */
+.btn{
+  font-family:var(--font-body); font-weight:600; font-size:0.88rem;
+  letter-spacing:0.01em; padding:13px 24px; border-radius:100px; border:none;
+  cursor:pointer; display:inline-flex; align-items:center; gap:8px;
+  transition:transform .25s var(--ease), box-shadow .25s var(--ease), background .25s var(--ease), color .2s var(--ease);
+  position:relative; overflow:hidden;
+}
+.btn::after{
+  content:""; position:absolute; inset:0; border-radius:inherit;
+  background:radial-gradient(circle, rgba(255,255,255,0.55) 0%, transparent 60%);
+  opacity:0; transform:scale(0.4); transition:opacity .5s var(--ease), transform .5s var(--ease);
+  pointer-events:none;
+}
+.btn:active::after{ opacity:1; transform:scale(1.4); transition:0s; }
+.btn:active{ transform:scale(0.97); }
+.btn-primary{
+  background:var(--grad-brand); background-size:160% 160%; background-position:0% 50%;
+  color:#fff; box-shadow:0 12px 24px -10px rgba(57,118,187,0.55);
+}
+.btn-secondary{
+  background:var(--grad-brand); background-size:160% 160%; background-position:0% 50%;
+  color:#fff; box-shadow:0 12px 24px -10px rgba(57,118,187,0.55);
+}
+.btn-third{
+  background:var(--white); background-size:160% 160%; background-position:0% 50%;
+  color:#3976BB; box-shadow:0 12px 24px -10px rgba(57,118,187,0.55);
+}
+.btn-primary:hover{ background-position:100% 50%; box-shadow:0 16px 30px -10px rgba(57,118,187,0.65); transform:translateY(-1px); }
+.btn-ghost{ background:transparent; color:var(--ink-soft); }
+.btn-ghost:hover{ color:var(--navy-1); transform:translateX(-2px); }
+.btn:disabled{ opacity:0.4; cursor:not-allowed; transform:none !important; }
+.btn:disabled::after{ display:none; }
+
+.btn-focus-ring:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-visible{
+  outline:2.5px solid var(--blue-2); outline-offset:2px; border-radius:6px;
+}
+
+/* ===================== FOOTER ===================== */
+.page-footer{
+  position:relative; z-index:1;
+  display:flex; flex-direction:column; align-items:center; gap:14px;
+  text-align:center; padding:56px 24px 36px;
+  border-top:1px solid var(--line); margin-top:64px;
+}
+.footer-affiliation{ display:flex; flex-direction:column; align-items:center; gap:8px; }
+.footer-affiliation-label{
+  font-family:var(--font-body); font-size:0.65rem; font-weight:700;
+  letter-spacing:0.12em; text-transform:uppercase; color:var(--ink-soft); opacity:0.75;
+}
+.footer-logo{ height:64px; width:auto; opacity:0.9; }
+.footer-meta{
+  font-family:var(--font-body); font-size:0.74rem; font-weight:600;
+  letter-spacing:0.02em; color:var(--ink-soft);
+}
+
+/* ===================== SCROLLBAR (subtle) ===================== */
+::-webkit-scrollbar{ width:10px; height:10px; }
+::-webkit-scrollbar-track{ background:transparent; }
+::-webkit-scrollbar-thumb{ background:#c7d2e3; border-radius:10px; border:2px solid var(--paper); }
+::-webkit-scrollbar-thumb:hover{ background:#a9b8d1; }
