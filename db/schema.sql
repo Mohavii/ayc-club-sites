@@ -191,7 +191,7 @@ create table if not exists portal_capability_grants (
               )),
   granted_by  uuid references portal_members(id),
   granted_at  timestamptz not null default now(),
-  revoked_at   text, -- null = currently active
+  revoked_at   timestamptz -- null = currently active
 
   -- Deliberately NO uniqueness constraint on (member_id, school_id,
   -- capability) beyond what the app enforces on insert — a member can
