@@ -52,7 +52,13 @@ const config = {
   // extensionless `/api/...` URLs used by the browser.
   ...(target === "portal-edge"
     ? { rewrites: edgeRewrites }
-    : { routes: [...functionRoutes, { handle: "filesystem" }] }),
+    : {
+        routes: [
+          { src: "/", dest: "/portal/login.html" },
+          ...functionRoutes,
+          { handle: "filesystem" },
+        ],
+      }),
 };
 
 // Vercel accepts either export form; providing both is compatible with the
