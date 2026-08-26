@@ -23,6 +23,11 @@ const { sql } = require("./db");
 const DISPLAY_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc", "supco_regional"];
 const CAPABILITIES = ["membership_approver", "report_validator", "pv_editor", "meeting_organizer"];
 const NATIONAL_ROLES = ["president_national"];
+const MEMBERSHIP_STATUSES = ["nouveau_adherent", "adherent", "responsable", "senior", "membre_national", "ancien"];
+
+function assertValidMembershipStatus(status) {
+  if (!MEMBERSHIP_STATUSES.includes(status)) throw new Error(`Statut d'adhésion inconnu : ${status}`);
+}
 
 function assertValidDisplayRole(role) {
   if (!DISPLAY_ROLES.includes(role)) throw new Error(`Rôle d'affichage inconnu : ${role}`);
@@ -203,6 +208,36 @@ async function clearNationalRole({ memberId, role }) {
   `;
 }
 
+async function getMemberStatusHistory(memberId) {
+  const db = sql();
+  return db`
+    select h.*, m.display_name as changed_by_name
+    from portal_member_status_history h
+    left join portal_members m on m.id = h.changed_by
+    where h.member_id = ${memberId}
+    order by h.changed_at desc
+  `;
+}
+
+async function setMembershipStatus({ memberId, status, changedBy, reason }) {
+  assertValidMembershipStatus(status);
+  const db = sql();
+  const result = await db.transaction((tx) => [
+    tx`
+      update portal_members
+      set membership_status = ${status}
+      where id = ${memberId}
+      returning *
+    `,
+    tx`
+      insert into portal_member_status_history (member_id, status, changed_by, reason)
+      values (${memberId}, ${status}, ${changedBy || null}, ${reason || null})
+      returning *
+    `,
+  ]);
+  return { member: result[0][0], history: result[1][0] };
+}
+
 async function getMemberNationalRoles(memberId) {
   const db = sql();
   return db`
@@ -258,6 +293,8 @@ module.exports = {
   DISPLAY_ROLES,
   CAPABILITIES,
   NATIONAL_ROLES,
+  MEMBERSHIP_STATUSES,
+  assertValidMembershipStatus,
   setClubDisplayRole,
   clearClubDisplayRole,
   getCurrentDisplayRole,
@@ -271,6 +308,8 @@ module.exports = {
   setNationalRole,
   clearNationalRole,
   getMemberNationalRoles,
+  getMemberStatusHistory,
+  setMembershipStatus,
   requireCapability,
   requireDisplayRole,
 };
