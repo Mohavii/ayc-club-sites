@@ -404,3 +404,79 @@ create table if not exists portal_responsibilities (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_portal_responsibilities_member on portal_responsibilities(member_id, held_on desc);
+
+-- =======================================================================
+-- STRUCTURED MEETINGS, ASSEMBLIES, AND PV EDITOR (PHASE 2)
+-- Existing JSONB columns remain for backward compatibility; these relations
+-- provide auditable rows for agenda, attendance, and motions.
+-- =======================================================================
+
+alter table portal_meetings add column if not exists status text not null default 'planned';
+alter table portal_meetings add column if not exists chair_id uuid references portal_members(id) on delete set null;
+alter table portal_meetings add column if not exists secretary_id uuid references portal_members(id) on delete set null;
+alter table portal_meetings add column if not exists cancelled_at timestamptz;
+
+alter table portal_minutes add column if not exists closing_at timestamptz;
+alter table portal_minutes add column if not exists duration_minutes integer;
+alter table portal_minutes add column if not exists validated_by uuid references portal_members(id) on delete set null;
+alter table portal_minutes add column if not exists validated_at timestamptz;
+
+alter table portal_meeting_attendees add column if not exists attendance_status text not null default 'invited';
+alter table portal_meeting_attendees add column if not exists member_role text;
+
+create table if not exists portal_meeting_agenda_items (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid not null references portal_meetings(id) on delete cascade,
+  position integer not null default 0,
+  title text not null,
+  duration_minutes integer,
+  notes text,
+  created_by uuid not null references portal_members(id),
+  created_at timestamptz not null default now(),
+  unique (meeting_id, position)
+);
+create index if not exists idx_portal_agenda_items_meeting on portal_meeting_agenda_items(meeting_id, position);
+
+create table if not exists portal_minutes_attendance (
+  id uuid primary key default gen_random_uuid(),
+  minutes_id uuid not null references portal_minutes(id) on delete cascade,
+  member_id uuid not null references portal_members(id) on delete cascade,
+  attendance_status text not null default 'present',
+  voting_rights boolean not null default false,
+  member_role text,
+  note text,
+  unique (minutes_id, member_id)
+);
+create index if not exists idx_portal_minutes_attendance_minutes on portal_minutes_attendance(minutes_id);
+
+create table if not exists portal_minutes_agenda_blocks (
+  id uuid primary key default gen_random_uuid(),
+  minutes_id uuid not null references portal_minutes(id) on delete cascade,
+  position integer not null default 0,
+  title text not null,
+  discussion text,
+  decision text,
+  duration_minutes integer,
+  unique (minutes_id, position)
+);
+create index if not exists idx_portal_minutes_agenda_blocks_minutes on portal_minutes_agenda_blocks(minutes_id, position);
+
+create table if not exists portal_minutes_motions (
+  id uuid primary key default gen_random_uuid(),
+  minutes_id uuid not null references portal_minutes(id) on delete cascade,
+  position integer not null default 0,
+  motion_type text not null default 'decision',
+  title text not null,
+  proposer_id uuid references portal_members(id) on delete set null,
+  seconder_id uuid references portal_members(id) on delete set null,
+  amendment text,
+  direct_negative text,
+  majority_type text,
+  votes_for integer not null default 0,
+  votes_against integer not null default 0,
+  abstentions integer not null default 0,
+  result text,
+  consequence text,
+  unique (minutes_id, position)
+);
+create index if not exists idx_portal_minutes_motions_minutes on portal_minutes_motions(minutes_id, position);
