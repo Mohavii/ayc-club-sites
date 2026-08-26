@@ -65,8 +65,17 @@
     { value: "report_validator", label: "Validateur de rapports" },
     { value: "pv_editor", label: "Éditeur de PV" },
     { value: "meeting_organizer", label: "Organisateur de réunions" },
+    { value: "project_manager", label: "Responsable de projets" },
   ];
   const NATIONAL_ROLES = [{ value: "president_national", label: "Président National" }];
+  const MEMBERSHIP_STATUSES = [
+    { value: "nouveau_adherent", label: "Nouveau adhérent" },
+    { value: "adherent", label: "Adhérent / membre" },
+    { value: "responsable", label: "Responsable" },
+    { value: "senior", label: "Senior" },
+    { value: "membre_national", label: "Membre national" },
+    { value: "ancien", label: "Ancien" },
+  ];
 
   const schoolSelect = document.getElementById("school-select");
   const twoCol = document.getElementById("two-col");
@@ -141,6 +150,13 @@
     const activeNationalValues = new Set(data.nationalRoles.map((r) => r.role));
 
     detailPanel.innerHTML = `
+      <div class="role-section-label">Statut officiel d'adhésion</div>
+      <div class="form-grid" style="align-items:end; margin-bottom:18px;">
+        <div class="form-field"><label for="membership-status">Statut</label><select id="membership-status">${MEMBERSHIP_STATUSES.map(s => `<option value="${s.value}"${data.membershipStatus === s.value ? " selected" : ""}>${s.label}</option>`).join("")}</select></div>
+        <div class="form-field"><label for="membership-reason">Motif / source (optionnel)</label><input id="membership-reason" placeholder="Assemblée, validation, mandat…"></div>
+        <div class="form-actions"><button class="btn btn-primary btn-sm" id="save-membership-status" type="button">Enregistrer le statut</button></div>
+      </div>
+
       <div class="role-section-label">Rôle d'affichage pour ce club</div>
       <div class="role-chip-row" id="display-chips">
         ${DISPLAY_ROLES.map(
@@ -185,6 +201,16 @@
               .join("")
       }
     `;
+
+    document.getElementById("save-membership-status").addEventListener("click", async () => {
+      await callRoles({
+        action: "setMembershipStatus",
+        memberId: currentMemberId,
+        membershipStatus: document.getElementById("membership-status").value,
+        reason: document.getElementById("membership-reason").value,
+      });
+      await renderDetail();
+    });
 
     document.getElementById("display-chips").addEventListener("click", async (e) => {
       const clear = e.target.closest("#clear-display-role");
