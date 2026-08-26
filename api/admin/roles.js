@@ -20,6 +20,7 @@
 // yet, regardless of how eager an admin is to get them set up early.
 
 const { requireNationalAdmin } = require("../_lib/sessions");
+const { sql } = require("../_lib/db");
 const { findMemberById, listActiveMembersBySchool, listSchools } = require("../_lib/members-store");
 const {
   DISPLAY_ROLES,
@@ -97,12 +98,14 @@ module.exports = async (req, res) => {
       case "list": {
         const target = await requireActiveTarget(res, memberId);
         if (!target) return;
-        const [roleHistory, capabilities, nationalRoles] = await Promise.all([
+        const [roleHistory, capabilities, nationalRoles, trainerRows, documents] = await Promise.all([
           getMemberRoleHistory(memberId),
           getMemberCapabilities(memberId),
           getMemberNationalRoles(memberId),
+          sql()`select * from portal_trainer_profiles where member_id = ${memberId}`,
+          sql()`select id, document_type, title, original_filename, visibility, status, created_at from portal_member_documents where member_id = ${memberId} and status <> 'archived' order by created_at desc`,
         ]);
-        res.status(200).json({ ok: true, roleHistory, capabilities, nationalRoles, membershipStatus: target.membership_status });
+        res.status(200).json({ ok: true, roleHistory, capabilities, nationalRoles, membershipStatus: target.membership_status, trainerProfile: trainerRows[0] || null, documents });
         return;
       }
 
@@ -120,6 +123,25 @@ module.exports = async (req, res) => {
           reason: body.reason,
         });
         res.status(200).json({ ok: true, member: result.member, history: result.history });
+        return;
+      }
+
+      case "setTrainerStatus": {
+        const allowed = ["pending", "verified", "suspended"];
+        if (!allowed.includes(body.certificationStatus)) {
+          res.status(400).json({ error: "Statut Formateur invalide." });
+          return;
+        }
+        const target = await requireActiveTarget(res, memberId);
+        if (!target) return;
+        const db = sql();
+        const rows = await db`
+          insert into portal_trainer_profiles (member_id, certification_status, verified_by, verified_at, homologated_at)
+          values (${memberId}, ${body.certificationStatus}, ${body.certificationStatus === 'verified' ? admin.id : null}, ${body.certificationStatus === 'verified' ? new Date() : null}, ${body.certificationStatus === 'verified' ? new Date() : null})
+          on conflict (member_id) do update set certification_status = excluded.certification_status, verified_by = excluded.verified_by, verified_at = excluded.verified_at, homologated_at = excluded.homologated_at, updated_at = now()
+          returning *
+        `;
+        res.status(200).json({ ok: true, trainerProfile: rows[0] });
         return;
       }
 
