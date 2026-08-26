@@ -220,7 +220,7 @@ create table if not exists portal_capability_grants (
   school_id   integer not null references portal_schools(id) on delete cascade,
   capability  text not null check (capability in (
                 'membership_approver', 'report_validator', 'pv_editor',
-                'meeting_organizer'
+                'meeting_organizer', 'project_manager'
               )),
   granted_by  uuid references portal_members(id),
   granted_at  timestamptz not null default now(),
@@ -232,6 +232,16 @@ create table if not exists portal_capability_grants (
   -- unlike display roles there's no hard exclusivity BETWEEN different
   -- capabilities, so a single exclude constraint doesn't apply here.
 );
+
+-- Keep the capability check in sync for databases created before the
+-- project-manager permission was introduced.
+do $$
+begin
+  alter table portal_capability_grants drop constraint if exists portal_capability_grants_capability_check;
+  alter table portal_capability_grants add constraint portal_capability_grants_capability_check
+    check (capability in ('membership_approver', 'report_validator', 'pv_editor', 'meeting_organizer', 'project_manager'));
+exception when duplicate_object then null;
+end $$;
 
 create index if not exists idx_capability_grants_member on portal_capability_grants(member_id);
 create index if not exists idx_capability_grants_lookup
