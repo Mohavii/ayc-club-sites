@@ -76,6 +76,10 @@
           ${h.reason ? `<span class="list-item-meta">${esc(h.reason)}</span>` : ''}
         </div>`).join('');
       const status = m.membership_status || 'nouveau_adherent';
+      const trainer = data.trainerProfile;
+      const awards = Array.isArray(data.awards) ? data.awards : [];
+      const documents = Array.isArray(data.documents) ? data.documents : [];
+      const documentLabels = { candidature: 'Candidature', training_evidence: 'Preuve de formation', trainer_certificate: 'Certificat Formateur', award_evidence: 'Justificatif de distinction', other: 'Autre document' };
 
       root.innerHTML = `
         <section class="portal-card card-span-12 profile-dossier-card">
@@ -136,11 +140,14 @@
 
           <section class="portal-card card-span-4">
             <h2>Dossier de candidature</h2>
-            <p class="list-item-meta">Les lettres de motivation et d'engagement, ainsi que le plan d'action, seront ajoutés dans la prochaine étape du dossier documentaire.</p>
-            <a class="btn btn-secondary btn-sm" href="responsibilities.html">Voir mes responsabilités</a>
+            <p class="list-item-meta">Les documents de candidature sont visibles par les membres actifs. Les preuves privées restent réservées à ton dossier et aux admins nationaux.</p>
+            <div class="list-stack" style="margin:14px 0">${documents.filter(d => d.document_type === 'candidature').map(d => `<div class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(d.title)}</span><span class="list-item-meta">${esc(d.status || 'en attente')}</span></div><a class="btn btn-secondary btn-sm" href="/api/portal?action=document_download&id=${encodeURIComponent(d.id)}">Voir</a></div>`).join('') || '<span class="list-item-meta">Aucun document de candidature.</span>'}</div>
+            <a class="btn btn-secondary btn-sm" href="training.html">Gérer mon dossier</a>
           </section>
 
-          ${m.formateur_track ? `<section class="portal-card card-span-12 red-theme"><div class="toolbar"><h2>Formateur homologué</h2><a class="btn btn-secondary btn-sm" href="training.html">Ouvrir mon portfolio</a></div><div class="quote-block">« Transmettre, faciliter et faire grandir les équipes avec exigence et bienveillance. »</div><div class="stats-grid" style="margin-top:16px"><div class="stat-card"><span class="stat-number">—</span><span class="stat-label">Formations reçues</span></div><div class="stat-card"><span class="stat-number">—</span><span class="stat-label">Formations dispensées</span></div><div class="stat-card"><span class="stat-number">—</span><span class="stat-label">Facilitations dirigées</span></div></div></section>` : ''}
+          ${m.formateur_track || trainer ? `<section class="portal-card card-span-8 red-theme"><div class="toolbar"><div><p class="eyebrow">Transmission</p><h2>Portfolio Formateur</h2></div><a class="btn btn-secondary btn-sm" href="training.html">Ouvrir mon portfolio</a></div><div class="quote-block">${esc(trainer?.oath_text || 'Transmettre, faciliter et faire grandir les équipes avec exigence et bienveillance.')}</div><div class="role-badges">${(trainer?.expertise_domains || []).map(x => `<span class="role-badge">${esc(x)}</span>`).join('') || '<span class="list-item-meta">Domaines d’expertise à renseigner</span>'}</div></section>` : ''}
+
+          <section class="portal-card card-span-4"><h2>Valeurs & distinctions</h2><div class="list-stack">${awards.slice(0, 4).map(a => `<div class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(a.title)}</span><span class="list-item-meta">${esc(a.issuer || 'Association YOUTH CLUBs')} · ${AYCPortal.formatDate(a.awarded_on)}</span></div></div>`).join('') || '<span class="list-item-meta">Aucune distinction enregistrée.</span>'}</div></section>
         </div>`;
 
       if (m.cover_photo_url) document.getElementById('profile-cover').style.backgroundImage = `url("${m.cover_photo_url.replace(/"/g, '')}")`;
