@@ -19,6 +19,7 @@ const TARGETS = {
     "api/onboarding/upload-photo.js",
     "api/schools.js",
     "api/session.js",
+    "api/portal.js",
   ],
 
   // Filled in as member-facing routes are built.
