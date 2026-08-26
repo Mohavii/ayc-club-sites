@@ -5,6 +5,7 @@ const { requireActiveMember } = require("./_lib/sessions");
 const {
   getMemberRoleHistory,
   getMemberCapabilities,
+  getMemberStatusHistory,
   requireCapability,
 } = require("./_lib/roles");
 
@@ -33,7 +34,7 @@ async function profile(member) {
   const rows = await db`
     select m.id, m.email, m.username, m.display_name, m.profile_picture_url,
            m.cover_photo_url, m.phone, m.education_level, m.formateur_track,
-           m.bio, m.status, m.is_national_admin, m.school_id,
+           m.bio, m.status, m.membership_status, m.is_national_admin, m.school_id,
            s.name as school_name, s.slug as school_slug
     from portal_members m left join portal_schools s on s.id = m.school_id
     where m.id = ${member.id}
@@ -42,7 +43,33 @@ async function profile(member) {
     member: rows[0] || member,
     roles: await getMemberRoleHistory(member.id),
     capabilities: await getMemberCapabilities(member.id),
+    statusHistory: await getMemberStatusHistory(member.id),
   };
+}
+
+async function updateProfile(req, res, member, body) {
+  if (req.method !== "POST") return json(res, 405, { error: "Méthode non autorisée." });
+  const phone = String(body.phone || "").trim().slice(0, 80) || null;
+  const educationLevel = String(body.educationLevel || "").trim().slice(0, 160) || null;
+  const bio = String(body.bio || "").trim().slice(0, 2000) || null;
+  let coverPhotoUrl = String(body.coverPhotoUrl || "").trim().slice(0, 1000) || null;
+  if (coverPhotoUrl) {
+    try {
+      const parsed = new URL(coverPhotoUrl);
+      if (parsed.protocol !== "https:") throw new Error("https required");
+    } catch {
+      return json(res, 400, { error: "Le lien de couverture doit être une URL HTTPS valide." });
+    }
+  }
+  const db = sql();
+  const rows = await db`
+    update portal_members
+    set phone = ${phone}, education_level = ${educationLevel}, bio = ${bio}, cover_photo_url = ${coverPhotoUrl}
+    where id = ${member.id}
+    returning id, email, username, display_name, profile_picture_url, cover_photo_url,
+              phone, education_level, bio, status, membership_status, school_id
+  `;
+  return json(res, 200, { member: rows[0] });
 }
 
 async function dashboard(member) {
@@ -241,7 +268,7 @@ async function responsibilities(req, res, member, body) {
   const db = sql();
   if (req.method === "GET") return json(res, 200, { responsibilities: await db`select r.*, s.name as school_name from portal_responsibilities r left join portal_schools s on s.id=r.school_id where r.member_id=${member.id} order by r.held_on desc nulls last, r.created_at desc` });
   if (!body.title) return json(res, 400, { error: "Titre requis." });
-  const rows = await db`insert into portal_responsibilities (member_id, school_id, title, description, project_url, database_url, held_on) values (${member.id}, ${body.schoolId || member.school_id}, ${String(body.title).trim()}, ${body.description || null}, ${body.projectUrl || null}, ${body.databaseUrl || null}, ${body.heldOn || null}) returning *`;
+  const rows = await db`insert into portal_responsibilities (member_id, school_id, title, description, project_url, database_url, held_on, status) values (${member.id}, ${member.school_id}, ${String(body.title).trim()}, ${body.description || null}, ${body.projectUrl || null}, ${body.databaseUrl || null}, ${body.heldOn || null}, 'proposed') returning *`;
   return json(res, 201, { responsibility: rows[0] });
 }
 
@@ -253,6 +280,7 @@ module.exports = async (req, res) => {
   const action = String(req.query?.action || body.action || "dashboard");
   try {
     if (action === "profile") return json(res, 200, await profile(member));
+    if (action === "update_profile") return updateProfile(req, res, member, body);
     if (action === "dashboard") return json(res, 200, await dashboard(member));
     if (action === "meetings") return req.method === "GET" ? json(res, 200, { meetings: await listMeetings(member, req.query || {}) }) : createMeeting(req, res, member, body);
     if (action === "meeting") return meetingDetail(req, res, member, body);
