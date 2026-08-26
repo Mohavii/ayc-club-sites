@@ -1,6 +1,162 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mon profil · Portail YOUTHCLUBber</title><link rel="icon" href="../assets/favicon-32.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet"><link rel="stylesheet" href="../theme.css"><link rel="stylesheet" href="portal.css"></head>
-<body><div id="topbar-root"></div><div class="workspace"><div id="sidebar-root"></div><main class="portal-content"><div class="portal-heading"><div><p class="eyebrow">Espace personnel</p><h1>Mon profil</h1><p>Une fiche unique, enrichie par les rôles et responsabilités que les admins nationaux t'ont attribués.</p></div><div class="heading-actions"><a class="btn btn-secondary" href="home.html">Retour au tableau de bord</a></div></div><div id="profile-root"><div class="empty-state"><strong>Chargement du profil…</strong><span>Quelques instants.</span></div></div></main></div>
-<script src="portal-common.js"></script><script>
-(async()=>{const root=document.getElementById('profile-root');try{const member=await AYCPortal.initPortalShell({requireActive:true});if(!member)return;const data=await AYCPortal.api('profile');const m=data.member||member;const initials=(m.display_name||m.displayName||'').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();const avatar=m.profile_picture_url?`<img class="profile-large-avatar" src="${AYCPortal.escapeHtml(m.profile_picture_url)}" alt="">`:`<span class="profile-large-avatar">${initials}</span>`;const roleNames={president:'Président',tresorier:'Trésorier',secretaire:'Secrétaire',vpi:'VPI',vpe:'VPE',vpc:'VPC',supco_regional:'Superviseur régional',president_national:'Président national'};const currentRoles=data.roles.filter(r=>!r.ended_at);const history=data.roles.map(r=>`<div class="list-item"><div class="list-item-main"><span class="list-item-title">${roleNames[r.role]||r.role}</span><span class="list-item-meta">${AYCPortal.escapeHtml(r.school_name||'Organisation nationale')} · ${AYCPortal.formatDate(r.started_at)} — ${r.ended_at?AYCPortal.formatDate(r.ended_at):'actuel'}</span></div><span class="status-badge ${!r.ended_at?'status-active':''}">${r.ended_at?'Terminé':'Actuel'}</span></div>`).join('');const capabilities=data.capabilities.map(c=>`<span class="role-badge">${AYCPortal.escapeHtml(c.capability.replaceAll('_',' '))} · ${AYCPortal.escapeHtml(c.school_name||'club')}</span>`).join('');root.innerHTML=`<div class="portal-card card-span-12"><div class="profile-cover"></div><div class="profile-header">${avatar}<div><h1>${AYCPortal.escapeHtml(m.display_name||m.displayName)}</h1><p>@${AYCPortal.escapeHtml(m.username)} · ${AYCPortal.escapeHtml(m.school_name||'Association YOUTH CLUBs')}</p><div class="role-badges">${currentRoles.map(r=>`<span class="role-badge">${roleNames[r.role]||r.role}</span>`).join('')||'<span class="role-badge">Membre YOUTHCLUBber</span>'}</div></div></div></div><div class="portal-grid" style="margin-top:18px"><section class="portal-card card-span-6"><h2>Coordonnées</h2><div class="list-stack"><div class="list-item"><div class="list-item-main"><span class="list-item-meta">Adresse e-mail</span><span class="list-item-title">${AYCPortal.escapeHtml(m.email||'—')}</span></div></div><div class="list-item"><div class="list-item-main"><span class="list-item-meta">Téléphone</span><span class="list-item-title">${AYCPortal.escapeHtml(m.phone||'Non renseigné')}</span></div></div><div class="list-item"><div class="list-item-main"><span class="list-item-meta">Niveau d'études</span><span class="list-item-title">${AYCPortal.escapeHtml(m.education_level||'Non renseigné')}</span></div></div><div class="list-item"><div class="list-item-main"><span class="list-item-meta">Club / établissement</span><span class="list-item-title">${AYCPortal.escapeHtml(m.school_name||'—')}</span></div></div></div></section><section class="portal-card card-span-6"><h2>Responsabilités actuelles</h2><div class="role-badges">${capabilities||'<span class="list-item-meta">Aucune capacité particulière attribuée.</span>'}</div><div class="quote-block" style="margin-top:20px">Les capacités sont attribuées individuellement par les admins nationaux et ne sont jamais déduites d'un titre général.</div></section><section class="portal-card card-span-8"><h2>Historique des postes occupés</h2><div class="list-stack">${history||AYCPortal.renderEmpty('Aucun poste enregistré')}</div></section><section class="portal-card card-span-4"><h2>Dossier de candidature</h2><p class="list-item-meta">Les documents de motivation, d'engagement et le plan d'action pourront être ajoutés ici par les responsables habilités.</p><a class="btn btn-secondary btn-sm" href="responsibilities.html">Voir mes responsabilités</a></section>${m.formateur_track?`<section class="portal-card card-span-12 red-theme"><h2>Formateur Homologué</h2><div class="quote-block">« Transmettre, faciliter et faire grandir les équipes avec exigence et bienveillance. »</div><div class="stats-grid" style="margin-top:16px"><div class="stat-card"><span class="stat-number">—</span><span class="stat-label">Formations reçues</span></div><div class="stat-card"><span class="stat-number">—</span><span class="stat-label">Formations dispensées</span></div><div class="stat-card"><span class="stat-number">—</span><span class="stat-label">Facilitations dirigées</span></div></div></section>`:''}</div>`;}catch(e){AYCPortal.renderError(root,e);}})();
-</script></body></html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mon profil · Portail YOUTHCLUBber</title>
+  <link rel="icon" href="../assets/favicon-32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <div id="topbar-root"></div>
+  <div class="workspace">
+    <div id="sidebar-root"></div>
+    <main class="portal-content">
+      <div class="portal-heading">
+        <div>
+          <p class="eyebrow">Espace personnel</p>
+          <h1>Mon profil</h1>
+          <p>Une fiche unique pour ton identité, ton parcours, tes responsabilités et tes formations YOUTHCLUBber.</p>
+        </div>
+        <div class="heading-actions">
+          <a class="btn btn-secondary" href="home.html">Retour au tableau de bord</a>
+        </div>
+      </div>
+      <div id="notice"></div>
+      <div id="profile-root">
+        <div class="empty-state"><strong>Chargement du profil…</strong><span>Quelques instants.</span></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="portal-common.js"></script>
+  <script>
+  (async () => {
+    const root = document.getElementById('profile-root');
+    const notice = document.getElementById('notice');
+    const esc = AYCPortal.escapeHtml;
+    const roleNames = {
+      president: 'Président local', tresorier: 'Trésorier local', secretaire: 'Secrétaire local',
+      vpi: 'VPI', vpe: 'VPE', vpc: 'VPC', supco_regional: 'SupCo régional',
+      president_national: 'Président national'
+    };
+    const statusNames = {
+      nouveau_adherent: 'Nouveau adhérent', adherent: 'Adhérent / membre', responsable: 'Responsable',
+      senior: 'Senior', membre_national: 'Membre national', ancien: 'Ancien'
+    };
+    try {
+      const sessionMember = await AYCPortal.initPortalShell({ requireActive: true });
+      if (!sessionMember) return;
+      const data = await AYCPortal.api('profile');
+      const m = data.member || sessionMember;
+      const initials = (m.display_name || m.displayName || '').split(/\s+/).map(x => x[0]).slice(0, 2).join('').toUpperCase();
+      const avatar = m.profile_picture_url
+        ? `<img class="profile-large-avatar" src="${esc(m.profile_picture_url)}" alt="Photo de profil">`
+        : `<span class="profile-large-avatar">${esc(initials)}</span>`;
+      const currentRoles = (data.roles || []).filter(r => !r.ended_at);
+      const history = (data.roles || []).map(r => `
+        <div class="list-item">
+          <div class="list-item-main">
+            <span class="list-item-title">${esc(roleNames[r.role] || r.role)}</span>
+            <span class="list-item-meta">${esc(r.school_name || 'Organisation nationale')} · ${AYCPortal.formatDate(r.started_at)} — ${r.ended_at ? AYCPortal.formatDate(r.ended_at) : 'actuel'}</span>
+          </div>
+          <span class="status-badge ${!r.ended_at ? 'status-active' : ''}">${r.ended_at ? 'Terminé' : 'Actuel'}</span>
+        </div>`).join('');
+      const capabilities = (data.capabilities || []).map(c => `<span class="role-badge">${esc(c.capability.replaceAll('_', ' '))} · ${esc(c.school_name || 'club')}</span>`).join('');
+      const statusHistory = (data.statusHistory || []).map(h => `
+        <div class="list-item">
+          <div class="list-item-main">
+            <span class="list-item-title">${esc(statusNames[h.status] || h.status)}</span>
+            <span class="list-item-meta">${AYCPortal.formatDate(h.changed_at)}${h.changed_by_name ? ` · par ${esc(h.changed_by_name)}` : ''}</span>
+          </div>
+          ${h.reason ? `<span class="list-item-meta">${esc(h.reason)}</span>` : ''}
+        </div>`).join('');
+      const status = m.membership_status || 'nouveau_adherent';
+
+      root.innerHTML = `
+        <section class="portal-card card-span-12 profile-dossier-card">
+          <div class="profile-cover" id="profile-cover"></div>
+          <div class="profile-header">
+            ${avatar}
+            <div>
+              <p class="eyebrow">Dossier membre</p>
+              <h2>${esc(m.display_name || m.displayName || 'Membre')}</h2>
+              <p>@${esc(m.username || '')} · ${esc(m.school_name || 'Association YOUTH CLUBs')}</p>
+              <div class="role-badges">
+                <span class="role-badge">${esc(statusNames[status] || status)}</span>
+                ${currentRoles.map(r => `<span class="role-badge">${esc(roleNames[r.role] || r.role)}</span>`).join('') || '<span class="role-badge">Parcours à compléter</span>'}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="portal-grid" style="margin-top:18px">
+          <section class="portal-card card-span-6">
+            <div class="toolbar"><h2>Coordonnées</h2><span class="status-badge status-active">Profil actif</span></div>
+            <div class="list-stack">
+              <div class="list-item"><div class="list-item-main"><span class="list-item-meta">Adresse e-mail</span><span class="list-item-title">${esc(m.email || '—')}</span></div></div>
+              <div class="list-item"><div class="list-item-main"><span class="list-item-meta">Téléphone</span><span class="list-item-title">${esc(m.phone || 'Non renseigné')}</span></div></div>
+              <div class="list-item"><div class="list-item-main"><span class="list-item-meta">Niveau d'études</span><span class="list-item-title">${esc(m.education_level || 'Non renseigné')}</span></div></div>
+              <div class="list-item"><div class="list-item-main"><span class="list-item-meta">Club / établissement</span><span class="list-item-title">${esc(m.school_name || '—')}</span></div></div>
+            </div>
+          </section>
+
+          <section class="portal-card card-span-6">
+            <h2>Mes informations</h2>
+            <form id="profile-form">
+              <div class="form-field"><label for="phone">Téléphone</label><input id="phone" maxlength="80" value="${esc(m.phone || '')}" placeholder="+216 …"></div>
+              <div class="form-field"><label for="educationLevel">Niveau d'études</label><input id="educationLevel" maxlength="160" value="${esc(m.education_level || '')}" placeholder="Ex. 3ème année secondaire"></div>
+              <div class="form-field"><label for="coverPhotoUrl">Lien de couverture (HTTPS)</label><input id="coverPhotoUrl" type="url" value="${esc(m.cover_photo_url || '')}" placeholder="https://…"></div>
+              <div class="form-field"><label for="bio">Présentation</label><textarea id="bio" maxlength="2000" placeholder="Quelques mots sur ton parcours…">${esc(m.bio || '')}</textarea></div>
+              <div class="form-actions"><button class="btn btn-primary" type="submit">Enregistrer mes informations</button></div>
+            </form>
+          </section>
+
+          <section class="portal-card card-span-6">
+            <h2>Responsabilités actuelles</h2>
+            <div class="role-badges">${capabilities || '<span class="list-item-meta">Aucune capacité particulière attribuée.</span>'}</div>
+            <div class="quote-block" style="margin-top:20px">Les capacités sont attribuées individuellement par les admins nationaux et ne sont jamais déduites d'un titre général.</div>
+          </section>
+
+          <section class="portal-card card-span-6">
+            <h2>Statut d'adhésion</h2>
+            <p class="list-item-meta">Ton statut officiel et son historique sont distincts de ton accès technique au portail.</p>
+            <div class="status-badge status-active" style="margin:10px 0 14px">${esc(statusNames[status] || status)}</div>
+            <div class="list-stack">${statusHistory || '<div class="empty-state">Aucun changement de statut enregistré.</div>'}</div>
+          </section>
+
+          <section class="portal-card card-span-8">
+            <h2>Historique des postes occupés</h2>
+            <div class="list-stack">${history || AYCPortal.renderEmpty('Aucun poste officiel enregistré')}</div>
+          </section>
+
+          <section class="portal-card card-span-4">
+            <h2>Dossier de candidature</h2>
+            <p class="list-item-meta">Les lettres de motivation et d'engagement, ainsi que le plan d'action, seront ajoutés dans la prochaine étape du dossier documentaire.</p>
+            <a class="btn btn-secondary btn-sm" href="responsibilities.html">Voir mes responsabilités</a>
+          </section>
+
+          ${m.formateur_track ? `<section class="portal-card card-span-12 red-theme"><div class="toolbar"><h2>Formateur homologué</h2><a class="btn btn-secondary btn-sm" href="training.html">Ouvrir mon portfolio</a></div><div class="quote-block">« Transmettre, faciliter et faire grandir les équipes avec exigence et bienveillance. »</div><div class="stats-grid" style="margin-top:16px"><div class="stat-card"><span class="stat-number">—</span><span class="stat-label">Formations reçues</span></div><div class="stat-card"><span class="stat-number">—</span><span class="stat-label">Formations dispensées</span></div><div class="stat-card"><span class="stat-number">—</span><span class="stat-label">Facilitations dirigées</span></div></div></section>` : ''}
+        </div>`;
+
+      if (m.cover_photo_url) document.getElementById('profile-cover').style.backgroundImage = `url("${m.cover_photo_url.replace(/"/g, '')}")`;
+      document.getElementById('profile-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const value = id => document.getElementById(id).value;
+        try {
+          await AYCPortal.api('update_profile', { method: 'POST', body: {
+            phone: value('phone'), educationLevel: value('educationLevel'), bio: value('bio'), coverPhotoUrl: value('coverPhotoUrl')
+          }});
+          notice.innerHTML = '<div class="alert alert-success">Tes informations ont été enregistrées.</div>';
+          setTimeout(() => { notice.innerHTML = ''; }, 4500);
+        } catch (error) { AYCPortal.renderError(notice, error); }
+      });
+    } catch (error) { AYCPortal.renderError(root, error); }
+  })();
+  </script>
+</body>
+</html>
