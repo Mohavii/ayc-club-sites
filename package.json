@@ -4,7 +4,7 @@
   "private": true,
   "description": "Discord-driven club website generator for Association YOUTH CLUBs",
   "scripts": {
-    "build": "node scripts/prune-functions.js && node scripts/build.js"
+    "build": "node scripts/build.js"
   },
   "dependencies": {
     "discord-interactions": "^3.4.0",

@@ -20,10 +20,11 @@ This repo's `api/*.js` route count is well past Vercel Hobby's
 routes AND the portal's. Since Hobby doesn't offer per-project repo
 filtering, this repo deploys as **multiple separate Vercel projects**,
 each importing the exact same GitHub repo, each kept under 12 functions
-by `scripts/prune-functions.js` deleting whatever doesn't belong to it
-at build time (controlled by the `DEPLOY_TARGET` env var — see that
-file for the authoritative list of targets and which routes each one
-keeps).
+by `vercel.cjs` allowlisting only that project's API entrypoints before
+Vercel packages functions (controlled by the `DEPLOY_TARGET` env var — see
+`scripts/deployment-targets.js` for the authoritative list). The old
+`prune-functions.js` remains only as a local inspection helper and is not
+part of the production build command.
 
 Portal projects are split **by who calls the routes** (this was a
 deliberate choice over splitting by feature — see the file's own
@@ -32,7 +33,7 @@ comments for why):
 | Vercel project | `DEPLOY_TARGET` | What it serves |
 |---|---|---|
 | (existing bot project) | `bot` | Discord bot's own API routes |
-| `ayc-portal-edge` | `portal-edge` | **Owns the real domain.** Static `public/portal/**` files + proxies `/api/*` to the service projects below via `vercel.json` rewrites. Zero API routes of its own. |
+| `ayc-portal-edge` | `portal-edge` | **Owns the real domain.** Static `public/portal/**` files + proxies `/api/*` to the service projects below via `vercel.cjs` rewrites. Zero API routes of its own. |
 | `ayc-portal-auth` | `portal-auth` | Google OAuth, sessions, onboarding, schools list |
 | `ayc-portal-admin` | `portal-admin` | National-admin-only: membership decide/pending, role/capability assignment |
 | *(future)* `ayc-portal-member` | `portal-member` | Active-member self-service routes, once built |
@@ -42,7 +43,7 @@ comments for why):
 directly:** the browser only ever talks to one origin
 (`internes.associationyouthclubs.org`), so cookies/sessions work
 exactly like a normal single-origin app. The `portal-edge` project's
-`vercel.json` rewrites forward `/api/auth/*`, `/api/onboarding/*`,
+`vercel.cjs` rewrites forward `/api/auth/*`, `/api/onboarding/*`,
 `/api/schools`, `/api/admin/*` etc. to each service project's real
 `*.vercel.app` URL server-side — the browser never sees the other
 origins.
@@ -52,21 +53,23 @@ origins.
 1. Create each Vercel project listed above by importing this same
    GitHub repo again for each row (Add New → Project → same repo,
    different project name each time).
-2. Set `DEPLOY_TARGET` in each project's env vars to match the table.
+2. Set `DEPLOY_TARGET` in each project's env vars to match the table. The
+variable name is case-sensitive; `deploy_target` is also accepted for
+backward compatibility, but new projects should use the uppercase spelling.
 3. Deploy `ayc-portal-auth` and `ayc-portal-admin` FIRST, note down
    their real `*.vercel.app` URLs once deployed.
-4. Edit `vercel.json` at the repo root, replacing the
-   `REPLACE-portal-auth.vercel.app` / `REPLACE-portal-admin.vercel.app`
-   placeholders with those real URLs. Commit and push — this triggers
-   all connected projects to redeploy, including `portal-edge` picking
-   up the corrected rewrite targets.
+4. Edit the `edgeRewrites` destinations in `vercel.cjs` at the repo root,
+   replacing the `REPLACE-portal-auth.vercel.app` /
+   `REPLACE-portal-admin.vercel.app` placeholders with those real URLs.
+   Commit and push — this triggers all connected projects to redeploy,
+   including `portal-edge` picking up the corrected rewrite targets.
 5. Add the `internes.associationyouthclubs.org` domain to the
    `ayc-portal-edge` project ONLY (Settings → Domains), with the
    matching CNAME at your DNS registrar.
 6. As new service projects are added later (`portal-member`,
    `portal-officer`), repeat steps 1–2 for them, add their routes to
-   `scripts/prune-functions.js`'s `TARGETS` map, add a rewrite line to
-   `vercel.json` pointing at their URL, and push.
+   `scripts/deployment-targets.js`, add a rewrite line to the
+   `edgeRewrites` array in `vercel.cjs` pointing at their URL, and push.
 
 **`DATABASE_URL` must be identical across EVERY project above**,
 including the bot project — the schools-sync feature and all portal
@@ -160,9 +163,9 @@ npm install   # picks up @neondatabase/serverless, google-auth-library, @vercel/
 ```
 
 Then follow the "Deployment topology" section above — each project
-deploys from the same push, and `prune-functions.js` handles keeping
-each one under the function cap automatically based on its
-`DEPLOY_TARGET`.
+deploys
+from the same push, and `vercel.cjs` selects the function allowlist before
+Vercel packages the deployment based on its `DEPLOY_TARGET`.
 
 ## Entry point
 
