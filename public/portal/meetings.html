@@ -1,6 +1,149 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Réunions · Portail YOUTHCLUBber</title><link rel="icon" href="../assets/favicon-32.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet"><link rel="stylesheet" href="../theme.css"><link rel="stylesheet" href="portal.css"></head>
-<body><div id="topbar-root"></div><div class="workspace"><div id="sidebar-root"></div><main class="portal-content"><div class="portal-heading"><div><p class="eyebrow">Vie du club</p><h1>Réunions & procès-verbaux</h1><p>Annonce les temps forts, confirme ta présence et documente les décisions au fil de la réunion.</p></div></div><div id="notice"></div><div class="portal-grid"><section class="portal-card card-span-8"><div class="toolbar"><h2>Calendrier des réunions</h2><div class="filter-tabs"><button class="active" data-filter="all">Toutes</button><button data-filter="reunion">Réunions</button><button data-filter="assemblee_locale">Assemblée locale</button><button data-filter="assemblee_generale">Assemblée générale</button></div></div><div id="meeting-list" class="list-stack"></div></section><section class="portal-card card-span-4" id="new"><h2>Annoncer une réunion</h2><form id="meeting-form"><div class="form-field"><label for="title">Titre</label><input id="title" required placeholder="Réunion mensuelle"></div><div class="form-grid"><div class="form-field"><label for="meetingType">Type</label><select id="meetingType"><option value="reunion">Réunion</option><option value="assemblee_locale">Assemblée locale</option><option value="assemblee_generale">Assemblée générale</option></select></div><div class="form-field"><label for="format">Format</label><select id="format"><option value="presentiel">Présentiel</option><option value="en_ligne">En ligne</option><option value="hybride">Hybride</option></select></div></div><div class="form-grid"><div class="form-field"><label for="startsAt">Début</label><input id="startsAt" type="datetime-local" required></div><div class="form-field"><label for="endsAt">Fin</label><input id="endsAt" type="datetime-local"></div></div><div class="form-field"><label for="location">Lieu / lien</label><input id="location" placeholder="Maison des jeunes ou lien visio"><input id="mapsUrl" placeholder="Lien Google Maps (optionnel)"></div><div class="form-field"><label for="comments">Commentaires</label><textarea id="comments" placeholder="Informations pratiques"></textarea></div><div class="form-field"><label for="agenda">Ordre du jour</label><textarea id="agenda" placeholder="Un point par ligne, avec la durée si besoin"></textarea></div><div class="form-actions"><button class="btn btn-primary" type="submit">Publier la réunion</button></div></form></section></div></main></div>
-<script src="portal-common.js"></script><script>
-(async()=>{const list=document.getElementById('meeting-list');let all=[];try{const member=await AYCPortal.initPortalShell({requireActive:true});if(!member)return;const render=filter=>{const rows=filter==='all'?all:all.filter(x=>x.meeting_type===filter);list.innerHTML=rows.length?rows.map(m=>`<article class="list-item" data-id="${m.id}"><div class="list-item-main"><span class="list-item-title">${AYCPortal.escapeHtml(m.title)}</span><span class="list-item-meta">${AYCPortal.formatDate(m.starts_at,true)} · ${AYCPortal.escapeHtml(m.school_name||'Mon club')} · ${AYCPortal.escapeHtml(m.format)}</span></div><div class="heading-actions"><span class="status-badge">${m.meeting_type.replaceAll('_',' ')}</span><button class="btn btn-secondary btn-sm" data-open="${m.id}">Détails</button></div></article>`).join(''):AYCPortal.renderEmpty('Aucune réunion enregistrée');};all=(await AYCPortal.api('meetings')).meetings||[];render('all');document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('active'));b.classList.add('active');render(b.dataset.filter);}));list.addEventListener('click',async e=>{const id=e.target.dataset.open;if(!id)return;const data=await AYCPortal.api('meeting',{query:{meetingId:id}});const m=data.meeting;const agenda=Array.isArray(m.agenda)?m.agenda:[];const block=document.createElement('div');block.className='portal-card';block.style.marginTop='14px';block.innerHTML=`<h2>${AYCPortal.escapeHtml(m.title)}</h2><p class="list-item-meta">${AYCPortal.formatDate(m.starts_at,true)} · ${AYCPortal.escapeHtml(m.location||'Format en ligne')}</p><h3>Ordre du jour</h3>${agenda.length?`<ol>${agenda.map(x=>`<li>${AYCPortal.escapeHtml(typeof x==='string'?x:x.title||'Point')}</li>`).join('')}</ol>`:AYCPortal.renderEmpty('Ordre du jour à compléter')}<div class="form-actions"><button class="btn btn-secondary btn-sm" data-rsvp="present">Je serai présent·e</button><button class="btn btn-secondary btn-sm" data-rsvp="absent">Absent·e</button><button class="btn btn-primary btn-sm" data-minutes="${m.id}">Ouvrir le PV</button></div><div id="minutes-${m.id}"></div>`;e.target.closest('article').after(block);block.querySelectorAll('[data-rsvp]').forEach(b=>b.addEventListener('click',async()=>{await AYCPortal.api('meeting',{method:'POST',body:{action:'rsvp',meetingId:id,rsvp:b.dataset.rsvp}});b.textContent='Réponse enregistrée';}));block.querySelector('[data-minutes]').addEventListener('click',()=>{const target=block.querySelector(`#minutes-${m.id}`);target.innerHTML=`<div class="form-grid"><div class="form-field"><label>Mode</label><select id="mode-${m.id}"><option value="standard">PV standard</option><option value="assemblee_generale">PV assemblée générale</option></select></div><div class="form-field"><label>Mandat</label><input id="mandate-${m.id}"></div><div class="form-field full"><label>Conclusions / points discutés</label><textarea id="agendaBlocks-${m.id}" placeholder="Un bloc par point à l'ordre du jour"></textarea></div><div class="form-field full"><label>Motion(s), pour une assemblée générale</label><textarea id="motions-${m.id}" placeholder="Nom · proposant · secondant · résultat"></textarea></div></div><div class="form-actions"><button class="btn btn-primary" id="save-minutes-${m.id}">Enregistrer le brouillon</button></div>`;target.querySelector('button').addEventListener('click',async()=>{await AYCPortal.api('meeting',{method:'POST',body:{action:'save_minutes',meetingId:id,mode:document.getElementById(`mode-${m.id}`).value,mandate:document.getElementById(`mandate-${m.id}`).value,agendaBlocks:document.getElementById(`agendaBlocks-${m.id}`).value.split('\n').filter(Boolean),motions:document.getElementById(`motions-${m.id}`).value.split('\n').filter(Boolean),status:'draft'}});target.insertAdjacentHTML('beforeend','<div class="alert alert-success">Brouillon du PV enregistré.</div>');});});});document.getElementById('meeting-form').addEventListener('submit',async e=>{e.preventDefault();const f=id=>document.getElementById(id).value;try{await AYCPortal.api('meetings',{method:'POST',body:{title:f('title'),meetingType:f('meetingType'),format:f('format'),startsAt:f('startsAt'),endsAt:f('endsAt'),location:f('location'),mapsUrl:f('mapsUrl'),comments:f('comments'),agenda:f('agenda').split('\n').filter(Boolean)}});location.reload();}catch(err){AYCPortal.renderError(document.getElementById('notice'),err);}});}catch(e){AYCPortal.renderError(document.getElementById('notice'),e);}})();
-</script></body></html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Réunions & PV · Portail YOUTHCLUBber</title>
+  <link rel="icon" href="../assets/favicon-32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <div id="topbar-root"></div>
+  <div class="workspace">
+    <div id="sidebar-root"></div>
+    <main class="portal-content">
+      <div class="portal-heading">
+        <div>
+          <p class="eyebrow">Vie du club</p>
+          <h1>Réunions & procès-verbaux</h1>
+          <p>Prépare les temps forts, suis le quorum et conserve des décisions lisibles, structurées et vérifiables.</p>
+        </div>
+      </div>
+      <div id="notice"></div>
+
+      <div class="portal-grid">
+        <section class="portal-card card-span-8">
+          <div class="toolbar">
+            <div><p class="eyebrow">Calendrier de travail</p><h2>Réunions à venir et archivées</h2></div>
+            <div class="filter-tabs" id="filters">
+              <button class="active" data-filter="all">Toutes</button>
+              <button data-filter="reunion">Réunions</button>
+              <button data-filter="assemblee_locale">Assemblées locales</button>
+              <button data-filter="assemblee_generale">Assemblées générales</button>
+            </div>
+          </div>
+          <div id="meeting-list" class="list-stack"></div>
+        </section>
+
+        <section class="portal-card card-span-4" id="new">
+          <p class="eyebrow">Organisation</p>
+          <h2>Créer un rendez-vous</h2>
+          <form id="meeting-form">
+            <div class="form-field"><label for="title">Titre</label><input id="title" required placeholder="Réunion mensuelle"></div>
+            <div class="form-grid">
+              <div class="form-field"><label for="meetingType">Type</label><select id="meetingType"><option value="reunion">Réunion</option><option value="assemblee_locale">Assemblée locale</option><option value="assemblee_generale">Assemblée générale</option></select></div>
+              <div class="form-field"><label for="status">État</label><select id="status"><option value="planned">Planifiée</option><option value="live">En cours</option><option value="completed">Terminée</option></select></div>
+            </div>
+            <div class="form-grid"><div class="form-field"><label for="startsAt">Début</label><input id="startsAt" type="datetime-local" required></div><div class="form-field"><label for="endsAt">Fin</label><input id="endsAt" type="datetime-local"></div></div>
+            <div class="form-grid"><div class="form-field"><label for="format">Format</label><select id="format"><option value="presentiel">Présentiel</option><option value="en_ligne">En ligne</option><option value="hybride">Hybride</option></select></div><div class="form-field"><label for="location">Lieu / lien</label><input id="location" placeholder="Maison des jeunes ou lien visio"></div></div>
+            <div class="form-field"><label for="mapsUrl">Google Maps (optionnel)</label><input id="mapsUrl" type="url" placeholder="https://maps.google.com/…"></div>
+            <div class="form-grid"><div class="form-field"><label for="chairId">Présidence de séance</label><select id="chairId"><option value="">À désigner</option></select></div><div class="form-field"><label for="secretaryId">Secrétariat de séance</label><select id="secretaryId"><option value="">À désigner</option></select></div></div>
+            <div class="form-field"><label for="comments">Informations pratiques</label><textarea id="comments" placeholder="Consignes, documents à préparer…"></textarea></div>
+            <div class="toolbar compact"><h3>Ordre du jour</h3><button type="button" id="add-agenda" class="btn btn-secondary btn-sm">Ajouter un point</button></div>
+            <div id="agenda-editor" class="list-stack"></div>
+            <div class="form-actions"><button class="btn btn-primary" type="submit">Publier la réunion</button></div>
+          </form>
+        </section>
+      </div>
+      <div id="detail-root"></div>
+    </main>
+  </div>
+
+  <script src="portal-common.js"></script>
+  <script>
+  (async () => {
+    const notice = document.getElementById('notice');
+    const list = document.getElementById('meeting-list');
+    const detailRoot = document.getElementById('detail-root');
+    const agendaEditor = document.getElementById('agenda-editor');
+    const esc = AYCPortal.escapeHtml;
+    const label = { reunion: 'Réunion', assemblee_locale: 'Assemblée locale', assemblee_generale: 'Assemblée générale', planned: 'Planifiée', live: 'En cours', completed: 'Terminée', cancelled: 'Annulée' };
+    let allMeetings = [];
+    let roster = [];
+    let activeFilter = 'all';
+
+    const apiError = error => AYCPortal.renderError(notice, error);
+    const fieldValue = id => document.getElementById(id).value;
+    const memberOptions = selected => `<option value="">À désigner</option>${roster.map(m => `<option value="${m.id}"${m.id === selected ? ' selected' : ''}>${esc(m.display_name || m.username)}</option>`).join('')}`;
+
+    function addAgendaRow(item = {}) {
+      const row = document.createElement('div');
+      row.className = 'list-item agenda-row';
+      row.innerHTML = `<div class="form-grid" style="width:100%;align-items:end"><div class="form-field"><label>Point</label><input class="agenda-title" value="${esc(item.title || '')}" placeholder="Validation du rapport d'activité"></div><div class="form-field"><label>Durée (min)</label><input class="agenda-duration" type="number" min="1" max="600" value="${item.durationMinutes || ''}"></div><div class="form-field"><label>Note</label><input class="agenda-notes" value="${esc(item.notes || '')}" placeholder="Document ou objectif"></div><button type="button" class="btn btn-secondary btn-sm remove-agenda">Retirer</button></div>`;
+      row.querySelector('.remove-agenda').addEventListener('click', () => row.remove());
+      agendaEditor.appendChild(row);
+    }
+
+    function readAgenda() {
+      return [...agendaEditor.querySelectorAll('.agenda-row')].map(row => ({ title: row.querySelector('.agenda-title').value.trim(), durationMinutes: Number(row.querySelector('.agenda-duration').value) || null, notes: row.querySelector('.agenda-notes').value.trim() || null })).filter(x => x.title);
+    }
+
+    function groupedMeetings(filter) {
+      const rows = filter === 'all' ? allMeetings : allMeetings.filter(x => x.meeting_type === filter);
+      const groups = new Map();
+      rows.forEach(m => { const key = new Date(m.starts_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }); if (!groups.has(key)) groups.set(key, []); groups.get(key).push(m); });
+      return groups;
+    }
+
+    function renderMeetings() {
+      const groups = groupedMeetings(activeFilter);
+      if (!groups.size) { list.innerHTML = AYCPortal.renderEmpty('Aucune réunion dans cette vue'); return; }
+      list.innerHTML = [...groups.entries()].map(([month, rows]) => `<div class="month-group"><div class="month-heading"><span>${esc(month.charAt(0).toUpperCase() + month.slice(1))}</span><span class="list-item-meta">${rows.length} rendez-vous</span></div>${rows.map(m => `<article class="list-item meeting-row" data-id="${m.id}"><div class="meeting-date"><strong>${new Date(m.starts_at).toLocaleDateString('fr-FR', { day: '2-digit' })}</strong><span>${new Date(m.starts_at).toLocaleDateString('fr-FR', { weekday: 'short' })}</span></div><div class="list-item-main"><span class="list-item-title">${esc(m.title)}</span><span class="list-item-meta">${new Date(m.starts_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${esc(m.school_name || 'Mon club')} · ${esc(m.location || (m.format === 'en_ligne' ? 'En ligne' : 'Lieu à préciser'))}</span><span class="list-item-meta">${m.agenda_items?.length || 0} point(s) à l'ordre du jour${m.chair_name ? ` · présidence : ${esc(m.chair_name)}` : ''}</span></div><div class="heading-actions"><span class="status-badge">${esc(label[m.meeting_type] || m.meeting_type)}</span><button class="btn btn-secondary btn-sm" data-open="${m.id}">Ouvrir</button></div></article>`).join('')}</div>`).join('');
+    }
+
+    function renderEditor(data) {
+      const m = data.meeting;
+      const saved = data.minutes || {};
+      const structured = data.structured || {};
+      const attendanceById = new Map((structured.attendance || []).map(a => [a.member_id, a]));
+      const blocks = structured.agendaBlocks || [];
+      const motions = structured.motions || [];
+      detailRoot.innerHTML = `<section class="portal-card meeting-detail-card"><div class="toolbar"><div><p class="eyebrow">${esc(label[m.meeting_type] || m.meeting_type)}</p><h2>${esc(m.title)}</h2><p class="list-item-meta">${AYCPortal.formatDate(m.starts_at, true)} · ${esc(m.location || 'Format en ligne')} · ${esc(label[m.status] || m.status || 'Planifiée')}</p></div><button class="btn btn-secondary btn-sm" id="close-detail">Fermer</button></div><div class="meeting-detail-grid"><div><h3>Ordre du jour</h3><div class="list-stack">${(data.agendaItems || []).length ? data.agendaItems.map(i => `<div class="list-item"><div class="meeting-date"><strong>${i.position + 1}</strong><span>${i.duration_minutes ? `${i.duration_minutes} min` : ''}</span></div><div class="list-item-main"><span class="list-item-title">${esc(i.title)}</span><span class="list-item-meta">${esc(i.notes || '')}</span></div></div>`).join('') : AYCPortal.renderEmpty('Ordre du jour à compléter')}</div><h3 style="margin-top:22px">Présence</h3><div class="form-actions"><button class="btn btn-secondary btn-sm" data-rsvp="present">Je serai présent·e</button><button class="btn btn-secondary btn-sm" data-rsvp="absent">Je serai absent·e</button></div></div><div><h3>PV structuré</h3><div class="form-grid"><div class="form-field"><label>Mode</label><select id="pv-mode"><option value="standard"${saved.mode === 'standard' ? ' selected' : ''}>PV standard</option><option value="assemblee_generale"${saved.mode === 'assemblee_generale' ? ' selected' : ''}>PV assemblée générale</option></select></div><div class="form-field"><label>Statut</label><select id="pv-status"><option value="draft">Brouillon</option><option value="sent">Envoyé</option><option value="validated">Validé</option></select></div><div class="form-field"><label>Mandat / session</label><input id="pv-mandate" value="${esc(saved.mandate || '')}"></div><div class="form-field"><label>Rédacteur·rice</label><input id="pv-organizer" value="${esc(saved.organizer || '')}"></div><div class="form-field"><label>Durée (minutes)</label><input id="pv-duration" type="number" min="0" value="${saved.duration_minutes || ''}"></div><div class="form-field"><label>Heure de clôture</label><input id="pv-closing" type="datetime-local"></div></div><h4>Présence et droits de vote</h4><div class="table-wrap"><table class="portal-table"><thead><tr><th>Membre</th><th>Présence</th><th>Voix</th></tr></thead><tbody id="attendance-rows">${roster.map(member => { const a = attendanceById.get(member.id) || {}; return `<tr data-member-id="${member.id}"><td>${esc(member.display_name || member.username)}</td><td><select class="attendance-status"><option value="present"${a.attendance_status === 'present' ? ' selected' : ''}>Présent·e</option><option value="absent"${a.attendance_status === 'absent' ? ' selected' : ''}>Absent·e</option><option value="excused"${a.attendance_status === 'excused' ? ' selected' : ''}>Excusé·e</option><option value="late"${a.attendance_status === 'late' ? ' selected' : ''}>En retard</option></select></td><td><input class="voting-rights" type="checkbox"${a.voting_rights ? ' checked' : ''}></td></tr>`; }).join('')}</tbody></table></div><h4>Points discutés et décisions</h4><div id="pv-blocks" class="list-stack">${blocks.map(b => `<div class="pv-block list-item"><div class="form-grid" style="width:100%"><input class="block-title" value="${esc(b.title || '')}" placeholder="Titre du point"><textarea class="block-discussion" placeholder="Discussion">${esc(b.discussion || '')}</textarea><textarea class="block-decision" placeholder="Décision / suite">${esc(b.decision || '')}</textarea></div></div>`).join('')}</div><button type="button" class="btn btn-secondary btn-sm" id="add-block">Ajouter un point</button><h4>Motions</h4><div id="pv-motions" class="list-stack">${motions.map(motion => `<div class="pv-motion list-item"><div class="form-grid" style="width:100%"><input class="motion-title" value="${esc(motion.title || '')}" placeholder="Objet de la motion"><select class="motion-proposer">${memberOptions(motion.proposer_id)}</select><select class="motion-seconder">${memberOptions(motion.seconder_id)}</select><input class="motion-for" type="number" min="0" value="${motion.votes_for || 0}" placeholder="Pour"><input class="motion-against" type="number" min="0" value="${motion.votes_against || 0}" placeholder="Contre"><input class="motion-abstentions" type="number" min="0" value="${motion.abstentions || 0}" placeholder="Abstentions"><textarea class="motion-result" placeholder="Résultat / conséquence">${esc(motion.result || '')}</textarea></div></div>`).join('')}</div><button type="button" class="btn btn-secondary btn-sm" id="add-motion">Ajouter une motion</button><div class="form-actions"><button class="btn btn-primary" id="save-pv">Enregistrer le PV</button></div></div></div></section>`;
+
+      document.getElementById('close-detail').onclick = () => { detailRoot.innerHTML = ''; };
+      detailRoot.querySelectorAll('[data-rsvp]').forEach(btn => btn.onclick = async () => { try { await AYCPortal.api('meeting', { method: 'POST', body: { action: 'rsvp', meetingId: m.id, rsvp: btn.dataset.rsvp } }); btn.textContent = 'Réponse enregistrée'; } catch (error) { apiError(error); } });
+      const blocksRoot = document.getElementById('pv-blocks');
+      const motionsRoot = document.getElementById('pv-motions');
+      document.getElementById('add-block').onclick = () => { const div = document.createElement('div'); div.className = 'pv-block list-item'; div.innerHTML = '<div class="form-grid" style="width:100%"><input class="block-title" placeholder="Titre du point"><textarea class="block-discussion" placeholder="Discussion"></textarea><textarea class="block-decision" placeholder="Décision / suite"></textarea></div>'; blocksRoot.appendChild(div); };
+      document.getElementById('add-motion').onclick = () => { const div = document.createElement('div'); div.className = 'pv-motion list-item'; div.innerHTML = `<div class="form-grid" style="width:100%"><input class="motion-title" placeholder="Objet de la motion"><select class="motion-proposer">${memberOptions('')}</select><select class="motion-seconder">${memberOptions('')}</select><input class="motion-for" type="number" min="0" value="0" placeholder="Pour"><input class="motion-against" type="number" min="0" value="0" placeholder="Contre"><input class="motion-abstentions" type="number" min="0" value="0" placeholder="Abstentions"><textarea class="motion-result" placeholder="Résultat / conséquence"></textarea></div>`; motionsRoot.appendChild(div); };
+      document.getElementById('save-pv').onclick = async () => {
+        const attendance = [...document.querySelectorAll('#attendance-rows tr')].map(row => ({ memberId: row.dataset.memberId, attendanceStatus: row.querySelector('.attendance-status').value, votingRights: row.querySelector('.voting-rights').checked }));
+        const agendaBlocks = [...blocksRoot.querySelectorAll('.pv-block')].map(row => ({ title: row.querySelector('.block-title').value.trim(), discussion: row.querySelector('.block-discussion').value.trim(), decision: row.querySelector('.block-decision').value.trim() })).filter(x => x.title);
+        const motions = [...motionsRoot.querySelectorAll('.pv-motion')].map(row => ({ title: row.querySelector('.motion-title').value.trim(), proposerId: row.querySelector('.motion-proposer').value || null, seconderId: row.querySelector('.motion-seconder').value || null, votesFor: Number(row.querySelector('.motion-for').value) || 0, votesAgainst: Number(row.querySelector('.motion-against').value) || 0, abstentions: Number(row.querySelector('.motion-abstentions').value) || 0, result: row.querySelector('.motion-result').value.trim() })).filter(x => x.title);
+        try { await AYCPortal.api('meeting', { method: 'POST', body: { action: 'save_minutes', meetingId: m.id, mode: fieldValue('pv-mode'), status: fieldValue('pv-status'), mandate: fieldValue('pv-mandate'), organizer: fieldValue('pv-organizer'), durationMinutes: fieldValue('pv-duration'), closingAt: fieldValue('pv-closing'), attendance, agendaBlocks, motions } }); notice.innerHTML = '<div class="alert alert-success">Le brouillon structuré du PV est enregistré.</div>'; } catch (error) { apiError(error); }
+      };
+      detailRoot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    try {
+      const member = await AYCPortal.initPortalShell({ requireActive: true });
+      if (!member) return;
+      roster = (await AYCPortal.api('roster')).members || [];
+      document.getElementById('chairId').innerHTML = memberOptions('');
+      document.getElementById('secretaryId').innerHTML = memberOptions('');
+      addAgendaRow();
+      document.getElementById('add-agenda').onclick = () => addAgendaRow();
+      allMeetings = (await AYCPortal.api('meetings')).meetings || [];
+      renderMeetings();
+      document.getElementById('filters').addEventListener('click', event => { const button = event.target.closest('[data-filter]'); if (!button) return; activeFilter = button.dataset.filter; document.querySelectorAll('#filters button').forEach(x => x.classList.toggle('active', x === button)); renderMeetings(); });
+      list.addEventListener('click', async event => { const button = event.target.closest('[data-open]'); if (!button) return; try { renderEditor(await AYCPortal.api('meeting', { query: { meetingId: button.dataset.open } })); } catch (error) { apiError(error); } });
+      document.getElementById('meeting-form').addEventListener('submit', async event => { event.preventDefault(); const agendaItems = readAgenda(); if (!agendaItems.length) { notice.innerHTML = '<div class="alert alert-error">Ajoute au moins un point à l’ordre du jour, ou précise pourquoi il n’y en a pas.</div>'; return; } try { await AYCPortal.api('meetings', { method: 'POST', body: { title: fieldValue('title'), meetingType: fieldValue('meetingType'), status: fieldValue('status'), startsAt: fieldValue('startsAt'), endsAt: fieldValue('endsAt'), format: fieldValue('format'), location: fieldValue('location'), mapsUrl: fieldValue('mapsUrl'), chairId: fieldValue('chairId') || null, secretaryId: fieldValue('secretaryId') || null, comments: fieldValue('comments'), agendaItems } }); event.target.reset(); agendaEditor.innerHTML = ''; addAgendaRow(); notice.innerHTML = '<div class="alert alert-success">La réunion a été publiée.</div>'; allMeetings = (await AYCPortal.api('meetings')).meetings || []; renderMeetings(); } catch (error) { apiError(error); } });
+    } catch (error) { apiError(error); }
+  })();
+  </script>
+</body>
+</html>

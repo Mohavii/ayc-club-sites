@@ -264,3 +264,20 @@ body.portal-page:before{
   .portal-reveal{ opacity:1 !important; transform:none !important; transition:none !important; }
   .portal-card,.stat-card,.list-item,.btn,.sidebar-link,.profile-large-avatar,.role-badge,.form-field input,.form-field select,.form-field textarea{ transition:none !important; }
 }
+
+/* Phase 2 meeting and PV workspace */
+.month-group { display: grid; gap: 10px; }
+.month-group + .month-group { margin-top: 22px; }
+.month-heading { display: flex; justify-content: space-between; align-items: center; color: var(--portal-navy); font-family: "Fjalla One", sans-serif; letter-spacing: .03em; border-bottom: 1px solid rgba(18,35,63,.12); padding-bottom: 8px; }
+.meeting-row { align-items: center; }
+.meeting-date { flex: 0 0 56px; min-width: 56px; display: grid; place-items: center; border-radius: 14px; background: linear-gradient(145deg, #0b346f, #1764b3); color: #fff; padding: 9px 5px; line-height: 1; box-shadow: 0 8px 18px rgba(11,52,111,.18); }
+.meeting-date strong { font-size: 1.35rem; }
+.meeting-date span { font-size: .68rem; text-transform: uppercase; opacity: .8; margin-top: 4px; }
+.meeting-detail-card { margin-top: 20px; scroll-margin-top: 20px; border-top: 4px solid #e5b942; }
+.meeting-detail-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 28px; margin-top: 18px; }
+.meeting-detail-grid h3, .meeting-detail-grid h4 { color: var(--portal-navy); margin: 20px 0 10px; }
+.agenda-row, .pv-block, .pv-motion { background: rgba(245,248,252,.8); }
+.agenda-row .form-grid, .pv-block .form-grid, .pv-motion .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.agenda-row .form-field:first-child, .pv-block .block-title, .pv-motion .motion-title, .pv-motion .motion-result { grid-column: 1 / -1; }
+@media (max-width: 900px) { .meeting-detail-grid { grid-template-columns: 1fr; } }
+@media (max-width: 620px) { .meeting-row { align-items: flex-start; } .meeting-row .heading-actions { flex-direction: column; align-items: flex-end; } .agenda-row .form-grid, .pv-block .form-grid, .pv-motion .form-grid { grid-template-columns: 1fr; } .agenda-row .form-field:first-child, .pv-block .block-title, .pv-motion .motion-title, .pv-motion .motion-result { grid-column: auto; } }
