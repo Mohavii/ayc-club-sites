@@ -46,6 +46,13 @@ create table if not exists portal_members (
   status               text not null default 'pending'
                          check (status in ('pending', 'active', 'rejected')),
 
+  -- Official membership status (from final.pdf)
+  membership_status    text not null default 'nouveau_adherent'
+                         check (membership_status in (
+                           'nouveau_adherent', 'adherent', 'responsable',
+                           'senior', 'membre_national', 'ancien'
+                         )),
+
   -- Portal-management admin flag. This is DELIBERATELY separate from
   -- any organizational title (see portal_national_roles below) — e.g.
   -- "Président National" is an org title, not portal-admin power, and
@@ -62,6 +69,21 @@ create table if not exists portal_members (
 
 create index if not exists idx_portal_members_status on portal_members(status);
 create index if not exists idx_portal_members_school on portal_members(school_id);
+create index if not exists idx_portal_members_membership_status on portal_members(membership_status);
+
+-- ---------------------------------------------------------------------
+-- Member status history
+-- ---------------------------------------------------------------------
+create table if not exists portal_member_status_history (
+  id          uuid primary key default gen_random_uuid(),
+  member_id   uuid not null references portal_members(id) on delete cascade,
+  status      text not null,
+  changed_by  uuid references portal_members(id),
+  changed_at  timestamptz not null default now(),
+  reason      text
+);
+
+create index if not exists idx_status_history_member on portal_member_status_history(member_id, changed_at desc);
 
 -- ---------------------------------------------------------------------
 -- Sessions — server-side, revocable. We deliberately do NOT use
@@ -143,6 +165,17 @@ create table if not exists portal_signup_tokens (
 --      portal_capability_grants rows, and someone can be a national
 --      admin while holding no title here at all.
 -- =======================================================================
+
+-- ---------------------------------------------------------------------
+-- Role definitions — metadata about official roles
+-- ---------------------------------------------------------------------
+create table if not exists portal_role_definitions (
+  slug        text primary key,
+  name        text not null,
+  description text,
+  scope       text not null check (scope in ('club', 'national', 'regional')),
+  required_training text -- e.g. 'COSTRA', 'RH', 'RELEX'
+);
 
 -- ---------------------------------------------------------------------
 -- Club display roles — one currently-active role per member per club.
@@ -365,6 +398,9 @@ create table if not exists portal_responsibilities (
   project_url text,
   database_url text,
   held_on date,
+  status text not null default 'proposed' check (status in ('proposed', 'validated', 'rejected')),
+  validated_by uuid references portal_members(id),
+  validated_at timestamptz,
   created_at timestamptz not null default now()
 );
 create index if not exists idx_portal_responsibilities_member on portal_responsibilities(member_id, held_on desc);
