@@ -27,7 +27,7 @@
         <div>
           <label class="btn btn-third" for="avatar-input" style="padding:10px 18px; font-size:0.85rem;">Choisir une photo</label>
           <input type="file" id="avatar-input" accept="image/png,image/jpeg,image/webp">
-          <div id="avatar-status" class="field-hint">JPEG, PNG ou WEBP, 5 Mo max.</div>
+          <div id="avatar-status" class="field-hint">Ta photo Google est utilisée par défaut. JPEG, PNG ou WEBP, 4 Mo max.</div>
         </div>
       </div>
 
@@ -86,7 +86,9 @@
   const submitBtn = document.getElementById("submit-btn");
 
   displayNameInput.value = prefill.suggestedName || "";
-  avatarPreview.src = prefill.googlePicture || "../assets/logo-secondary-color.png";
+  let selectedPictureUrl = prefill.googlePicture || null;
+  avatarPreview.src = selectedPictureUrl || "/assets/logo-secondary-color.png";
+  if (selectedPictureUrl) avatarStatus.textContent = "Photo Google prête — tu peux la remplacer.";
 
   // ---- schools ----
   try {
@@ -131,15 +133,30 @@
   // ---- avatar upload ----
   // The file's bytes are POSTed straight to our own function, which
   // stores them in Vercel Blob server-side and hands back the public URL.
-  let uploadedPictureUrl = null;
   avatarInput.addEventListener("change", async () => {
-    const file = avatarInput.files[0];
+    const file = avatarInput.files && avatarInput.files[0];
     if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      avatarStatus.textContent = "Format non supporté. Choisis un JPEG, PNG ou WEBP.";
+      avatarPreview.src = selectedPictureUrl || "/assets/logo-secondary-color.png";
+      return;
+    }
+    if (!file.size) {
+      avatarStatus.textContent = "Le fichier est vide ou illisible. La photo Google reste sélectionnée.";
+      avatarPreview.src = selectedPictureUrl || "/assets/logo-secondary-color.png";
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      avatarStatus.textContent = "Image trop lourde (4 Mo max). La photo Google reste sélectionnée.";
+      avatarPreview.src = selectedPictureUrl || "/assets/logo-secondary-color.png";
+      return;
+    }
 
     const preview = URL.createObjectURL(file);
     avatarPreview.src = preview;
     avatarStatus.textContent = "Téléversement…";
-    uploadedPictureUrl = null;
 
     try {
       const res = await fetch("/api/onboarding/upload-photo", {
@@ -149,10 +166,13 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Échec du téléversement.");
-      uploadedPictureUrl = data.url;
-      avatarStatus.textContent = "Photo téléversée.";
+      selectedPictureUrl = data.url;
+      avatarStatus.textContent = "Photo personnelle téléversée.";
     } catch (err) {
-      avatarStatus.textContent = err.message || "Échec du téléversement, réessaie.";
+      avatarPreview.src = selectedPictureUrl || "/assets/logo-secondary-color.png";
+      avatarStatus.textContent = `${err.message || "Échec du téléversement."} La photo Google reste sélectionnée.`;
+    } finally {
+      URL.revokeObjectURL(preview);
     }
   });
 
@@ -171,8 +191,8 @@
       formError.style.display = "block";
       return;
     }
-    if (!uploadedPictureUrl) {
-      formError.textContent = "Ajoute une photo de profil.";
+    if (!selectedPictureUrl) {
+      formError.textContent = "Aucune photo disponible. Choisis une photo ou reconnecte-toi avec Google.";
       formError.style.display = "block";
       return;
     }
@@ -187,7 +207,7 @@
           username: usernameInput.value.trim().toLowerCase(),
           displayName: displayNameInput.value.trim(),
           schoolId: Number(schoolSelect.value),
-          profilePictureUrl: uploadedPictureUrl,
+          profilePictureUrl: selectedPictureUrl,
         }),
       });
       const data = await res.json();
