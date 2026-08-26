@@ -1,0 +1,97 @@
+/* portal.css — extends theme.css's tokens for the members-only portal.
+   Nothing here redefines --navy-1/--blue-1/etc.; it only adds portal
+   layout on top of the existing design system so the two surfaces stay
+   visually identical. */
+
+.portal-shell{
+  max-width:640px; margin:0 auto; padding:48px 24px 80px;
+  position:relative; z-index:1;
+}
+.portal-shell.wide{ max-width:920px; }
+
+.portal-card{
+  background:var(--white); border:1px solid var(--line); border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-card); padding:36px;
+}
+@media (max-width:560px){ .portal-card{ padding:24px; } }
+
+.portal-title{
+  font-family:var(--font-display); color:var(--navy-1);
+  font-size:1.7rem; margin:0 0 8px;
+}
+.portal-subtitle{ color:var(--ink-soft); font-size:0.95rem; margin:0 0 28px; line-height:1.5; }
+
+/* auth control in the topbar — visually distinct from a disabled button */
+.auth-slot{ display:flex; align-items:center; gap:10px; }
+.auth-avatar{
+  width:34px; height:34px; border-radius:50%; object-fit:cover;
+  border:2px solid var(--blue-2); flex:none; background:var(--paper-2);
+}
+.btn-logout{
+  font-family:var(--font-body); font-weight:600; font-size:0.85rem;
+  color:var(--navy-1); background:var(--paper-2); border:1px solid var(--line);
+  padding:9px 18px; border-radius:100px; cursor:pointer;
+  transition:background .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease);
+}
+.btn-logout:hover{ background:#FBE9E9; border-color:#E9C6C6; color:#B23A3A; }
+
+.btn-google{
+  display:inline-flex; align-items:center; gap:12px; justify-content:center;
+  width:100%; font-family:var(--font-body); font-weight:600; font-size:0.95rem;
+  color:var(--ink); background:var(--white); border:1px solid var(--line);
+  padding:14px 22px; border-radius:100px; cursor:pointer;
+  box-shadow:var(--shadow-card); transition:transform .2s var(--ease), box-shadow .2s var(--ease);
+}
+.btn-google:hover{ transform:translateY(-1px); box-shadow:0 12px 28px -12px rgba(39,40,99,0.3); }
+
+.field{ margin-bottom:20px; }
+.field label{
+  display:block; font-family:var(--font-body); font-weight:600; font-size:0.85rem;
+  color:var(--navy-1); margin-bottom:8px;
+}
+.field input[type="text"], .field select{
+  width:100%; font-family:var(--font-body); font-size:0.95rem; color:var(--ink);
+  background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm);
+  padding:12px 14px; transition:border-color .2s var(--ease);
+}
+.field input:focus, .field select:focus{ outline:none; border-color:var(--blue-1); }
+.field-hint{ font-size:0.8rem; color:var(--ink-soft); margin-top:6px; }
+.field-error{ font-size:0.8rem; color:#B23A3A; margin-top:6px; }
+.field-ok{ font-size:0.8rem; color:#2C8659; margin-top:6px; }
+
+.avatar-upload{ display:flex; align-items:center; gap:16px; margin-bottom:20px; }
+.avatar-preview{
+  width:72px; height:72px; border-radius:50%; object-fit:cover;
+  background:var(--paper-2); border:2px solid var(--line); flex:none;
+}
+.avatar-upload label.btn-third{ cursor:pointer; }
+.avatar-upload input[type="file"]{ display:none; }
+
+.status-banner{
+  border-radius:var(--radius); padding:18px 20px; margin-bottom:24px;
+  font-size:0.92rem; line-height:1.5;
+}
+.status-banner.pending{ background:#FFF6E3; color:#8A5A00; border:1px solid #F4DFAE; }
+.status-banner.rejected{ background:#FBE9E9; color:#8A2A2A; border:1px solid #E9C6C6; }
+.status-banner.active{ background:#E8F5EC; color:#1E6B3E; border:1px solid #C7E9D2; }
+
+.review-row{
+  display:flex; align-items:center; gap:16px; padding:16px 0;
+  border-bottom:1px solid var(--line);
+}
+.review-row:last-child{ border-bottom:none; }
+.review-row img{ width:48px; height:48px; border-radius:50%; object-fit:cover; background:var(--paper-2); flex:none; }
+.review-row .who{ flex:1; min-width:0; }
+.review-row .who strong{ display:block; font-size:0.95rem; color:var(--ink); }
+.review-row .who span{ display:block; font-size:0.82rem; color:var(--ink-soft); }
+.review-row .actions{ display:flex; gap:8px; flex:none; }
+.btn-approve, .btn-reject{
+  font-family:var(--font-body); font-weight:600; font-size:0.82rem;
+  border-radius:100px; padding:9px 16px; border:none; cursor:pointer;
+}
+.btn-approve{ background:#1E6B3E; color:#fff; }
+.btn-approve:hover{ background:#175430; }
+.btn-reject{ background:var(--paper-2); color:#B23A3A; }
+.btn-reject:hover{ background:#FBE9E9; }
+
+.empty-state{ text-align:center; color:var(--ink-soft); padding:40px 0; font-size:0.92rem; }
