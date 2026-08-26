@@ -480,3 +480,90 @@ create table if not exists portal_minutes_motions (
   unique (minutes_id, position)
 );
 create index if not exists idx_portal_minutes_motions_minutes on portal_minutes_motions(minutes_id, position);
+
+-- =======================================================================
+-- REPORT TEMPLATES, DEADLINES, AND STRATEGIC AXES (PHASE 3)
+-- =======================================================================
+
+create table if not exists portal_strategic_axes (
+  slug text primary key,
+  name text not null,
+  description text,
+  sort_order integer not null default 0
+);
+
+create table if not exists portal_strategic_sub_axes (
+  slug text primary key,
+  axis_slug text not null references portal_strategic_axes(slug) on delete cascade,
+  name text not null,
+  description text,
+  sort_order integer not null default 0
+);
+
+insert into portal_strategic_axes (slug, name, description, sort_order) values
+  ('scolarite', 'Scolarité', 'Réussite scolaire, orientation et accompagnement éducatif.', 1),
+  ('education_formelle', 'Éducation formelle', 'Apprentissages, transmission et développement des compétences.', 2),
+  ('sante_4d', 'Santé en 4D', 'Santé physique, mentale, sociale et environnementale.', 3),
+  ('citoyennete', 'Citoyenneté', 'Engagement, droits, devoirs et participation à la vie collective.', 4),
+  ('vie_active', 'Vie active', 'Insertion, autonomie, projets et préparation à la vie professionnelle.', 5)
+on conflict (slug) do nothing;
+
+create table if not exists portal_report_templates (
+  slug text primary key,
+  name text not null,
+  report_type text not null check (report_type in ('pre_projet','post_projet','proces_verbal','collaboration','mise_a_jour','supervision','investigation')),
+  description text,
+  recipient text,
+  deadline_rule text,
+  default_due_days integer,
+  required_sections jsonb not null default '[]'::jsonb,
+  validator_departments jsonb not null default '[]'::jsonb,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+insert into portal_report_templates
+  (slug, name, report_type, description, recipient, deadline_rule, default_due_days, required_sections, validator_departments)
+values
+  ('pre_projet', 'Rapport pré-projet', 'pre_projet', 'À préparer avant le premier engagement externe.', 'Bureau exécutif local', '7 jours avant le premier engagement externe', -7, '["contexte", "objectifs", "public", "budget", "risques", "indicateurs"]'::jsonb, '["coordination_strategique", "tresorerie"]'::jsonb),
+  ('post_projet', 'Rapport post-projet', 'post_projet', 'Bilan à transmettre après la fin du projet.', 'Bureau exécutif local', '10 jours après la fin du projet', 10, '["realisation", "participants", "resultats", "budget", "evaluation", "pieces_jointes"]'::jsonb, '["coordination_strategique", "tresorerie"]'::jsonb),
+  ('proces_verbal', 'Procès-verbal', 'proces_verbal', 'Procès-verbal structuré de réunion ou d’assemblée.', 'Instance concernée', 'Après la clôture de la séance', 0, '["mandat", "ordre_du_jour", "presence", "decisions", "cloture"]'::jsonb, '["secretariat", "supervision"]'::jsonb),
+  ('collaboration', 'Rapport collaboration / partenariat', 'collaboration', 'Suivi d’un partenariat ou d’une collaboration.', 'Bureau exécutif local', 'Selon la convention', 0, '["partenaire", "objectifs", "engagements", "resultats", "suite"]'::jsonb, '["relations_exterieures", "coordination_strategique"]'::jsonb),
+  ('mise_a_jour', 'Rapport de mise à jour', 'mise_a_jour', 'Mise à jour périodique de la vie du club.', 'Bureau exécutif national', 'Selon le calendrier annuel', 0, '["activite", "membres", "responsabilites", "projets", "besoins"]'::jsonb, '["coordination_strategique", "secretariat"]'::jsonb),
+  ('supervision', 'Rapport de supervision', 'supervision', 'Dossier adressé à une instance de supervision.', 'Conseil de supervision compétent', 'À la demande de l’instance', 0, '["faits", "pieces", "mesures", "suivi"]'::jsonb, '["supervision"]'::jsonb),
+  ('investigation', 'Rapport d’investigation', 'investigation', 'Dossier d’examen et de décision disciplinaire.', 'Conseil de supervision compétent', 'À la demande de l’instance', 0, '["saisine", "faits", "auditions", "constats", "decision"]'::jsonb, '["supervision", "cscy"]'::jsonb)
+on conflict (slug) do nothing;
+
+alter table portal_projects add column if not exists axis_slug text references portal_strategic_axes(slug) on delete set null;
+alter table portal_projects add column if not exists sub_axis_slug text references portal_strategic_sub_axes(slug) on delete set null;
+alter table portal_projects add column if not exists objectives text;
+alter table portal_projects add column if not exists expected_results text;
+alter table portal_projects add column if not exists evaluation_method text;
+alter table portal_projects add column if not exists stakeholders jsonb not null default '[]'::jsonb;
+alter table portal_projects add column if not exists indicators jsonb not null default '[]'::jsonb;
+
+alter table portal_reports add column if not exists project_id uuid references portal_projects(id) on delete set null;
+alter table portal_reports add column if not exists template_slug text references portal_report_templates(slug) on delete set null;
+alter table portal_reports add column if not exists recipient text;
+alter table portal_reports add column if not exists axis_slug text references portal_strategic_axes(slug) on delete set null;
+alter table portal_reports add column if not exists sub_axis_slug text references portal_strategic_sub_axes(slug) on delete set null;
+alter table portal_reports add column if not exists due_at timestamptz;
+alter table portal_reports add column if not exists submitted_at timestamptz;
+
+create index if not exists idx_portal_projects_axis on portal_projects(axis_slug, sub_axis_slug);
+create index if not exists idx_portal_reports_deadline on portal_reports(school_id, due_at);
+create index if not exists idx_portal_reports_template on portal_reports(template_slug);
+
+create table if not exists portal_report_deadlines (
+  id uuid primary key default gen_random_uuid(),
+  template_slug text not null references portal_report_templates(slug) on delete cascade,
+  school_id integer not null references portal_schools(id) on delete cascade,
+  project_id uuid references portal_projects(id) on delete set null,
+  report_id uuid references portal_reports(id) on delete set null,
+  due_at timestamptz not null,
+  status text not null default 'upcoming' check (status in ('upcoming','late','completed','escalated','cancelled')),
+  reminder_at timestamptz,
+  escalated_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_portal_report_deadlines_scope on portal_report_deadlines(school_id, due_at);
