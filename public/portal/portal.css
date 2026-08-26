@@ -281,3 +281,35 @@ body.portal-page:before{
 .agenda-row .form-field:first-child, .pv-block .block-title, .pv-motion .motion-title, .pv-motion .motion-result { grid-column: 1 / -1; }
 @media (max-width: 900px) { .meeting-detail-grid { grid-template-columns: 1fr; } }
 @media (max-width: 620px) { .meeting-row { align-items: flex-start; } .meeting-row .heading-actions { flex-direction: column; align-items: flex-end; } .agenda-row .form-grid, .pv-block .form-grid, .pv-motion .form-grid { grid-template-columns: 1fr; } .agenda-row .form-field:first-child, .pv-block .block-title, .pv-motion .motion-title, .pv-motion .motion-result { grid-column: auto; } }
+
+/* Phase 3 reports, projects, strategic axes, and validation matrix */
+.report-hero { display:flex; align-items:center; justify-content:space-between; gap:28px; padding:28px 32px; margin-bottom:18px; border-radius:22px; color:#fff; overflow:hidden; position:relative; background:linear-gradient(118deg,#1f2a5a 0%,#2855a6 56%,#3ab8ea 100%); box-shadow:0 20px 42px -26px rgba(31,42,90,.58); }
+.report-hero:after { content:""; position:absolute; inset:auto -7% -60% auto; width:55%; aspect-ratio:1; border-radius:50%; background:radial-gradient(circle,rgba(255,255,255,.22),transparent 68%); pointer-events:none; }
+.report-hero > div:first-child { position:relative; z-index:1; max-width:660px; }
+.report-hero .eyebrow { color:#f6d56d; }
+.report-hero h2 { margin:0; color:#fff; font:400 clamp(1.65rem,3vw,2.55rem)/1.08 "Fjalla One",sans-serif; }
+.report-hero p:not(.eyebrow) { color:rgba(255,255,255,.82); line-height:1.6; max-width:600px; }
+.axis-orbit { width:205px; height:205px; flex:none; position:relative; display:grid; place-items:center; border:1px solid rgba(255,255,255,.28); border-radius:50%; background:radial-gradient(circle,rgba(255,255,255,.14),transparent 62%); animation:axisFloat 8s ease-in-out infinite alternate; }
+.axis-orbit:before { content:"AYC"; display:grid; place-items:center; width:70px; height:70px; border-radius:50%; background:#fff; color:var(--portal-navy); font:400 1.55rem "Fjalla One",sans-serif; box-shadow:0 12px 25px rgba(0,0,0,.16); }
+.axis-orbit span { position:absolute; padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.23); color:#fff; font-size:.55rem; font-weight:900; letter-spacing:.07em; white-space:nowrap; }
+.axis-orbit span:nth-child(1){top:8px;left:50%;transform:translateX(-50%)} .axis-orbit span:nth-child(2){right:-10px;top:50%;transform:translateY(-50%)} .axis-orbit span:nth-child(3){bottom:12px;right:10px} .axis-orbit span:nth-child(4){bottom:12px;left:7px} .axis-orbit span:nth-child(5){left:-18px;top:50%;transform:translateY(-50%)}
+@keyframes axisFloat { from{transform:translateY(2px) rotate(-2deg)} to{transform:translateY(-7px) rotate(2deg)} }
+.report-stats { grid-template-columns:repeat(5,1fr); margin-bottom:18px; }
+.section-note { color:#78849b; font-size:.75rem; font-weight:700; }
+.project-create-form { margin-top:18px; padding-top:18px; border-top:1px solid #edf0f6; }
+.project-item { min-height:58px; }
+.report-detail-row td { padding:0; background:#fbfdff; }
+.report-detail { padding:18px; border-left:4px solid #e5b942; display:grid; gap:10px; }
+.report-detail p { margin:0; line-height:1.55; }
+.review-chip-row { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.review-chip { display:inline-flex; align-items:center; border-radius:999px; padding:4px 7px; background:#eef2f8; color:#68738d; font-size:.62rem; font-weight:800; }
+.review-valid { background:#e7f5ec; color:var(--portal-green); }
+.review-invalid { background:#fff0f1; color:var(--portal-red); }
+.review-pending { background:#fff5dc; color:#966b10; }
+.review-form { display:grid; grid-template-columns:1fr 1fr 2fr auto; gap:8px; align-items:center; margin-top:4px; }
+.review-form input,.review-form select { min-width:0; border:1px solid #d9dfeb; border-radius:9px; background:#fff; padding:9px 10px; color:#36415a; font:inherit; font-size:.76rem; }
+.status-late { background:#fff0f1; color:var(--portal-red); }
+.status-draft { background:#eef2f8; color:#526078; }
+@media (max-width:980px) { .report-stats { grid-template-columns:repeat(3,1fr); } .report-hero { align-items:flex-start; } .axis-orbit { width:165px; height:165px; } .review-form { grid-template-columns:1fr 1fr; } }
+@media (max-width:620px) { .report-hero { padding:22px; } .axis-orbit { display:none; } .report-stats { grid-template-columns:repeat(2,1fr); } .review-form { grid-template-columns:1fr; } .section-note { display:none; } }
+@media (prefers-reduced-motion: reduce) { .axis-orbit { animation:none; } }
