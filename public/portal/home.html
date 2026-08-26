@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portail YOUTHCLUBber</title>
+<link rel="icon" type="image/png" href="../assets/favicon-32.png" sizes="32x32">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../theme.css">
+<link rel="stylesheet" href="portal.css">
+</head>
+<body>
+
+<div class="pattern-veil"></div>
+<div id="topbar-root"></div>
+
+<main class="portal-shell" style="max-width:520px;">
+  <div class="portal-card">
+    <h1 class="portal-title">Bienvenue, <span id="name-slot"></span></h1>
+    <div class="status-banner active">Ton compte est actif. Bienvenue sur le portail YOUTHCLUBber !</div>
+    <p class="portal-subtitle" id="admin-note" style="display:none;">
+      Tu es admin national·e — tu peux <a href="admin-review.html">valider les demandes d'adhésion en attente</a>.
+    </p>
+    <p class="portal-subtitle" style="margin-bottom:0;">
+      Le reste du portail (tableau de bord, réunions, formations…) arrive dans une prochaine étape.
+    </p>
+  </div>
+</main>
+
+<script src="portal-common.js"></script>
+<script>
+(async function () {
+  const member = await window.AYCPortal.initPortalShell();
+  if (!member) { window.location.href = "login.html"; return; }
+  if (member.status === "pending") { window.location.href = "pending.html"; return; }
+  if (member.status === "rejected") { window.location.href = "rejected.html"; return; }
+
+  document.getElementById("name-slot").textContent = member.displayName;
+  if (member.isNationalAdmin) document.getElementById("admin-note").style.display = "block";
+})();
+</script>
+</body>
+</html>

@@ -11,6 +11,7 @@
 //   GITHUB_BRANCH  - usually "main"
 
 const { Octokit } = require("@octokit/rest");
+const { syncSchoolOnSave, syncSchoolOnDelete } = require("./schools-sync");
 
 function getClient() {
   return new Octokit({ auth: process.env.GITHUB_TOKEN });
@@ -107,12 +108,19 @@ async function listClubs() {
 async function saveClub(club, commitMessage) {
   const { sha } = await readJsonFile(clubPath(club.slug));
   await writeJsonFile(clubPath(club.slug), club, commitMessage, sha);
+  // Keep the member portal's school list live-synced with this club.
+  // See schools-sync.js — failures there are logged, never thrown, so
+  // a portal/database hiccup can't break the Discord bot's own save.
+  await syncSchoolOnSave(club);
 }
 
 async function deleteClub(slug, commitMessage) {
   const { sha } = await readJsonFile(clubPath(slug));
   if (!sha) return; // already gone
   await deleteFile(clubPath(slug), commitMessage, sha);
+  // Deactivates the portal school and deletes any member accounts tied
+  // to it — a club being deleted here means it no longer exists at all.
+  await syncSchoolOnDelete(slug);
 }
 
 // ---------- pending edits ----------
