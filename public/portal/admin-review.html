@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demandes d'adhésion · Portail YOUTHCLUBber</title>
+<link rel="icon" type="image/png" href="../assets/favicon-32.png" sizes="32x32">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../theme.css">
+<link rel="stylesheet" href="portal.css">
+</head>
+<body>
+
+<div class="pattern-veil"></div>
+<div id="topbar-root"></div>
+
+<main class="portal-shell wide">
+  <div class="portal-card">
+    <h1 class="portal-title">Demandes d'adhésion en attente</h1>
+    <p class="portal-subtitle">Validation réservée aux admins nationaux.</p>
+    <div id="list"></div>
+  </div>
+</main>
+
+<script src="portal-common.js"></script>
+<script>
+(async function () {
+  const member = await window.AYCPortal.initPortalShell();
+  if (!member) { window.location.href = "login.html"; return; }
+  if (member.status !== "active" || !member.isNationalAdmin) {
+    window.location.href = "home.html";
+    return;
+  }
+
+  const listEl = document.getElementById("list");
+
+  async function load() {
+    listEl.innerHTML = '<div class="empty-state">Chargement…</div>';
+    const res = await fetch("/api/admin/members/pending");
+    if (!res.ok) {
+      listEl.innerHTML = '<div class="empty-state">Impossible de charger les demandes.</div>';
+      return;
+    }
+    const data = await res.json();
+    if (data.pending.length === 0) {
+      listEl.innerHTML = '<div class="empty-state">Aucune demande en attente.</div>';
+      return;
+    }
+    listEl.innerHTML = "";
+    for (const m of data.pending) {
+      const row = document.createElement("div");
+      row.className = "review-row";
+      row.innerHTML = `
+        ${m.profilePictureUrl ? `<img src="${m.profilePictureUrl}" alt="">` : `<img src="../assets/logo-secondary-color.png" alt="">`}
+        <div class="who">
+          <strong>${window.AYCPortal.escapeHtml(m.displayName)}</strong>
+          <span>@${window.AYCPortal.escapeHtml(m.username)} · ${window.AYCPortal.escapeHtml(m.schoolName || "—")} · ${window.AYCPortal.escapeHtml(m.email)}</span>
+        </div>
+        <div class="actions">
+          <button class="btn-approve" data-id="${m.id}" data-decision="approve">Approuver</button>
+          <button class="btn-reject" data-id="${m.id}" data-decision="reject">Refuser</button>
+        </div>
+      `;
+      listEl.appendChild(row);
+    }
+  }
+
+  listEl.addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-id]");
+    if (!btn) return;
+    const memberId = btn.dataset.id;
+    const decision = btn.dataset.decision;
+
+    let rejectionNote;
+    if (decision === "reject") {
+      rejectionNote = window.prompt("Raison du refus (optionnel) :") || undefined;
+    }
+
+    btn.closest(".review-row").style.opacity = "0.5";
+    try {
+      const res = await fetch("/api/admin/members/decide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId, decision, rejectionNote }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Échec.");
+      await load();
+    } catch (err) {
+      alert(err.message);
+      await load();
+    }
+  });
+
+  await load();
+})();
+</script>
+</body>
+</html>
