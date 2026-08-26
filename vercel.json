@@ -1,9 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/api/auth/:path*", "destination": "https://REPLACE-portal-auth.vercel.app/api/auth/:path*" },
-    { "source": "/api/onboarding/:path*", "destination": "https://REPLACE-portal-auth.vercel.app/api/onboarding/:path*" },
-    { "source": "/api/schools", "destination": "https://REPLACE-portal-auth.vercel.app/api/schools" },
-    { "source": "/api/admin/:path*", "destination": "https://REPLACE-portal-admin.vercel.app/api/admin/:path*" },
-    { "source": "/", "destination": "/portal/login.html" }
-  ]
-}
