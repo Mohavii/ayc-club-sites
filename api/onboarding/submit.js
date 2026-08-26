@@ -15,11 +15,14 @@ const { createSession } = require("../_lib/sessions");
 const { sendNewRequestNotice } = require("../_lib/mailer");
 const { getCapabilityHolders } = require("../_lib/roles");
 
-function isTrustedBlobUrl(url) {
+function isTrustedProfileUrl(url) {
   if (typeof url !== "string") return false;
   try {
     const u = new URL(url);
-    return u.protocol === "https:" && u.hostname.endsWith(".public.blob.vercel-storage.com");
+    if (u.protocol !== "https:") return false;
+    return u.hostname.endsWith(".public.blob.vercel-storage.com")
+      || u.hostname === "lh3.googleusercontent.com"
+      || u.hostname.endsWith(".googleusercontent.com");
   } catch {
     return false;
   }
@@ -42,7 +45,7 @@ module.exports = async (req, res) => {
   const username = String(body?.username || "").trim().toLowerCase();
   const displayName = String(body?.displayName || "").trim();
   const schoolId = Number(body?.schoolId);
-  const profilePictureUrl = body?.profilePictureUrl ? String(body.profilePictureUrl) : null;
+  const requestedPictureUrl = body?.profilePictureUrl ? String(body.profilePictureUrl) : null;
 
   try {
     const identity = await getSignupIdentity(req);
@@ -82,7 +85,10 @@ module.exports = async (req, res) => {
       return;
     }
 
-    if (profilePictureUrl && !isTrustedBlobUrl(profilePictureUrl)) {
+    // Prefer a manually uploaded Blob image, but fall back to the verified
+    // Google avatar stored in the signup token when no manual photo was chosen.
+    const profilePictureUrl = requestedPictureUrl || identity.google_picture || null;
+    if (profilePictureUrl && !isTrustedProfileUrl(profilePictureUrl)) {
       res.status(400).json({ error: "Photo de profil invalide." });
       return;
     }

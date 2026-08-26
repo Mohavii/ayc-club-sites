@@ -19,6 +19,24 @@ const { getSignupIdentity } = require("../_lib/signup-tokens");
 const MAX_BYTES = 4 * 1024 * 1024; // 4 MB — comfortably under Vercel's default serverless request-body limit
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+async function normalizeBody(req) {
+  const raw = req.body;
+  if (Buffer.isBuffer(raw)) return raw;
+  if (raw instanceof Uint8Array) return Buffer.from(raw);
+  if (raw instanceof ArrayBuffer) return Buffer.from(raw);
+  if (ArrayBuffer.isView(raw)) return Buffer.from(raw.buffer, raw.byteOffset, raw.byteLength);
+  if (raw && raw.type === "Buffer" && Array.isArray(raw.data)) return Buffer.from(raw.data);
+  if (typeof raw === "string" && raw.length > 0) return Buffer.from(raw, "binary");
+
+  // Some local adapters expose a raw request stream instead of req.body.
+  if (req && typeof req[Symbol.asyncIterator] === "function") {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    if (chunks.length > 0) return Buffer.concat(chunks);
+  }
+  return null;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method not allowed" });
@@ -38,8 +56,8 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const body = req.body; // Buffer, per Vercel's Node runtime for this content-type
-    if (!Buffer.isBuffer(body) || body.length === 0) {
+    const body = await normalizeBody(req);
+    if (!body || body.length === 0) {
       res.status(400).json({ error: "Fichier vide ou illisible." });
       return;
     }
