@@ -228,3 +228,143 @@ create table if not exists portal_national_roles (
 );
 
 create index if not exists idx_national_roles_member on portal_national_roles(member_id);
+
+
+-- =======================================================================
+-- MEMBER PORTAL WORKSPACE FEATURES
+-- =======================================================================
+
+alter table portal_members add column if not exists phone text;
+alter table portal_members add column if not exists education_level text;
+alter table portal_members add column if not exists cover_photo_url text;
+alter table portal_members add column if not exists formateur_track boolean not null default false;
+alter table portal_members add column if not exists bio text;
+
+create table if not exists portal_projects (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  created_by uuid not null references portal_members(id),
+  title text not null,
+  description text,
+  project_type text not null default 'projet',
+  starts_at timestamptz,
+  ends_at timestamptz,
+  status text not null default 'draft' check (status in ('draft','in_progress','completed','cancelled')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_projects_school on portal_projects(school_id, starts_at);
+
+create table if not exists portal_meetings (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  created_by uuid not null references portal_members(id),
+  title text not null,
+  meeting_type text not null check (meeting_type in ('reunion','assemblee_locale','assemblee_generale')),
+  starts_at timestamptz not null,
+  ends_at timestamptz,
+  format text not null default 'presentiel' check (format in ('presentiel','en_ligne','hybride')),
+  location text,
+  maps_url text,
+  comments text,
+  agenda jsonb not null default '[]'::jsonb,
+  attachments jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_meetings_school_date on portal_meetings(school_id, starts_at desc);
+
+create table if not exists portal_meeting_attendees (
+  meeting_id uuid not null references portal_meetings(id) on delete cascade,
+  member_id uuid not null references portal_members(id) on delete cascade,
+  rsvp text not null default 'pending' check (rsvp in ('pending','present','absent')),
+  voting_rights boolean not null default false,
+  primary key (meeting_id, member_id)
+);
+
+create table if not exists portal_minutes (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid unique not null references portal_meetings(id) on delete cascade,
+  mode text not null default 'standard' check (mode in ('standard','assemblee_generale')),
+  mandate text,
+  organizer text,
+  drafted_at timestamptz,
+  sent_at timestamptz,
+  redactors jsonb not null default '[]'::jsonb,
+  attendance jsonb not null default '[]'::jsonb,
+  agenda_blocks jsonb not null default '[]'::jsonb,
+  motions jsonb not null default '[]'::jsonb,
+  status text not null default 'draft' check (status in ('draft','sent','validated')),
+  created_by uuid not null references portal_members(id),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists portal_reports (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  submitted_by uuid not null references portal_members(id),
+  report_type text not null check (report_type in ('pre_projet','post_projet','proces_verbal','collaboration','mise_a_jour','supervision','investigation')),
+  title text not null,
+  event_date date,
+  description text,
+  payload jsonb not null default '{}'::jsonb,
+  status text not null default 'draft' check (status in ('draft','submitted','validated','invalidated')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_reports_scope on portal_reports(school_id, created_at desc);
+
+create table if not exists portal_report_reviews (
+  report_id uuid not null references portal_reports(id) on delete cascade,
+  department text not null,
+  status text not null default 'pending' check (status in ('pending','valid','invalid')),
+  comment text,
+  reviewer_id uuid references portal_members(id),
+  reviewed_at timestamptz,
+  primary key (report_id, department)
+);
+
+create table if not exists portal_training_entries (
+  id uuid primary key default gen_random_uuid(),
+  member_id uuid not null references portal_members(id) on delete cascade,
+  category text not null check (category in ('received','delivered','facilitation','other')),
+  title text not null,
+  host text,
+  held_on date,
+  location text,
+  booklet_url text,
+  hours numeric(8,2),
+  notes text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_portal_training_member on portal_training_entries(member_id, held_on desc);
+
+create table if not exists portal_tasks (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer references portal_schools(id) on delete cascade,
+  assigned_to uuid not null references portal_members(id) on delete cascade,
+  project_id uuid references portal_projects(id) on delete set null,
+  title text not null,
+  description text,
+  priority text not null default 'normale' check (priority in ('basse','normale','haute','urgente')),
+  assigned_at timestamptz not null default now(),
+  deadline date,
+  status text not null default 'a_faire' check (status in ('a_faire','soumis','executee','hors_delai')),
+  comments text,
+  created_by uuid not null references portal_members(id),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_tasks_assignee on portal_tasks(assigned_to, deadline);
+
+create table if not exists portal_responsibilities (
+  id uuid primary key default gen_random_uuid(),
+  member_id uuid not null references portal_members(id) on delete cascade,
+  school_id integer references portal_schools(id) on delete cascade,
+  title text not null,
+  description text,
+  project_url text,
+  database_url text,
+  held_on date,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_portal_responsibilities_member on portal_responsibilities(member_id, held_on desc);
