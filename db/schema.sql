@@ -13,6 +13,7 @@
 --   psql "$DATABASE_URL" -f db/seed-schools.sql
 
 create extension if not exists pgcrypto; -- gen_random_uuid()
+create extension if not exists btree_gist; -- exclusion constraints on uuid/integer
 
 -- ---------------------------------------------------------------------
 -- Schools / clubs a member can belong to (portal's own copy of the list)
@@ -173,9 +174,8 @@ create index if not exists idx_club_roles_member on portal_club_display_roles(me
 create index if not exists idx_club_roles_school on portal_club_display_roles(school_id);
 create index if not exists idx_club_roles_current on portal_club_display_roles(school_id, role) where ended_at is null;
 
--- The exclude constraint above needs the btree_gist extension (gist
--- indexes don't support plain `=` on uuid/integer without it).
-create extension if not exists btree_gist;
+-- The btree_gist extension is enabled near the top before exclusion
+-- constraints are created.
 
 -- ---------------------------------------------------------------------
 -- Capability grants — stackable, backend-only, per club. Independent
@@ -191,7 +191,7 @@ create table if not exists portal_capability_grants (
               )),
   granted_by  uuid references portal_members(id),
   granted_at  timestamptz not null default now(),
-  revoked_at  timestamptz -- null = currently active
+  revoked_at   text, -- null = currently active
 
   -- Deliberately NO uniqueness constraint on (member_id, school_id,
   -- capability) beyond what the app enforces on insert — a member can
