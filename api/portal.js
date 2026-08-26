@@ -274,20 +274,90 @@ async function meetingDetail(req, res, member, body) {
   return json(res, 400, { error: "Action de réunion inconnue." });
 }
 
+async function strategicAxes(req, res) {
+  const db = sql();
+  const axes = await db`
+    select a.slug, a.name, a.description, a.sort_order,
+      coalesce(json_agg(json_build_object('slug', s.slug, 'name', s.name, 'description', s.description) order by s.sort_order, s.name) filter (where s.slug is not null), '[]'::json) as sub_axes
+    from portal_strategic_axes a
+    left join portal_strategic_sub_axes s on s.axis_slug = a.slug
+    group by a.slug order by a.sort_order, a.name
+  `;
+  return json(res, 200, { axes });
+}
+
+async function reportTemplates(req, res) {
+  const db = sql();
+  const templates = await db`select * from portal_report_templates order by name`;
+  return json(res, 200, { templates });
+}
+
+async function projects(req, res, member, body) {
+  const db = sql();
+  if (req.method === "GET") {
+    const schoolId = schoolScope(member, req.query?.schoolId);
+    if (!schoolId) return json(res, 200, { projects: [] });
+    const rows = await db`
+      select p.*, a.name as axis_name, sa.name as sub_axis_name,
+        (select count(*)::int from portal_reports r where r.project_id = p.id) as report_count
+      from portal_projects p
+      left join portal_strategic_axes a on a.slug = p.axis_slug
+      left join portal_strategic_sub_axes sa on sa.slug = p.sub_axis_slug
+      where p.school_id = ${schoolId} and p.status <> 'cancelled'
+      order by coalesce(p.starts_at, p.created_at) desc
+    `;
+    return json(res, 200, { projects: rows });
+  }
+  if (!(await requireClubCapability(req, res, member, "meeting_organizer", schoolScope(member, body.schoolId)))) return;
+  const schoolId = schoolScope(member, body.schoolId);
+  const title = String(body.title || "").trim();
+  if (!schoolId || !title) return json(res, 400, { error: "Club et titre de projet requis." });
+  const axisSlug = body.axisSlug ? String(body.axisSlug).trim() : null;
+  if (axisSlug) {
+    const axis = await db`select slug from portal_strategic_axes where slug = ${axisSlug}`;
+    if (!axis[0]) return json(res, 400, { error: "Axe stratégique invalide." });
+  }
+  const projectType = String(body.projectType || "projet").slice(0, 80);
+  const result = await db`
+    insert into portal_projects
+      (school_id, created_by, title, description, project_type, starts_at, ends_at, status, axis_slug, sub_axis_slug, objectives, expected_results, evaluation_method, stakeholders, indicators)
+    values
+      (${schoolId}, ${member.id}, ${title}, ${body.description || null}, ${projectType}, ${body.startsAt || null}, ${body.endsAt || null},
+       ${["draft", "in_progress", "completed", "cancelled"].includes(body.status) ? body.status : "draft"}, ${axisSlug}, ${body.subAxisSlug || null},
+       ${body.objectives || null}, ${body.expectedResults || null}, ${body.evaluationMethod || null},
+       ${JSON.stringify(Array.isArray(body.stakeholders) ? body.stakeholders : [])}::jsonb,
+       ${JSON.stringify(Array.isArray(body.indicators) ? body.indicators : [])}::jsonb)
+    returning *
+  `;
+  return json(res, 201, { project: result[0] });
+}
+
+function reportDeadlineStatus(report) {
+  if (!report.due_at) return null;
+  if (["validated", "invalidated"].includes(report.status)) return report.status === "validated" ? "completed" : "blocked";
+  return new Date(report.due_at).getTime() < Date.now() ? "late" : "upcoming";
+}
+
 async function reports(req, res, member, body) {
   const db = sql();
   if (req.method === "GET") {
     const schoolId = schoolScope(member, req.query?.schoolId);
     if (!schoolId) return json(res, 200, { reports: [] });
     const rows = await db`
-      select r.*, m.display_name as submitter_name,
-        coalesce(json_agg(json_build_object('department', rv.department, 'status', rv.status, 'comment', rv.comment)) filter (where rv.report_id is not null), '[]') as reviews
-      from portal_reports r join portal_members m on m.id = r.submitted_by
+      select r.*, m.display_name as submitter_name, p.title as project_title,
+        a.name as axis_name, t.name as template_name, t.required_sections, t.validator_departments,
+        coalesce(json_agg(json_build_object('department', rv.department, 'status', rv.status, 'comment', rv.comment, 'reviewedAt', rv.reviewed_at) order by rv.department) filter (where rv.report_id is not null), '[]'::json) as reviews
+      from portal_reports r
+      join portal_members m on m.id = r.submitted_by
+      left join portal_projects p on p.id = r.project_id
+      left join portal_strategic_axes a on a.slug = r.axis_slug
+      left join portal_report_templates t on t.slug = r.template_slug
       left join portal_report_reviews rv on rv.report_id = r.id
       where r.school_id = ${schoolId}
-      group by r.id, m.display_name order by r.created_at desc
+      group by r.id, m.display_name, p.title, a.name, t.name, t.required_sections, t.validator_departments
+      order by coalesce(r.due_at, r.created_at) asc, r.created_at desc
     `;
-    return json(res, 200, { reports: rows });
+    return json(res, 200, { reports: rows.map(row => ({ ...row, deadline_status: reportDeadlineStatus(row) })) });
   }
   if (body.action === "review") {
     const reportRows = await db`select school_id from portal_reports where id = ${body.reportId}`;
@@ -295,20 +365,47 @@ async function reports(req, res, member, body) {
     if (!report) return json(res, 404, { error: "Rapport introuvable." });
     if (!(await requireClubCapability(req, res, member, "report_validator", report.school_id))) return;
     const status = ["pending", "valid", "invalid"].includes(body.status) ? body.status : "pending";
+    const department = String(body.department || "coordination_strategique").trim().slice(0, 100);
     const result = await db`
       insert into portal_report_reviews (report_id, department, status, comment, reviewer_id, reviewed_at)
-      values (${body.reportId}, ${body.department || "coordination_strategique"}, ${status}, ${body.comment || null}, ${member.id}, now())
+      values (${body.reportId}, ${department}, ${status}, ${body.comment || null}, ${member.id}, now())
       on conflict (report_id, department) do update set status=excluded.status, comment=excluded.comment, reviewer_id=excluded.reviewer_id, reviewed_at=now()
       returning *
     `;
-    await db`update portal_reports set status = case when ${status} = 'invalid' then 'invalidated' when ${status} = 'valid' then 'validated' else status end, updated_at = now() where id = ${body.reportId}`;
-    return json(res, 200, { review: result[0] });
+    const reviewRows = await db`select status from portal_report_reviews where report_id = ${body.reportId}`;
+    const nextStatus = reviewRows.some(row => row.status === "invalid") ? "invalidated" : (reviewRows.length > 0 && reviewRows.every(row => row.status === "valid") ? "validated" : "submitted");
+    await db`update portal_reports set status = ${nextStatus}, updated_at = now() where id = ${body.reportId}`;
+    return json(res, 200, { review: result[0], reportStatus: nextStatus });
+  }
+  if (body.action === "update" && body.reportId) {
+    const result = await db`
+      update portal_reports
+      set title = ${String(body.title || "Rapport").trim()}, description = ${body.description || null}, event_date = ${body.eventDate || null}, payload = ${JSON.stringify(body.payload || {})}::jsonb, status = ${body.status === "draft" ? "draft" : "submitted"}, updated_at = now(), submitted_at = case when ${body.status === "draft" ? "draft" : "submitted"} = 'submitted' then coalesce(submitted_at, now()) else submitted_at end
+      where id = ${body.reportId} and submitted_by = ${member.id}
+      returning *
+    `;
+    return json(res, result[0] ? 200 : 404, result[0] ? { report: result[0] } : { error: "Rapport introuvable." });
   }
   const schoolId = schoolScope(member, body.schoolId);
-  if (!schoolId || !body.title || !body.reportType) return json(res, 400, { error: "Type, club et titre requis." });
+  const allowedTypes = ["pre_projet", "post_projet", "proces_verbal", "collaboration", "mise_a_jour", "supervision", "investigation"];
+  if (!schoolId || !body.title || !allowedTypes.includes(body.reportType)) return json(res, 400, { error: "Type, club et titre requis." });
+  const templateSlug = String(body.templateSlug || body.reportType);
+  const template = await db`select slug, validator_departments from portal_report_templates where slug = ${templateSlug}`;
+  if (!template[0]) return json(res, 400, { error: "Modèle de rapport invalide." });
+  const axisSlug = body.axisSlug ? String(body.axisSlug).trim() : null;
+  if (axisSlug) {
+    const axis = await db`select slug from portal_strategic_axes where slug = ${axisSlug}`;
+    if (!axis[0]) return json(res, 400, { error: "Axe stratégique invalide." });
+  }
+  const projectId = body.projectId || null;
+  if (projectId) {
+    const project = await db`select id from portal_projects where id = ${projectId} and school_id = ${schoolId}`;
+    if (!project[0]) return json(res, 400, { error: "Projet invalide pour ce club." });
+  }
+  const status = body.status === "draft" ? "draft" : "submitted";
   const result = await db`
-    insert into portal_reports (school_id, submitted_by, report_type, title, event_date, description, payload, status)
-    values (${schoolId}, ${member.id}, ${body.reportType}, ${String(body.title).trim()}, ${body.eventDate || null}, ${body.description || null}, ${JSON.stringify(body.payload || {})}::jsonb, ${body.status === "draft" ? "draft" : "submitted"})
+    insert into portal_reports (school_id, submitted_by, project_id, template_slug, report_type, title, recipient, axis_slug, sub_axis_slug, event_date, due_at, submitted_at, description, payload, status)
+    values (${schoolId}, ${member.id}, ${projectId}, ${templateSlug}, ${body.reportType}, ${String(body.title).trim()}, ${body.recipient || null}, ${axisSlug}, ${body.subAxisSlug || null}, ${body.eventDate || null}, ${body.dueAt || null}, ${status === "submitted" ? new Date() : null}, ${body.description || null}, ${JSON.stringify(body.payload || {})}::jsonb, ${status})
     returning *
   `;
   return json(res, 201, { report: result[0] });
@@ -371,6 +468,9 @@ module.exports = async (req, res) => {
     }
     if (action === "meetings") return req.method === "GET" ? json(res, 200, { meetings: await listMeetings(member, req.query || {}) }) : createMeeting(req, res, member, body);
     if (action === "meeting") return meetingDetail(req, res, member, body);
+    if (action === "strategic_axes") return strategicAxes(req, res);
+    if (action === "report_templates") return reportTemplates(req, res);
+    if (action === "projects") return projects(req, res, member, body);
     if (action === "reports") return reports(req, res, member, body);
     if (action === "training") return training(req, res, member, body);
     if (action === "tasks") return tasks(req, res, member, body);
