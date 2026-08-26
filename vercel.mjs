@@ -1,19 +1,21 @@
-// vercel.cjs
+// vercel.mjs
 //
-// Vercel evaluates this configuration before it packages filesystem API
-// routes. The same Git repository is imported by multiple projects, so the
-// selected project must allowlist its function entrypoints here rather than
-// deleting other routes from npm's build command.
+// Vercel evaluates this configuration before packaging filesystem API routes.
+// The same repository is imported by multiple projects, so each project
+// selects only its own function entrypoints through DEPLOY_TARGET.
 
-const { TARGETS, getDeployTarget } = require("./scripts/deployment-targets");
+import targetsModule from "./scripts/deployment-targets.js";
 
+const { TARGETS, getDeployTarget } = targetsModule;
 const target = getDeployTarget();
+
 if (!target) {
   throw new Error(
     "Missing DEPLOY_TARGET (or deploy_target). Set it to one of: " +
       Object.keys(TARGETS).join(", ")
   );
 }
+
 if (!TARGETS[target]) {
   throw new Error(
     `Unknown deployment target "${target}". Valid values: ${Object.keys(TARGETS).join(", ")}`
@@ -30,13 +32,19 @@ const edgeRewrites = [
   { source: "/api/auth/:path*", destination: "https://REPLACE-portal-auth.vercel.app/api/auth/:path*" },
   { source: "/api/onboarding/:path*", destination: "https://REPLACE-portal-auth.vercel.app/api/onboarding/:path*" },
   { source: "/api/schools", destination: "https://REPLACE-portal-auth.vercel.app/api/schools" },
+  { source: "/api/session", destination: "https://REPLACE-portal-auth.vercel.app/api/session" },
   { source: "/api/admin/:path*", destination: "https://REPLACE-portal-admin.vercel.app/api/admin/:path*" },
   { source: "/", destination: "/portal/login.html" },
 ];
 
-module.exports = {
+const config = {
   builds,
-  // Rewrites belong only to portal-edge. If service projects inherit these,
-  // their local functions can be shadowed by proxy rules or placeholders.
+  // Proxy rewrites belong only to portal-edge. Service projects expose their
+  // selected local functions directly.
   ...(target === "portal-edge" ? { rewrites: edgeRewrites } : {}),
 };
+
+// Vercel accepts either export form; providing both is compatible with the
+// current config loader and makes the intended contract explicit.
+export { config };
+export default config;

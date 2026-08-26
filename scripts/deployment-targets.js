@@ -1,7 +1,7 @@
 // deployment-targets.js
 //
 // The same repository is imported by several Vercel projects. Each project
-// selects one allowlist in vercel.cjs before Vercel packages functions.
+// selects one allowlist in vercel.mjs before Vercel packages functions.
 
 const TARGETS = {
   bot: ["api/chat.js", "api/interactions.js", "api/submit-form.js", "api/session.js"],
@@ -18,6 +18,7 @@ const TARGETS = {
     "api/onboarding/submit.js",
     "api/onboarding/upload-photo.js",
     "api/schools.js",
+    "api/session.js",
   ],
 
   // Filled in as member-facing routes are built.

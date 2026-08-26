@@ -1,7 +1,7 @@
 // prune-functions.js
 //
 // Optional local helper for inspecting one deployment target. Production
-// Vercel deployments use vercel.cjs to allowlist function entrypoints before
+// Vercel deployments use vercel.mjs to allowlist function entrypoints before
 // packaging; they must not delete routes during npm run build.
 
 const fs = require("fs");
