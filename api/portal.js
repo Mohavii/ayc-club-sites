@@ -1,6 +1,7 @@
 // Consolidated YOUTHCLUBber portal API.
 // This route uses only the portal Neon database and portal session/role model.
 const { sql } = require("./_lib/db");
+const { put, get } = require("@vercel/blob");
 const { requireActiveMember } = require("./_lib/sessions");
 const {
   getMemberRoleHistory,
@@ -17,6 +18,31 @@ function parseBody(req) {
 
 function json(res, status, value) {
   res.status(status).json(value);
+}
+
+async function normalizeRawBody(req) {
+  const raw = req.body;
+  if (Buffer.isBuffer(raw)) return raw;
+  if (raw instanceof Uint8Array) return Buffer.from(raw);
+  if (raw instanceof ArrayBuffer) return Buffer.from(raw);
+  if (ArrayBuffer.isView(raw)) return Buffer.from(raw.buffer, raw.byteOffset, raw.byteLength);
+  if (raw && raw.type === "Buffer" && Array.isArray(raw.data)) return Buffer.from(raw.data);
+  if (req && typeof req[Symbol.asyncIterator] === "function") {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    return chunks.length ? Buffer.concat(chunks) : null;
+  }
+  return null;
+}
+
+function safeFilename(value) {
+  return String(value || "document").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 120) || "document";
+}
+
+function jsonArrayInput(value) {
+  if (Array.isArray(value)) return value.map(item => String(item).trim()).filter(Boolean).slice(0, 20);
+  if (typeof value === "string") return value.split(",").map(item => item.trim()).filter(Boolean).slice(0, 20);
+  return [];
 }
 
 function schoolScope(member, requested) {
@@ -39,11 +65,19 @@ async function profile(member) {
     from portal_members m left join portal_schools s on s.id = m.school_id
     where m.id = ${member.id}
   `;
+  const [trainerRows, awards, documents] = await Promise.all([
+    db`select * from portal_trainer_profiles where member_id = ${member.id}`,
+    db`select id, title, issuer, awarded_on, value_tag, description, visibility, created_at from portal_member_awards where member_id = ${member.id} and (visibility = 'active_members' or visibility = 'owner_admins') order by awarded_on desc nulls last, created_at desc`,
+    db`select id, member_id, document_type, title, description, original_filename, mime_type, size_bytes, visibility, status, created_at from portal_member_documents where (member_id = ${member.id} or visibility = 'active_members') and status <> 'archived' order by created_at desc`,
+  ]);
   return {
     member: rows[0] || member,
     roles: await getMemberRoleHistory(member.id),
     capabilities: await getMemberCapabilities(member.id),
     statusHistory: await getMemberStatusHistory(member.id),
+    trainerProfile: trainerRows[0] || null,
+    awards,
+    documents: documents.map(doc => ({ ...doc, downloadAction: `document_download&id=${encodeURIComponent(doc.id)}` })),
   };
 }
 
@@ -501,16 +535,120 @@ async function reports(req, res, member, body) {
   return json(res, 201, { report: result[0] });
 }
 
+async function visibleDocuments(db, member) {
+  return db`
+    select id, member_id, document_type, title, description, original_filename, mime_type, size_bytes, visibility, status, created_at
+    from portal_member_documents
+    where (member_id = ${member.id} or (visibility = 'active_members' and ${member.status} = 'active'))
+      and status <> 'archived'
+    order by created_at desc
+  `;
+}
+
+async function documentUpload(req, res, member) {
+  if (req.method !== "POST") return json(res, 405, { error: "Méthode non autorisée." });
+  const contentType = String(req.headers["content-type"] || "").split(";")[0].toLowerCase();
+  const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+  if (!allowedTypes.includes(contentType)) return json(res, 400, { error: "Format non supporté. Utilise PDF, DOCX, JPEG, PNG ou WEBP." });
+  const body = await normalizeRawBody(req);
+  const maxBytes = 12 * 1024 * 1024;
+  if (!body || !body.length) return json(res, 400, { error: "Fichier vide ou illisible." });
+  if (body.length > maxBytes) return json(res, 400, { error: "Fichier trop lourd (12 Mo maximum)." });
+  const documentType = String(req.query?.documentType || "other");
+  const allowedDocumentTypes = ["candidature", "training_evidence", "trainer_certificate", "award_evidence", "other"];
+  if (!allowedDocumentTypes.includes(documentType)) return json(res, 400, { error: "Type de document invalide." });
+  const title = String(req.query?.title || req.query?.filename || "Document").trim().slice(0, 200);
+  if (!title) return json(res, 400, { error: "Titre du document requis." });
+  const filename = safeFilename(req.query?.filename || title);
+  const visibility = documentType === "candidature" ? "active_members" : "owner_admins";
+  const pathname = `portal-documents/${member.id}/${Date.now()}-${filename}`;
+  const blob = await put(pathname, body, { access: "private", contentType, addRandomSuffix: true });
+  const db = sql();
+  const rows = await db`
+    insert into portal_member_documents
+      (member_id, uploaded_by, document_type, title, storage_key, storage_url, original_filename, mime_type, size_bytes, visibility, status)
+    values
+      (${member.id}, ${member.id}, ${documentType}, ${title}, ${blob.pathname || pathname}, ${blob.url || null}, ${filename}, ${contentType}, ${body.length}, ${visibility}, 'pending')
+    returning id, document_type, title, visibility, status, created_at
+  `;
+  return json(res, 201, { document: rows[0] });
+}
+
+async function documentDownload(req, res, member) {
+  if (req.method !== "GET") return json(res, 405, { error: "Méthode non autorisée." });
+  const id = String(req.query?.id || "");
+  if (!id) return json(res, 400, { error: "Document introuvable." });
+  const db = sql();
+  const rows = await db`
+    select id, member_id, storage_key, original_filename, mime_type
+    from portal_member_documents
+    where id = ${id}
+      and status <> 'archived'
+      and (member_id = ${member.id} or (visibility = 'active_members' and ${member.status} = 'active'))
+  `;
+  if (!rows[0]) return json(res, 404, { error: "Document introuvable ou non autorisé." });
+  const blob = await get(rows[0].storage_key, { access: "private" });
+  if (!blob) return json(res, 404, { error: "Fichier indisponible." });
+  const buffer = Buffer.from(await new Response(blob.stream).arrayBuffer());
+  res.statusCode = 200;
+  res.setHeader("Content-Type", rows[0].mime_type || "application/octet-stream");
+  res.setHeader("Content-Length", String(buffer.length));
+  res.setHeader("Content-Disposition", `attachment; filename="${safeFilename(rows[0].original_filename || "document")}"`);
+  return res.end(buffer);
+}
+
 async function training(req, res, member, body) {
   const db = sql();
   if (req.method === "GET") {
-    const entries = await db`select * from portal_training_entries where member_id = ${member.id} order by held_on desc nulls last, created_at desc`;
-    return json(res, 200, { entries });
+    const [entries, trainerRows, awards, documents] = await Promise.all([
+      db`select * from portal_training_entries where member_id = ${member.id} order by held_on desc nulls last, created_at desc`,
+      db`select * from portal_trainer_profiles where member_id = ${member.id}`,
+      db`select id, title, issuer, awarded_on, value_tag, description, visibility, created_at from portal_member_awards where member_id = ${member.id} and visibility = 'active_members' order by awarded_on desc nulls last, created_at desc`,
+      visibleDocuments(db, member),
+    ]);
+    const totals = { received: 0, delivered: 0, facilitation: 0, other: 0, hours: 0 };
+    for (const entry of entries) { totals[entry.category] = (totals[entry.category] || 0) + 1; totals.hours += Number(entry.hours || 0); }
+    return json(res, 200, { entries, trainerProfile: trainerRows[0] || null, awards, documents, totals });
+  }
+  if (body.action === "trainer_profile") {
+    const domains = jsonArrayInput(body.expertiseDomains);
+    const oathText = String(body.oathText || "").trim().slice(0, 3000) || null;
+    const otherActivity = String(body.otherActivity || "").trim().slice(0, 2000) || null;
+    const rows = await db`
+      insert into portal_trainer_profiles (member_id, expertise_domains, oath_text, other_activity)
+      values (${member.id}, ${JSON.stringify(domains)}::jsonb, ${oathText}, ${otherActivity})
+      on conflict (member_id) do update set expertise_domains = excluded.expertise_domains, oath_text = excluded.oath_text, other_activity = excluded.other_activity, updated_at = now()
+      returning *
+    `;
+    await db`update portal_members set formateur_track = true where id = ${member.id}`;
+    return json(res, 200, { trainerProfile: rows[0] });
+  }
+  if (body.action === "award") {
+    const title = String(body.title || "").trim().slice(0, 200);
+    if (!title) return json(res, 400, { error: "Intitulé de distinction requis." });
+    let evidenceId = body.evidenceDocumentId ? String(body.evidenceDocumentId) : null;
+    if (evidenceId) {
+      const evidence = await db`select id from portal_member_documents where id = ${evidenceId} and member_id = ${member.id}`;
+      if (!evidence[0]) return json(res, 400, { error: "Justificatif invalide." });
+    }
+    const rows = await db`
+      insert into portal_member_awards (member_id, title, issuer, awarded_on, value_tag, description, evidence_document_id, visibility)
+      values (${member.id}, ${title}, ${body.issuer || null}, ${body.awardedOn || null}, ${body.valueTag || null}, ${body.description || null}, ${evidenceId}, 'active_members')
+      returning *
+    `;
+    return json(res, 201, { award: rows[0] });
   }
   if (!body.title || !["received", "delivered", "facilitation", "other"].includes(body.category)) return json(res, 400, { error: "Catégorie et titre requis." });
+  const hours = body.hours === "" || body.hours == null ? null : Number(body.hours);
+  if (hours !== null && (!Number.isFinite(hours) || hours < 0 || hours > 10000)) return json(res, 400, { error: "Nombre d'heures invalide." });
+  let evidenceId = body.evidenceDocumentId ? String(body.evidenceDocumentId) : null;
+  if (evidenceId) {
+    const evidence = await db`select id from portal_member_documents where id = ${evidenceId} and member_id = ${member.id}`;
+    if (!evidence[0]) return json(res, 400, { error: "Justificatif invalide." });
+  }
   const rows = await db`
-    insert into portal_training_entries (member_id, category, title, host, held_on, location, booklet_url, hours, notes)
-    values (${member.id}, ${body.category}, ${String(body.title).trim()}, ${body.host || null}, ${body.heldOn || null}, ${body.location || null}, ${body.bookletUrl || null}, ${body.hours || null}, ${body.notes || null})
+    insert into portal_training_entries (member_id, category, title, host, held_on, location, booklet_url, hours, notes, evidence_document_id)
+    values (${member.id}, ${body.category}, ${String(body.title).trim()}, ${body.host || null}, ${body.heldOn || null}, ${body.location || null}, ${body.bookletUrl || null}, ${hours}, ${body.notes || null}, ${evidenceId})
     returning *
   `;
   return json(res, 201, { entry: rows[0] });
@@ -562,6 +700,8 @@ module.exports = async (req, res) => {
     if (action === "report_templates") return reportTemplates(req, res);
     if (action === "projects") return projects(req, res, member, body);
     if (action === "reports") return reports(req, res, member, body);
+    if (action === "document_upload") return documentUpload(req, res, member);
+    if (action === "document_download") return documentDownload(req, res, member);
     if (action === "training") return training(req, res, member, body);
     if (action === "tasks") return tasks(req, res, member, body);
     if (action === "responsibilities") return responsibilities(req, res, member, body);
