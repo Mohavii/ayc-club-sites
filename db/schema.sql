@@ -367,6 +367,59 @@ create table if not exists portal_report_reviews (
   primary key (report_id, department)
 );
 
+-- ---------------------------------------------------------------------
+-- Trainer portfolio, awards, and member dossier documents (PHASE 4)
+-- ---------------------------------------------------------------------
+create table if not exists portal_member_documents (
+  id uuid primary key default gen_random_uuid(),
+  member_id uuid not null references portal_members(id) on delete cascade,
+  uploaded_by uuid not null references portal_members(id),
+  document_type text not null check (document_type in ('candidature','training_evidence','trainer_certificate','award_evidence','other')),
+  title text not null,
+  description text,
+  storage_key text not null unique,
+  storage_url text,
+  original_filename text,
+  mime_type text not null,
+  size_bytes bigint not null default 0,
+  visibility text not null default 'owner_admins' check (visibility in ('active_members','owner_admins')),
+  status text not null default 'pending' check (status in ('pending','validated','rejected','archived')),
+  validated_by uuid references portal_members(id),
+  validated_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_documents_member on portal_member_documents(member_id, document_type, created_at desc);
+create index if not exists idx_portal_documents_visibility on portal_member_documents(visibility, status, created_at desc);
+
+create table if not exists portal_trainer_profiles (
+  member_id uuid primary key references portal_members(id) on delete cascade,
+  certification_status text not null default 'pending' check (certification_status in ('pending','verified','suspended')),
+  homologated_at timestamptz,
+  expertise_domains jsonb not null default '[]'::jsonb,
+  oath_text text,
+  other_activity text,
+  verified_by uuid references portal_members(id),
+  verified_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists portal_member_awards (
+  id uuid primary key default gen_random_uuid(),
+  member_id uuid not null references portal_members(id) on delete cascade,
+  title text not null,
+  issuer text,
+  awarded_on date,
+  value_tag text,
+  description text,
+  evidence_document_id uuid references portal_member_documents(id) on delete set null,
+  visibility text not null default 'active_members' check (visibility in ('active_members','owner_admins')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_awards_member on portal_member_awards(member_id, awarded_on desc nulls last, created_at desc);
+
 create table if not exists portal_training_entries (
   id uuid primary key default gen_random_uuid(),
   member_id uuid not null references portal_members(id) on delete cascade,
@@ -378,9 +431,14 @@ create table if not exists portal_training_entries (
   booklet_url text,
   hours numeric(8,2),
   notes text,
-  created_at timestamptz not null default now()
+  evidence_document_id uuid references portal_member_documents(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 create index if not exists idx_portal_training_member on portal_training_entries(member_id, held_on desc);
+
+alter table portal_training_entries add column if not exists evidence_document_id uuid references portal_member_documents(id) on delete set null;
+alter table portal_training_entries add column if not exists updated_at timestamptz not null default now();
 
 create table if not exists portal_tasks (
   id uuid primary key default gen_random_uuid(),
