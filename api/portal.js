@@ -308,7 +308,7 @@ async function projects(req, res, member, body) {
     `;
     return json(res, 200, { projects: rows });
   }
-  if (!(await requireClubCapability(req, res, member, "meeting_organizer", schoolScope(member, body.schoolId)))) return;
+  if (!(await requireClubCapability(req, res, member, "project_manager", schoolScope(member, body.schoolId)))) return;
   const schoolId = schoolScope(member, body.schoolId);
   const title = String(body.title || "").trim();
   if (!schoolId || !title) return json(res, 400, { error: "Club et titre de projet requis." });
@@ -338,6 +338,56 @@ function reportDeadlineStatus(report) {
   return new Date(report.due_at).getTime() < Date.now() ? "late" : "upcoming";
 }
 
+function jsonArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function parseOptionalDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function deadlineRowStatus(report, dueAt) {
+  if (report.status === "validated") return "completed";
+  if (report.status === "invalidated") return "escalated";
+  return dueAt.getTime() < Date.now() ? "late" : "upcoming";
+}
+
+async function syncReportDeadline(db, report) {
+  if (!report.due_at) {
+    await db`update portal_report_deadlines set status = 'cancelled' where report_id = ${report.id} and status not in ('completed', 'cancelled')`;
+    return;
+  }
+  const dueAt = new Date(report.due_at);
+  if (Number.isNaN(dueAt.getTime())) return;
+  const status = deadlineRowStatus(report, dueAt);
+  const reminderAt = new Date(dueAt.getTime() - (48 * 60 * 60 * 1000));
+  const updated = await db`
+    update portal_report_deadlines
+    set template_slug = ${report.template_slug}, school_id = ${report.school_id}, project_id = ${report.project_id || null},
+        due_at = ${dueAt}, status = ${status}, reminder_at = ${reminderAt}
+    where report_id = ${report.id}
+    returning id
+  `;
+  if (!updated[0]) {
+    await db`
+      insert into portal_report_deadlines
+        (template_slug, school_id, project_id, report_id, due_at, status, reminder_at)
+      values (${report.template_slug}, ${report.school_id}, ${report.project_id || null}, ${report.id}, ${dueAt}, ${status}, ${reminderAt})
+    `;
+  }
+}
+
 async function reports(req, res, member, body) {
   const db = sql();
   if (req.method === "GET") {
@@ -364,34 +414,73 @@ async function reports(req, res, member, body) {
     const report = reportRows[0];
     if (!report) return json(res, 404, { error: "Rapport introuvable." });
     if (!(await requireClubCapability(req, res, member, "report_validator", report.school_id))) return;
+    const templateRows = await db`
+      select t.validator_departments, r.template_slug
+      from portal_reports r left join portal_report_templates t on t.slug = r.template_slug
+      where r.id = ${body.reportId}
+    `;
+    const requiredDepartments = jsonArray(templateRows[0]?.validator_departments).map(value => String(value));
     const status = ["pending", "valid", "invalid"].includes(body.status) ? body.status : "pending";
-    const department = String(body.department || "coordination_strategique").trim().slice(0, 100);
+    const department = String(body.department || "").trim().slice(0, 100);
+    if (!department || !requiredDepartments.includes(department)) {
+      return json(res, 400, { error: "Ce département ne fait pas partie de la matrice de validation du modèle." });
+    }
     const result = await db`
       insert into portal_report_reviews (report_id, department, status, comment, reviewer_id, reviewed_at)
       values (${body.reportId}, ${department}, ${status}, ${body.comment || null}, ${member.id}, now())
       on conflict (report_id, department) do update set status=excluded.status, comment=excluded.comment, reviewer_id=excluded.reviewer_id, reviewed_at=now()
       returning *
     `;
-    const reviewRows = await db`select status from portal_report_reviews where report_id = ${body.reportId}`;
-    const nextStatus = reviewRows.some(row => row.status === "invalid") ? "invalidated" : (reviewRows.length > 0 && reviewRows.every(row => row.status === "valid") ? "validated" : "submitted");
-    await db`update portal_reports set status = ${nextStatus}, updated_at = now() where id = ${body.reportId}`;
+    const reviewRows = await db`select department, status from portal_report_reviews where report_id = ${body.reportId}`;
+    const reviewMap = new Map(reviewRows.map(row => [row.department, row.status]));
+    const nextStatus = reviewRows.some(row => row.status === "invalid")
+      ? "invalidated"
+      : (requiredDepartments.length > 0 && requiredDepartments.every(required => reviewMap.get(required) === "valid") ? "validated" : "submitted");
+    const reportAfterReview = await db`update portal_reports set status = ${nextStatus}, updated_at = now() where id = ${body.reportId} returning *`;
+    if (reportAfterReview[0]) await syncReportDeadline(db, reportAfterReview[0]);
     return json(res, 200, { review: result[0], reportStatus: nextStatus });
   }
   if (body.action === "update" && body.reportId) {
+    const existing = await db`select school_id from portal_reports where id = ${body.reportId} and submitted_by = ${member.id}`;
+    if (!existing[0]) return json(res, 404, { error: "Rapport introuvable." });
+    const schoolId = existing[0].school_id;
+    const templateSlug = String(body.templateSlug || body.reportType || "proces_verbal");
+    const template = await db`select slug from portal_report_templates where slug = ${templateSlug} and active = true`;
+    if (!template[0]) return json(res, 400, { error: "Modèle de rapport invalide." });
+    const axisSlug = body.axisSlug ? String(body.axisSlug).trim() : null;
+    if (axisSlug) {
+      const axis = await db`select slug from portal_strategic_axes where slug = ${axisSlug}`;
+      if (!axis[0]) return json(res, 400, { error: "Axe stratégique invalide." });
+    }
+    const projectId = body.projectId || null;
+    if (projectId) {
+      const project = await db`select id from portal_projects where id = ${projectId} and school_id = ${schoolId}`;
+      if (!project[0]) return json(res, 400, { error: "Projet invalide pour ce club." });
+    }
+    const status = body.status === "draft" ? "draft" : "submitted";
+    const dueAt = parseOptionalDate(body.dueAt);
+    if (body.dueAt && !dueAt) return json(res, 400, { error: "Échéance invalide." });
     const result = await db`
       update portal_reports
-      set title = ${String(body.title || "Rapport").trim()}, description = ${body.description || null}, event_date = ${body.eventDate || null}, payload = ${JSON.stringify(body.payload || {})}::jsonb, status = ${body.status === "draft" ? "draft" : "submitted"}, updated_at = now(), submitted_at = case when ${body.status === "draft" ? "draft" : "submitted"} = 'submitted' then coalesce(submitted_at, now()) else submitted_at end
+      set project_id = ${projectId}, template_slug = ${templateSlug}, report_type = ${body.reportType || templateSlug},
+          title = ${String(body.title || "Rapport").trim()}, recipient = ${body.recipient || null}, axis_slug = ${axisSlug},
+          sub_axis_slug = ${body.subAxisSlug || null}, description = ${body.description || null}, event_date = ${body.eventDate || null},
+          due_at = ${dueAt}, payload = ${JSON.stringify(body.payload || {})}::jsonb, status = ${status}, updated_at = now(),
+          submitted_at = case when ${status} = 'submitted' then coalesce(submitted_at, now()) else submitted_at end
       where id = ${body.reportId} and submitted_by = ${member.id}
       returning *
     `;
+    if (result[0]) await syncReportDeadline(db, result[0]);
     return json(res, result[0] ? 200 : 404, result[0] ? { report: result[0] } : { error: "Rapport introuvable." });
   }
   const schoolId = schoolScope(member, body.schoolId);
   const allowedTypes = ["pre_projet", "post_projet", "proces_verbal", "collaboration", "mise_a_jour", "supervision", "investigation"];
   if (!schoolId || !body.title || !allowedTypes.includes(body.reportType)) return json(res, 400, { error: "Type, club et titre requis." });
   const templateSlug = String(body.templateSlug || body.reportType);
-  const template = await db`select slug, validator_departments from portal_report_templates where slug = ${templateSlug}`;
+  const template = await db`select slug, validator_departments from portal_report_templates where slug = ${templateSlug} and active = true`;
   if (!template[0]) return json(res, 400, { error: "Modèle de rapport invalide." });
+  const dueAt = parseOptionalDate(body.dueAt);
+  if (body.dueAt && !dueAt) return json(res, 400, { error: "Échéance invalide." });
   const axisSlug = body.axisSlug ? String(body.axisSlug).trim() : null;
   if (axisSlug) {
     const axis = await db`select slug from portal_strategic_axes where slug = ${axisSlug}`;
@@ -405,9 +494,10 @@ async function reports(req, res, member, body) {
   const status = body.status === "draft" ? "draft" : "submitted";
   const result = await db`
     insert into portal_reports (school_id, submitted_by, project_id, template_slug, report_type, title, recipient, axis_slug, sub_axis_slug, event_date, due_at, submitted_at, description, payload, status)
-    values (${schoolId}, ${member.id}, ${projectId}, ${templateSlug}, ${body.reportType}, ${String(body.title).trim()}, ${body.recipient || null}, ${axisSlug}, ${body.subAxisSlug || null}, ${body.eventDate || null}, ${body.dueAt || null}, ${status === "submitted" ? new Date() : null}, ${body.description || null}, ${JSON.stringify(body.payload || {})}::jsonb, ${status})
+    values (${schoolId}, ${member.id}, ${projectId}, ${templateSlug}, ${body.reportType}, ${String(body.title).trim()}, ${body.recipient || null}, ${axisSlug}, ${body.subAxisSlug || null}, ${body.eventDate || null}, ${dueAt}, ${status === "submitted" ? new Date() : null}, ${body.description || null}, ${JSON.stringify(body.payload || {})}::jsonb, ${status})
     returning *
   `;
+  if (result[0]) await syncReportDeadline(db, result[0]);
   return json(res, 201, { report: result[0] });
 }
 
