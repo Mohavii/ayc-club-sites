@@ -110,11 +110,31 @@ async function listMeetings(member, query) {
   if (!schoolId) return [];
   return db`
     select m.*, s.name as school_name,
-      (select count(*)::int from portal_meeting_attendees a where a.meeting_id = m.id) as attendee_count
-    from portal_meetings m join portal_schools s on s.id = m.school_id
+      chair.display_name as chair_name, secretary.display_name as secretary_name,
+      (select count(*)::int from portal_meeting_attendees a where a.meeting_id = m.id) as attendee_count,
+      (select coalesce(json_agg(json_build_object('id', i.id, 'position', i.position, 'title', i.title, 'durationMinutes', i.duration_minutes, 'notes', i.notes) order by i.position), '[]'::json)
+         from portal_meeting_agenda_items i where i.meeting_id = m.id) as agenda_items
+    from portal_meetings m
+      join portal_schools s on s.id = m.school_id
+      left join portal_members chair on chair.id = m.chair_id
+      left join portal_members secretary on secretary.id = m.secretary_id
     where m.school_id = ${schoolId}
     order by m.starts_at desc
   `;
+}
+
+function normalizeAgendaItems(body) {
+  if (Array.isArray(body.agendaItems)) {
+    return body.agendaItems.map((item, index) => ({
+      position: index,
+      title: String(item.title || '').trim(),
+      durationMinutes: item.durationMinutes ? Number(item.durationMinutes) : null,
+      notes: item.notes ? String(item.notes).trim() : null,
+    })).filter(item => item.title).slice(0, 30);
+  }
+  return (Array.isArray(body.agenda) ? body.agenda : [])
+    .map((title, index) => ({ position: index, title: String(title || '').trim(), durationMinutes: null, notes: null }))
+    .filter(item => item.title).slice(0, 30);
 }
 
 async function createMeeting(req, res, member, body) {
@@ -124,22 +144,33 @@ async function createMeeting(req, res, member, body) {
   const title = String(body.title || "").trim();
   const startsAt = String(body.startsAt || "").trim();
   const allowedTypes = ["reunion", "assemblee_locale", "assemblee_generale"];
+  const allowedFormats = ["presentiel", "en_ligne", "hybride"];
+  const allowedStatuses = ["planned", "live", "completed", "cancelled"];
+  const format = allowedFormats.includes(body.format) ? body.format : "presentiel";
+  const status = allowedStatuses.includes(body.status) ? body.status : "planned";
+  const agendaItems = normalizeAgendaItems(body);
   if (!title || !startsAt || !allowedTypes.includes(body.meetingType)) {
     return json(res, 400, { error: "Titre, type et date requis." });
   }
   const db = sql();
-  const rows = await db`
+  const meetingResult = await db`
     insert into portal_meetings
-      (school_id, created_by, title, meeting_type, starts_at, ends_at, format, location, maps_url, comments, agenda, attachments)
+      (school_id, created_by, title, meeting_type, starts_at, ends_at, format, location, maps_url, comments, agenda, attachments, status, chair_id, secretary_id)
     values
-      (${schoolId}, ${member.id}, ${title}, ${body.meetingType}, ${startsAt},
-       ${body.endsAt || null}, ${body.format || "presentiel"}, ${body.location || null},
-       ${body.mapsUrl || null}, ${body.comments || null},
-       ${JSON.stringify(Array.isArray(body.agenda) ? body.agenda : [])}::jsonb,
-       ${JSON.stringify(Array.isArray(body.attachments) ? body.attachments : [])}::jsonb)
+      (${schoolId}, ${member.id}, ${title}, ${body.meetingType}, ${startsAt}, ${body.endsAt || null},
+       ${format}, ${body.location || null}, ${body.mapsUrl || null}, ${body.comments || null},
+       ${JSON.stringify(agendaItems)}::jsonb, ${JSON.stringify(Array.isArray(body.attachments) ? body.attachments : [])}::jsonb,
+       ${status}, ${body.chairId || null}, ${body.secretaryId || null})
     returning *
   `;
-  return json(res, 201, { meeting: rows[0] });
+  const meeting = meetingResult[0];
+  if (agendaItems.length) {
+    await db.transaction(agendaItems.map(item => db`
+      insert into portal_meeting_agenda_items (meeting_id, position, title, duration_minutes, notes, created_by)
+      values (${meeting.id}, ${item.position}, ${item.title}, ${item.durationMinutes}, ${item.notes}, ${member.id})
+    `));
+  }
+  return json(res, 201, { meeting });
 }
 
 async function meetingDetail(req, res, member, body) {
@@ -151,21 +182,32 @@ async function meetingDetail(req, res, member, body) {
   if (!meeting || (!member.is_national_admin && meeting.school_id !== member.school_id)) {
     return json(res, 404, { error: "Réunion introuvable." });
   }
-  const [attendees, minutes] = await Promise.all([
+  const [agendaItems, attendees, minutes, roster] = await Promise.all([
+    db`select * from portal_meeting_agenda_items where meeting_id = ${id} order by position`,
     db`
-      select a.*, m.display_name, m.username, m.profile_picture_url
+      select a.*, m.display_name, m.username, m.profile_picture_url, m.membership_status
       from portal_meeting_attendees a join portal_members m on m.id = a.member_id
       where a.meeting_id = ${id} order by m.display_name
     `,
     db`select * from portal_minutes where meeting_id = ${id}`,
+    db`select id, display_name, username, membership_status from portal_members where school_id = ${meeting.school_id} and status = 'active' order by display_name`,
   ]);
-  if (req.method === "GET" || body.action === "meeting") return json(res, 200, { meeting, attendees, minutes: minutes[0] || null });
+  let structured = { attendance: [], agendaBlocks: [], motions: [] };
+  if (minutes[0]) {
+    const [attendance, agendaBlocks, motions] = await Promise.all([
+      db`select a.*, m.display_name, m.username from portal_minutes_attendance a join portal_members m on m.id = a.member_id where a.minutes_id = ${minutes[0].id} order by m.display_name`,
+      db`select * from portal_minutes_agenda_blocks where minutes_id = ${minutes[0].id} order by position`,
+      db`select * from portal_minutes_motions where minutes_id = ${minutes[0].id} order by position`,
+    ]);
+    structured = { attendance, agendaBlocks, motions };
+  }
+  if (req.method === "GET" || body.action === "meeting") return json(res, 200, { meeting, agendaItems, attendees, roster, minutes: minutes[0] || null, structured });
   if (body.action === "rsvp") {
     const rsvp = ["pending", "present", "absent"].includes(body.rsvp) ? body.rsvp : "pending";
     const result = await db`
-      insert into portal_meeting_attendees (meeting_id, member_id, rsvp, voting_rights)
-      values (${id}, ${member.id}, ${rsvp}, ${Boolean(body.votingRights)})
-      on conflict (meeting_id, member_id) do update set rsvp = excluded.rsvp, voting_rights = excluded.voting_rights
+      insert into portal_meeting_attendees (meeting_id, member_id, rsvp)
+      values (${id}, ${member.id}, ${rsvp})
+      on conflict (meeting_id, member_id) do update set rsvp = excluded.rsvp
       returning *
     `;
     return json(res, 200, { attendee: result[0] });
@@ -173,22 +215,61 @@ async function meetingDetail(req, res, member, body) {
   if (body.action === "save_minutes") {
     if (!(await requireClubCapability(req, res, member, "pv_editor", meeting.school_id))) return;
     const mode = body.mode === "assemblee_generale" ? body.mode : "standard";
-    const result = await db`
+    const status = ["draft", "sent", "validated"].includes(body.status) ? body.status : "draft";
+    const attendance = Array.isArray(body.attendance) ? body.attendance.slice(0, 300) : [];
+    const agendaBlocks = Array.isArray(body.agendaBlocks) ? body.agendaBlocks.slice(0, 50) : [];
+    const motions = Array.isArray(body.motions) ? body.motions.slice(0, 100) : [];
+    const activeIds = new Set(roster.map(row => row.id));
+    const normalizedAttendance = attendance.filter(row => activeIds.has(row.memberId)).map((row, index) => ({
+      memberId: row.memberId,
+      attendanceStatus: ["present", "absent", "excused", "late"].includes(row.attendanceStatus) ? row.attendanceStatus : "present",
+      votingRights: Boolean(row.votingRights),
+      memberRole: row.memberRole ? String(row.memberRole).slice(0, 160) : null,
+      note: row.note ? String(row.note).slice(0, 500) : null,
+      position: index,
+    }));
+    const savedMinutes = await db`
       insert into portal_minutes
-        (meeting_id, mode, mandate, organizer, drafted_at, sent_at, redactors, attendance, agenda_blocks, motions, status, created_by)
-      values (${id}, ${mode}, ${body.mandate || null}, ${body.organizer || null},
-        ${body.draftedAt || null}, ${body.sentAt || null},
-        ${JSON.stringify(body.redactors || [])}::jsonb, ${JSON.stringify(body.attendance || [])}::jsonb,
-        ${JSON.stringify(body.agendaBlocks || [])}::jsonb, ${JSON.stringify(body.motions || [])}::jsonb,
-        ${body.status || "draft"}, ${member.id})
+        (meeting_id, mode, mandate, organizer, drafted_at, sent_at, closing_at, duration_minutes, redactors, attendance, agenda_blocks, motions, status, created_by)
+      values (${id}, ${mode}, ${body.mandate || null}, ${body.organizer || null}, ${body.draftedAt || null}, ${body.sentAt || null},
+        ${body.closingAt || null}, ${body.durationMinutes ? Number(body.durationMinutes) : null},
+        ${JSON.stringify(body.redactors || [])}::jsonb, ${JSON.stringify(normalizedAttendance)}::jsonb,
+        ${JSON.stringify(agendaBlocks)}::jsonb, ${JSON.stringify(motions)}::jsonb, ${status}, ${member.id})
       on conflict (meeting_id) do update set
         mode = excluded.mode, mandate = excluded.mandate, organizer = excluded.organizer,
-        drafted_at = excluded.drafted_at, sent_at = excluded.sent_at, redactors = excluded.redactors,
-        attendance = excluded.attendance, agenda_blocks = excluded.agenda_blocks, motions = excluded.motions,
-        status = excluded.status, updated_at = now()
+        drafted_at = excluded.drafted_at, sent_at = excluded.sent_at, closing_at = excluded.closing_at,
+        duration_minutes = excluded.duration_minutes, redactors = excluded.redactors, attendance = excluded.attendance,
+        agenda_blocks = excluded.agenda_blocks, motions = excluded.motions, status = excluded.status, updated_at = now()
       returning *
     `;
-    return json(res, 200, { minutes: result[0] });
+    const minutesId = savedMinutes[0].id;
+    const statements = [
+      db`delete from portal_minutes_attendance where minutes_id = ${minutesId}`,
+      db`delete from portal_minutes_agenda_blocks where minutes_id = ${minutesId}`,
+      db`delete from portal_minutes_motions where minutes_id = ${minutesId}`,
+    ];
+    const structuredResult = await db.transaction(async tx => {
+      await tx`delete from portal_minutes_attendance where minutes_id = ${minutesId}`;
+      await tx`delete from portal_minutes_agenda_blocks where minutes_id = ${minutesId}`;
+      await tx`delete from portal_minutes_motions where minutes_id = ${minutesId}`;
+      for (const row of normalizedAttendance) await tx`
+        insert into portal_minutes_attendance (minutes_id, member_id, attendance_status, voting_rights, member_role, note)
+        values (${minutesId}, ${row.memberId}, ${row.attendanceStatus}, ${row.votingRights}, ${row.memberRole}, ${row.note})
+      `;
+      for (const [position, block] of agendaBlocks.entries()) await tx`
+        insert into portal_minutes_agenda_blocks (minutes_id, position, title, discussion, decision, duration_minutes)
+        values (${minutesId}, ${position}, ${String(block.title || 'Point').slice(0, 300)}, ${block.discussion || null}, ${block.decision || null}, ${block.durationMinutes ? Number(block.durationMinutes) : null})
+      `;
+      for (const [position, motion] of motions.entries()) await tx`
+        insert into portal_minutes_motions (minutes_id, position, motion_type, title, proposer_id, seconder_id, amendment, direct_negative, majority_type, votes_for, votes_against, abstentions, result, consequence)
+        values (${minutesId}, ${position}, ${String(motion.motionType || 'decision').slice(0, 80)}, ${String(motion.title || 'Motion').slice(0, 300)},
+          ${activeIds.has(motion.proposerId) ? motion.proposerId : null}, ${activeIds.has(motion.seconderId) ? motion.seconderId : null},
+          ${motion.amendment || null}, ${motion.directNegative || null}, ${motion.majorityType || null},
+          ${Number(motion.votesFor || 0)}, ${Number(motion.votesAgainst || 0)}, ${Number(motion.abstentions || 0)}, ${motion.result || null}, ${motion.consequence || null})
+      `;
+      return true;
+    });
+    return json(res, 200, { minutes: savedMinutes[0], structuredSaved: structuredResult });
   }
   return json(res, 400, { error: "Action de réunion inconnue." });
 }
@@ -282,6 +363,12 @@ module.exports = async (req, res) => {
     if (action === "profile") return json(res, 200, await profile(member));
     if (action === "update_profile") return updateProfile(req, res, member, body);
     if (action === "dashboard") return json(res, 200, await dashboard(member));
+    if (action === "roster") {
+      const schoolId = schoolScope(member, req.query?.schoolId);
+      if (!schoolId) return json(res, 200, { members: [] });
+      const roster = await sql()`select id, display_name, username, membership_status from portal_members where school_id = ${schoolId} and status = 'active' order by display_name`;
+      return json(res, 200, { members: roster });
+    }
     if (action === "meetings") return req.method === "GET" ? json(res, 200, { meetings: await listMeetings(member, req.query || {}) }) : createMeeting(req, res, member, body);
     if (action === "meeting") return meetingDetail(req, res, member, body);
     if (action === "reports") return reports(req, res, member, body);
