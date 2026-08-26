@@ -21,7 +21,7 @@
 const { sql } = require("./db");
 
 const DISPLAY_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc", "supco_regional"];
-const CAPABILITIES = ["membership_approver", "report_validator", "pv_editor", "meeting_organizer"];
+const CAPABILITIES = ["membership_approver", "report_validator", "pv_editor", "meeting_organizer", "project_manager"];
 const NATIONAL_ROLES = ["president_national"];
 const MEMBERSHIP_STATUSES = ["nouveau_adherent", "adherent", "responsable", "senior", "membre_national", "ancien"];
 
