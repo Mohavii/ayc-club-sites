@@ -25,6 +25,7 @@ const {
   DISPLAY_ROLES,
   CAPABILITIES,
   NATIONAL_ROLES,
+  MEMBERSHIP_STATUSES,
   setClubDisplayRole,
   clearClubDisplayRole,
   getCurrentDisplayRole,
@@ -35,6 +36,7 @@ const {
   setNationalRole,
   clearNationalRole,
   getMemberNationalRoles,
+  setMembershipStatus,
 } = require("../_lib/roles");
 
 async function requireActiveTarget(res, memberId) {
@@ -86,6 +88,7 @@ module.exports = async (req, res) => {
             displayName: m.display_name,
             profilePictureUrl: m.profile_picture_url,
             email: m.email,
+            membershipStatus: m.membership_status,
           })),
         });
         return;
@@ -99,7 +102,24 @@ module.exports = async (req, res) => {
           getMemberCapabilities(memberId),
           getMemberNationalRoles(memberId),
         ]);
-        res.status(200).json({ ok: true, roleHistory, capabilities, nationalRoles });
+        res.status(200).json({ ok: true, roleHistory, capabilities, nationalRoles, membershipStatus: target.membership_status });
+        return;
+      }
+
+      case "setMembershipStatus": {
+        if (!MEMBERSHIP_STATUSES.includes(body.membershipStatus)) {
+          res.status(400).json({ error: `Statut invalide. Attendu : ${MEMBERSHIP_STATUSES.join(", ")}` });
+          return;
+        }
+        const target = await requireActiveTarget(res, memberId);
+        if (!target) return;
+        const result = await setMembershipStatus({
+          memberId,
+          status: body.membershipStatus,
+          changedBy: admin.id,
+          reason: body.reason,
+        });
+        res.status(200).json({ ok: true, member: result.member, history: result.history });
         return;
       }
 
