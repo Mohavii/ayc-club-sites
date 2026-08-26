@@ -37,11 +37,22 @@ const edgeRewrites = [
   { source: "/", destination: "/portal/login.html" },
 ];
 
+const functionRoutes = TARGETS[target].flatMap((source) => {
+  const route = `/${source.slice(0, -3)}`;
+  return [
+    { src: route, dest: `/${source}` },
+    { src: `${route}.js`, dest: `/${source}` },
+  ];
+});
+
 const config = {
   builds,
-  // Proxy rewrites belong only to portal-edge. Service projects expose their
-  // selected local functions directly.
-  ...(target === "portal-edge" ? { rewrites: edgeRewrites } : {}),
+  // Legacy builds need explicit routes. Without these, Vercel can package
+  // the Lambda outputs successfully but still return NOT_FOUND for the
+  // extensionless `/api/...` URLs used by the browser.
+  ...(target === "portal-edge"
+    ? { rewrites: edgeRewrites }
+    : { routes: [...functionRoutes, { handle: "filesystem" }] }),
 };
 
 // Vercel accepts either export form; providing both is compatible with the
