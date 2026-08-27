@@ -666,7 +666,19 @@ async function tasks(req, res, member, body) {
     return json(res, rows[0] ? 200 : 404, rows[0] ? { task: rows[0] } : { error: "Tâche introuvable." });
   }
   if (!body.title) return json(res, 400, { error: "Titre requis." });
-  const rows = await db`insert into portal_tasks (school_id, assigned_to, project_id, title, description, priority, deadline, comments, created_by) values (${body.schoolId || member.school_id}, ${body.assignedTo || member.id}, ${body.projectId || null}, ${String(body.title).trim()}, ${body.description || null}, ${body.priority || "normale"}, ${body.deadline || null}, ${body.comments || null}, ${member.id}) returning *`;
+  const schoolId = schoolScope(member, body.schoolId);
+  if (!schoolId || !(await requireClubCapability(req, res, member, "project_manager", schoolId))) return;
+  const assignedTo = String(body.assignedTo || member.id);
+  const assigneeRows = await db`select id from portal_members where id=${assignedTo} and status='active' and school_id=${schoolId}`;
+  if (!assigneeRows[0]) return json(res, 400, { error: "Membre assigné invalide pour ce club." });
+  let projectId = body.projectId || null;
+  if (projectId) {
+    const projectRows = await db`select id from portal_projects where id=${projectId} and school_id=${schoolId} and status <> 'cancelled'`;
+    if (!projectRows[0]) return json(res, 400, { error: "Projet invalide pour ce club." });
+  }
+  const priority = ["basse", "normale", "haute", "urgente"].includes(body.priority) ? body.priority : "normale";
+  const rows = await db`insert into portal_tasks (school_id, assigned_to, project_id, title, description, priority, deadline, comments, created_by) values (${schoolId}, ${assignedTo}, ${projectId}, ${String(body.title).trim()}, ${body.description || null}, ${priority}, ${body.deadline || null}, ${body.comments || null}, ${member.id}) returning *`;
+  await recordAudit(db, { actorId: member.id, action: "task.created", entityType: "task", entityId: rows[0].id, afterData: rows[0] });
   return json(res, 201, { task: rows[0] });
 }
 
@@ -676,6 +688,273 @@ async function responsibilities(req, res, member, body) {
   if (!body.title) return json(res, 400, { error: "Titre requis." });
   const rows = await db`insert into portal_responsibilities (member_id, school_id, title, description, project_url, database_url, held_on, status) values (${member.id}, ${member.school_id}, ${String(body.title).trim()}, ${body.description || null}, ${body.projectUrl || null}, ${body.databaseUrl || null}, ${body.heldOn || null}, 'proposed') returning *`;
   return json(res, 201, { responsibility: rows[0] });
+}
+
+const ASSEMBLY_TYPES = ["alofm", "adhesion", "validation", "aloe", "dissolution", "ag_ordinaire", "ag_extraordinaire"];
+const ASSEMBLY_LABELS = { alofm: "ALOFM", adhesion: "AL d’adhésion", validation: "AL de validation", aloe: "ALOE", dissolution: "AL de dissolution", ag_ordinaire: "AG ordinaire", ag_extraordinaire: "AG extraordinaire" };
+const ELIGIBLE_MEMBER_STATUSES = new Set(["adherent", "responsable"]);
+
+function majorityOutcome(forVotes, againstVotes, abstentions, majorityType) {
+  const yes = Math.max(0, Number(forVotes) || 0);
+  const no = Math.max(0, Number(againstVotes) || 0);
+  const abstain = Math.max(0, Number(abstentions) || 0);
+  if (yes === no && yes > 0) return "tie";
+  if (majorityType === "absolute") return yes > (yes + no + abstain) / 2 ? "adopted" : "rejected";
+  if (majorityType === "two_thirds") return yes >= (2 * no) && yes > 0 ? "adopted" : "rejected";
+  if (majorityType === "relative") return yes > no ? "adopted" : "rejected";
+  return yes > no ? "adopted" : "rejected";
+}
+
+async function recordAudit(db, { actorId, action, entityType, entityId, beforeData, afterData }) {
+  await db`
+    insert into portal_audit_events (actor_id, action, entity_type, entity_id, before_data, after_data)
+    values (${actorId || null}, ${action}, ${entityType}, ${entityId || null}, ${beforeData ? JSON.stringify(beforeData) : null}::jsonb, ${afterData ? JSON.stringify(afterData) : null}::jsonb)
+  `;
+}
+
+function assemblyMotionSeed(assemblyType) {
+  const opening = [
+    "Présentation du rapport préliminaire du CSCY",
+    "Adoption du rapport préliminaire du CSCY",
+    "Présentation de l’agenda",
+    "Adoption de l’agenda",
+    "Adoption du PV de la dernière Assemblée",
+  ];
+  const closing = [
+    "Présentation du rapport final du CSCY",
+    "Adoption du rapport final du CSCY",
+    "Clôture de l’Assemblée",
+  ];
+  return [...opening, `Délibérations de l’${ASSEMBLY_LABELS[assemblyType] || "assemblée"}`, ...closing];
+}
+
+async function assemblies(req, res, member, body) {
+  const db = sql();
+  if (req.method === "GET") {
+    const requested = req.query?.schoolId;
+    const schoolId = schoolScope(member, requested);
+    const rows = member.is_national_admin && !requested
+      ? await db`
+          select a.*, m.title, m.starts_at, m.ends_at, m.format, m.location, s.name as school_name,
+            coalesce((select json_agg(json_build_object('memberId', ar.member_id, 'role', ar.role)) from portal_assembly_roles ar where ar.assembly_id = a.id), '[]'::json) as roles,
+            (select count(*)::int from portal_assembly_attendance aa where aa.assembly_id = a.id and aa.attendance_status in ('present','late')) as present_count
+          from portal_assemblies a join portal_meetings m on m.id = a.meeting_id left join portal_schools s on s.id = a.school_id
+          order by m.starts_at desc
+        `
+      : !schoolId ? [] : await db`
+          select a.*, m.title, m.starts_at, m.ends_at, m.format, m.location, s.name as school_name,
+            coalesce((select json_agg(json_build_object('memberId', ar.member_id, 'role', ar.role)) from portal_assembly_roles ar where ar.assembly_id = a.id), '[]'::json) as roles,
+            (select count(*)::int from portal_assembly_attendance aa where aa.assembly_id = a.id and aa.attendance_status in ('present','late')) as present_count
+          from portal_assemblies a join portal_meetings m on m.id = a.meeting_id left join portal_schools s on s.id = a.school_id
+          where a.school_id = ${schoolId}
+          order by m.starts_at desc
+        `;
+    return json(res, 200, { assemblies: rows.map(row => ({ ...row, assembly_label: ASSEMBLY_LABELS[row.assembly_type] || row.assembly_type })) });
+  }
+  if (body.action !== "create") return json(res, 400, { error: "Action d’assemblée inconnue." });
+  const schoolId = schoolScope(member, body.schoolId);
+  if (!schoolId || !(await requireClubCapability(req, res, member, "meeting_organizer", schoolId))) return;
+  const assemblyType = String(body.assemblyType || "");
+  if (!ASSEMBLY_TYPES.includes(assemblyType)) return json(res, 400, { error: "Type d’assemblée invalide." });
+  const title = String(body.title || ASSEMBLY_LABELS[assemblyType]).trim();
+  const startsAt = String(body.startsAt || "").trim();
+  if (!title || !startsAt) return json(res, 400, { error: "Titre et date requis." });
+  const scope = assemblyType.startsWith("ag_") ? "national" : "local";
+  const meetingType = scope === "national" ? "assemblee_generale" : "assemblee_locale";
+  const memberRows = scope === "local"
+    ? await db`select id, display_name, username, membership_status from portal_members where school_id = ${schoolId} and status = 'active' order by display_name`
+    : await db`select id, display_name, username, membership_status from portal_members where status = 'active' order by display_name`;
+  const eligible = memberRows.filter(row => ELIGIBLE_MEMBER_STATUSES.has(row.membership_status));
+  const memberSnapshot = memberRows.map(row => ({ memberId: row.id, displayName: row.display_name, username: row.username, membershipStatus: row.membership_status, votingRights: ELIGIBLE_MEMBER_STATUSES.has(row.membership_status) }));
+  const quorumRequired = scope === "local" ? Math.max(1, Math.ceil(memberRows.length / 3)) : 0;
+  const meetingRows = await db`
+    insert into portal_meetings (school_id, created_by, title, meeting_type, starts_at, ends_at, format, location, maps_url, comments, agenda, status)
+    values (${schoolId}, ${member.id}, ${title}, ${meetingType}, ${startsAt}, ${body.endsAt || null}, ${["presentiel", "en_ligne", "hybride"].includes(body.format) ? body.format : "presentiel"}, ${body.location || null}, ${body.mapsUrl || null}, ${body.comments || null}, ${JSON.stringify(assemblyMotionSeed(assemblyType).map((item, position) => ({ position, title: item })))}::jsonb, 'planned')
+    returning *
+  `;
+  const meeting = meetingRows[0];
+  const assemblyRows = await db`
+    insert into portal_assemblies (meeting_id, school_id, assembly_type, scope, status, member_snapshot_count, quorum_required, eligible_voter_count, voter_snapshot, project_url, database_url, created_by)
+    values (${meeting.id}, ${schoolId}, ${assemblyType}, ${scope}, 'planned', ${memberRows.length}, ${quorumRequired}, ${eligible.length}, ${JSON.stringify(memberSnapshot)}::jsonb, ${body.projectUrl || null}, ${body.databaseUrl || null}, ${member.id})
+    returning *
+  `;
+  const assembly = assemblyRows[0];
+  for (const row of memberRows) await db`insert into portal_assembly_attendance (assembly_id, member_id, attendance_status, voting_rights, eligibility_basis, assigned_by) values (${assembly.id}, ${row.id}, 'invited', ${ELIGIBLE_MEMBER_STATUSES.has(row.membership_status)}, ${row.membership_status}, ${member.id}) on conflict (assembly_id, member_id) do nothing`;
+  for (const [position, motionTitle] of assemblyMotionSeed(assemblyType).entries()) await db`insert into portal_assembly_motions (assembly_id, position, motion_type, title, majority_type, required_motion) values (${assembly.id}, ${position}, ${position < 5 || position >= assemblyMotionSeed(assemblyType).length - 3 ? "procedural" : "decision"}, ${motionTitle}, 'simple', ${position < 5 || position >= assemblyMotionSeed(assemblyType).length - 3})`;
+  await recordAudit(db, { actorId: member.id, action: "assembly.created", entityType: "assembly", entityId: assembly.id, afterData: { assemblyType, scope, memberSnapshotCount: memberRows.length, quorumRequired } });
+  return json(res, 201, { assembly, meeting });
+}
+
+async function assemblyDetail(req, res, member, body) {
+  const id = String(body.assemblyId || req.query?.assemblyId || "");
+  if (!id) return json(res, 400, { error: "Assemblée introuvable." });
+  const db = sql();
+  const assemblyRows = await db`select a.*, m.title, m.starts_at, m.ends_at, m.format, m.location, m.comments, s.name as school_name from portal_assemblies a join portal_meetings m on m.id = a.meeting_id left join portal_schools s on s.id = a.school_id where a.id = ${id}`;
+  const assembly = assemblyRows[0];
+  if (!assembly || (!member.is_national_admin && assembly.school_id !== member.school_id)) return json(res, 404, { error: "Assemblée introuvable." });
+  const [attendance, roles, motions, elections] = await Promise.all([
+    db`select a.*, m.display_name, m.username, m.membership_status from portal_assembly_attendance a join portal_members m on m.id = a.member_id where a.assembly_id = ${id} order by m.display_name`,
+    db`select ar.*, m.display_name, m.username from portal_assembly_roles ar join portal_members m on m.id = ar.member_id where ar.assembly_id = ${id} order by m.display_name`,
+    db`select * from portal_assembly_motions where assembly_id = ${id} order by position`,
+    db`select * from portal_elections where assembly_id = ${id} order by created_at`,
+  ]);
+  const presentCount = attendance.filter(row => ["present", "late"].includes(row.attendance_status)).length;
+  const quorumMet = assembly.scope === "local" ? presentCount >= assembly.quorum_required : null;
+  if (req.method === "GET" || body.action === "assembly") return json(res, 200, { assembly: { ...assembly, assembly_label: ASSEMBLY_LABELS[assembly.assembly_type] || assembly.assembly_type, present_count: presentCount, quorum_met_live: quorumMet }, attendance, roles, motions, elections });
+  if (body.action === "attendance") {
+    if (!(await requireClubCapability(req, res, member, "cscy_reviewer", assembly.school_id))) return;
+    const target = attendance.find(row => row.member_id === body.memberId);
+    if (!target) return json(res, 404, { error: "Membre absent du relevé de l’assemblée." });
+    const attendanceStatus = ["invited", "present", "absent", "excused", "late"].includes(body.attendanceStatus) ? body.attendanceStatus : "invited";
+    const votingRights = Boolean(body.votingRights);
+    if (votingRights && !ELIGIBLE_MEMBER_STATUSES.has(target.membership_status)) return json(res, 400, { error: "Ce statut d’adhésion ne permet pas d’attribuer un droit de vote." });
+    const result = await db`update portal_assembly_attendance set attendance_status=${attendanceStatus}, voting_rights=${votingRights}, eligibility_basis=${body.eligibilityBasis || target.membership_status}, assigned_by=${member.id}, note=${body.note || null} where assembly_id=${id} and member_id=${body.memberId} returning *`;
+    await recordAudit(db, { actorId: member.id, action: "assembly.attendance.updated", entityType: "assembly", entityId: id, afterData: result[0] });
+    return json(res, 200, { attendance: result[0] });
+  }
+  if (body.action === "motion") {
+    if (!(await requireClubCapability(req, res, member, "pv_editor", assembly.school_id))) return;
+    const position = Number(body.position);
+    const existing = motions.find(row => row.position === position);
+    const majorityType = ["simple", "absolute", "relative", "two_thirds"].includes(body.majorityType) ? body.majorityType : (existing?.majority_type || "simple");
+    const votesFor = Math.max(0, Number(body.votesFor) || 0);
+    const votesAgainst = Math.max(0, Number(body.votesAgainst) || 0);
+    const abstentions = Math.max(0, Number(body.abstentions) || 0);
+    const resultLabel = majorityOutcome(votesFor, votesAgainst, abstentions, majorityType);
+    const rows = await db`
+      insert into portal_assembly_motions (assembly_id, position, motion_type, title, majority_type, required_motion, votes_for, votes_against, abstentions, result, consequence)
+      values (${id}, ${Number.isInteger(position) && position >= 0 ? position : motions.length}, ${String(body.motionType || "decision")}, ${String(body.title || "Motion").slice(0, 300)}, ${majorityType}, ${Boolean(body.requiredMotion)}, ${votesFor}, ${votesAgainst}, ${abstentions}, ${resultLabel}, ${body.consequence || null})
+      on conflict (assembly_id, position) do update set title=excluded.title, majority_type=excluded.majority_type, votes_for=excluded.votes_for, votes_against=excluded.votes_against, abstentions=excluded.abstentions, result=excluded.result, consequence=excluded.consequence
+      returning *
+    `;
+    await recordAudit(db, { actorId: member.id, action: "assembly.motion.recorded", entityType: "assembly", entityId: id, afterData: rows[0] });
+    return json(res, 200, { motion: rows[0] });
+  }
+  if (body.action === "close") {
+    if (!(await requireClubCapability(req, res, member, "supervision_editor", assembly.school_id))) return;
+    const rows = await db`update portal_assemblies set status='closed', quorum_met=${quorumMet}, outcome_summary=${body.outcomeSummary || null}, closed_at=now(), updated_at=now() where id=${id} returning *`;
+    await db`update portal_meetings set status='completed', updated_at=now() where id=${assembly.meeting_id}`;
+    await recordAudit(db, { actorId: member.id, action: "assembly.closed", entityType: "assembly", entityId: id, afterData: rows[0] });
+    return json(res, 200, { assembly: rows[0], quorumMet });
+  }
+  return json(res, 400, { error: "Action d’assemblée inconnue." });
+}
+
+async function elections(req, res, member, body) {
+  const db = sql();
+  if (req.method === "GET") {
+    const assemblyId = String(req.query?.assemblyId || "");
+    if (!assemblyId) return json(res, 400, { error: "Assemblée requise." });
+    const rows = await db`select e.*, a.school_id, a.assembly_type from portal_elections e join portal_assemblies a on a.id=e.assembly_id where e.assembly_id=${assemblyId} and (${member.is_national_admin} or a.school_id=${member.school_id}) order by e.created_at`;
+    return json(res, 200, { elections: rows });
+  }
+  const assemblyId = String(body.assemblyId || "");
+  const assemblyRows = await db`select * from portal_assemblies where id=${assemblyId}`;
+  const assembly = assemblyRows[0];
+  if (!assembly || (!member.is_national_admin && assembly.school_id !== member.school_id)) return json(res, 404, { error: "Assemblée introuvable." });
+  if (!(await requireClubCapability(req, res, member, "pv_editor", assembly.school_id))) return;
+  if (body.action === "create") {
+    const office = String(body.office || "").trim().slice(0, 160);
+    if (!office) return json(res, 400, { error: "Poste à élire requis." });
+    const scope = ["local", "national", "regional"].includes(body.scope) ? body.scope : (assembly.scope === "national" ? "national" : "local");
+    const rows = await db`insert into portal_elections (assembly_id, office, scope, majority_type) values (${assemblyId}, ${office}, ${scope}, 'absolute') returning *`;
+    await recordAudit(db, { actorId: member.id, action: "election.created", entityType: "election", entityId: rows[0].id, afterData: rows[0] });
+    return json(res, 201, { election: rows[0] });
+  }
+  if (body.action === "candidate") {
+    const electionRows = await db`select * from portal_elections where id=${body.electionId} and assembly_id=${assemblyId}`;
+    if (!electionRows[0]) return json(res, 404, { error: "Élection introuvable." });
+    const targetRows = await db`select id, school_id, membership_status, status from portal_members where id=${body.memberId}`;
+    const target = targetRows[0];
+    if (!target || target.status !== "active") return json(res, 404, { error: "Candidat introuvable." });
+    if (assembly.scope === "local" && target.school_id !== assembly.school_id) return json(res, 400, { error: "Un candidat à une élection locale doit appartenir au club concerné." });
+    const eligibility = ELIGIBLE_MEMBER_STATUSES.has(target.membership_status) ? "eligible" : "ineligible";
+    const rows = await db`insert into portal_election_candidates (election_id, member_id, eligibility_status, statement) values (${body.electionId}, ${body.memberId}, ${eligibility}, ${body.statement || null}) on conflict (election_id, member_id) do update set eligibility_status=excluded.eligibility_status, statement=excluded.statement returning *`;
+    return json(res, 201, { candidate: rows[0] });
+  }
+  if (body.action === "round") {
+    const electionRows = await db`select id from portal_elections where id=${body.electionId} and assembly_id=${assemblyId}`;
+    if (!electionRows[0]) return json(res, 404, { error: "Élection introuvable." });
+    const roundNumber = Math.max(1, Number(body.roundNumber) || 1);
+    const rows = await db`insert into portal_election_rounds (election_id, round_number, discussion_minutes, tie_note, status) values (${body.electionId}, ${roundNumber}, ${Number(body.discussionMinutes) || null}, ${body.tieNote || null}, 'planned') on conflict (election_id, round_number) do update set discussion_minutes=excluded.discussion_minutes, tie_note=excluded.tie_note returning *`;
+    return json(res, 201, { round: rows[0] });
+  }
+  if (body.action === "tally") {
+    const roundRows = await db`select r.*, e.assembly_id from portal_election_rounds r join portal_elections e on e.id=r.election_id where r.id=${body.roundId} and e.assembly_id=${assemblyId}`;
+    if (!roundRows[0]) return json(res, 404, { error: "Tour de scrutin introuvable." });
+    const rows = await db`insert into portal_election_tallies (round_id, candidate_id, votes_for, abstentions) values (${body.roundId}, ${body.candidateId}, ${Math.max(0, Number(body.votesFor) || 0)}, ${Math.max(0, Number(body.abstentions) || 0)}) on conflict (round_id, candidate_id) do update set votes_for=excluded.votes_for, abstentions=excluded.abstentions returning *`;
+    return json(res, 200, { tally: rows[0] });
+  }
+  return json(res, 400, { error: "Action électorale inconnue." });
+}
+
+async function electionDetail(req, res, member, body) {
+  const id = String(body.electionId || req.query?.electionId || "");
+  if (!id) return json(res, 400, { error: "Élection introuvable." });
+  const db = sql();
+  const rows = await db`select e.*, a.school_id, a.scope as assembly_scope, a.assembly_type from portal_elections e join portal_assemblies a on a.id=e.assembly_id where e.id=${id}`;
+  const election = rows[0];
+  if (!election || (!member.is_national_admin && election.school_id !== member.school_id)) return json(res, 404, { error: "Élection introuvable." });
+  const [candidates, rounds] = await Promise.all([
+    db`select c.*, m.display_name, m.username from portal_election_candidates c join portal_members m on m.id=c.member_id where c.election_id=${id} order by m.display_name`,
+    db`select r.*, coalesce(json_agg(json_build_object('candidateId', t.candidate_id, 'votesFor', t.votes_for, 'abstentions', t.abstentions)) filter (where t.candidate_id is not null), '[]'::json) as tallies from portal_election_rounds r left join portal_election_tallies t on t.round_id=r.id where r.election_id=${id} group by r.id order by r.round_number`,
+  ]);
+  return json(res, 200, { election, candidates, rounds });
+}
+
+async function supervision(req, res, member, body) {
+  const db = sql();
+  const requestedSchool = req.method === "GET" ? req.query?.schoolId : body.schoolId;
+  const schoolId = schoolScope(member, requestedSchool);
+  if (!schoolId && !member.is_national_admin) return json(res, 200, { reports: [], investigations: [] });
+  const targetSchool = member.is_national_admin && !requestedSchool ? null : schoolId;
+  if (req.method === "GET") {
+    if (!member.is_national_admin && (!schoolId || !(await requireClubCapability(req, res, member, "supervision_editor", schoolId)))) return;
+    const reportsRows = targetSchool
+      ? await db`select r.id, r.school_id, r.title, r.report_type, r.status, r.created_at, r.submitted_at, r.due_at, s.name as school_name from portal_reports r left join portal_schools s on s.id=r.school_id where r.school_id=${targetSchool} and r.report_type in ('supervision','investigation','mise_a_jour') order by r.created_at desc`
+      : await db`select r.id, r.school_id, r.title, r.report_type, r.status, r.created_at, r.submitted_at, r.due_at, s.name as school_name from portal_reports r left join portal_schools s on s.id=r.school_id where r.report_type in ('supervision','investigation','mise_a_jour') order by r.created_at desc`;
+    const investigationsRows = targetSchool
+      ? await db`select i.*, s.name as school_name, m.display_name as subject_name from portal_investigations i left join portal_schools s on s.id=i.school_id left join portal_members m on m.id=i.subject_member_id where i.school_id=${targetSchool} and (${member.is_national_admin} or i.confidentiality <> 'national_only') order by i.opened_at desc`
+      : await db`select i.*, s.name as school_name, m.display_name as subject_name from portal_investigations i left join portal_schools s on s.id=i.school_id left join portal_members m on m.id=i.subject_member_id where ${member.is_national_admin} or i.confidentiality <> 'national_only' order by i.opened_at desc`;
+    return json(res, 200, { reports: reportsRows, investigations: investigationsRows });
+  }
+  if (body.action !== "open_investigation") return json(res, 400, { error: "Action de supervision inconnue." });
+  if (!(await requireClubCapability(req, res, member, "supervision_editor", schoolId))) return;
+  const category = ["communication", "personal_conflict", "regulation", "law", "other"].includes(body.category) ? body.category : "other";
+  const level = body.level === "national" || category === "law" ? "national" : "local";
+  if (category === "law" && !member.is_national_admin) return json(res, 403, { error: "Les sujets relevant de la loi sont réservés à la supervision nationale." });
+  const title = String(body.title || "Investigation").trim().slice(0, 240);
+  if (!title) return json(res, 400, { error: "Titre requis." });
+  const rows = await db`insert into portal_investigations (school_id, subject_member_id, opened_by, level, category, title, summary, confidentiality) values (${schoolId}, ${body.subjectMemberId || null}, ${member.id}, ${level}, ${category}, ${title}, ${body.summary || null}, ${level === "national" ? "national_only" : "supervision"}) returning *`;
+  await db`insert into portal_investigation_events (investigation_id, actor_id, event_type, content) values (${rows[0].id}, ${member.id}, 'status_change', 'Investigation ouverte dans le portail.')`;
+  await recordAudit(db, { actorId: member.id, action: "investigation.opened", entityType: "investigation", entityId: rows[0].id, afterData: rows[0] });
+  return json(res, 201, { investigation: rows[0] });
+}
+
+async function investigationDetail(req, res, member, body) {
+  const id = String(body.investigationId || req.query?.investigationId || "");
+  const db = sql();
+  const rows = await db`select i.*, s.name as school_name from portal_investigations i left join portal_schools s on s.id=i.school_id where i.id=${id}`;
+  const investigation = rows[0];
+  if (!investigation || (!member.is_national_admin && (investigation.school_id !== member.school_id || investigation.confidentiality === "national_only"))) return json(res, 404, { error: "Dossier de supervision introuvable." });
+  if (req.method === "GET" || body.action === "investigation") return json(res, 200, { investigation, events: await db`select e.*, m.display_name as actor_name from portal_investigation_events e join portal_members m on m.id=e.actor_id where e.investigation_id=${id} order by e.created_at` });
+  if (!(await requireClubCapability(req, res, member, "supervision_editor", investigation.school_id))) return;
+  if (body.action === "event") {
+    const eventType = ["note", "evidence", "hearing", "decision", "restriction", "status_change"].includes(body.eventType) ? body.eventType : "note";
+    const content = String(body.content || "").trim().slice(0, 4000);
+    if (!content) return json(res, 400, { error: "Contenu de l’événement requis." });
+    const eventRows = await db`insert into portal_investigation_events (investigation_id, actor_id, event_type, content) values (${id}, ${member.id}, ${eventType}, ${content}) returning *`;
+    return json(res, 201, { event: eventRows[0] });
+  }
+  if (body.action === "update") {
+    const status = ["open", "under_review", "decision", "closed", "dismissed"].includes(body.status) ? body.status : investigation.status;
+    const decision = body.decision == null ? investigation.decision : String(body.decision).slice(0, 4000);
+    const restrictionSummary = body.restrictionSummary == null ? investigation.restriction_summary : String(body.restrictionSummary).slice(0, 2000);
+    const updated = await db`update portal_investigations set status=${status}, decision=${decision || null}, restriction_summary=${restrictionSummary || null}, closed_at=${["closed", "dismissed"].includes(status) ? new Date() : null}, updated_at=now() where id=${id} returning *`;
+    await recordAudit(db, { actorId: member.id, action: "investigation.updated", entityType: "investigation", entityId: id, afterData: updated[0] });
+    return json(res, 200, { investigation: updated[0] });
+  }
+  return json(res, 400, { error: "Action d’investigation inconnue." });
 }
 
 module.exports = async (req, res) => {
@@ -700,6 +979,12 @@ module.exports = async (req, res) => {
     if (action === "report_templates") return reportTemplates(req, res);
     if (action === "projects") return projects(req, res, member, body);
     if (action === "reports") return reports(req, res, member, body);
+    if (action === "assemblies") return assemblies(req, res, member, body);
+    if (action === "assembly") return assemblyDetail(req, res, member, body);
+    if (action === "elections") return elections(req, res, member, body);
+    if (action === "election") return electionDetail(req, res, member, body);
+    if (action === "supervision") return supervision(req, res, member, body);
+    if (action === "investigation") return investigationDetail(req, res, member, body);
     if (action === "document_upload") return documentUpload(req, res, member);
     if (action === "document_download") return documentDownload(req, res, member);
     if (action === "training") return training(req, res, member, body);
