@@ -34,7 +34,7 @@ const edgeRewrites = [
   { source: "/api/schools", destination: "https://REPLACE-portal-auth.vercel.app/api/schools" },
   { source: "/api/session", destination: "https://REPLACE-portal-auth.vercel.app/api/session" },
   { source: "/api/admin/:path*", destination: "https://REPLACE-portal-admin.vercel.app/api/admin/:path*" },
-  { source: "/", destination: "/portal/login.html" },
+  { source: "/", destination: "/portal/login" },
 ];
 
 const functionRoutes = TARGETS[target].flatMap((source) => {
@@ -46,6 +46,7 @@ const functionRoutes = TARGETS[target].flatMap((source) => {
 });
 
 const config = {
+  cleanUrls: true,
   builds,
   // Legacy builds need explicit routes. Without these, Vercel can package
   // the Lambda outputs successfully but still return NOT_FOUND for the
@@ -54,7 +55,7 @@ const config = {
     ? { rewrites: edgeRewrites }
     : {
         routes: [
-          { src: "/", dest: "/portal/login.html" },
+          { src: "/", dest: "/portal/login" },
           ...functionRoutes,
           { handle: "filesystem" },
         ],

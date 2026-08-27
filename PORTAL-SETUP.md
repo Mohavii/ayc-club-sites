@@ -171,13 +171,13 @@ Vercel packages the deployment based on its `DEPLOY_TARGET`.
 
 Point people at `https://internes.associationyouthclubs.org/` — the
 `portal-edge` project's `vercel.json` rewrites `/` to
-`/portal/login.html`. Everything else in the flow (onboarding, pending
+`/portal/login`. Everything else in the flow (onboarding, pending
 status, admin review) is reached from there.
 
 ## What's deliberately NOT built yet
 
 - The personal dashboard, meetings/PV editor, report tracking, training
-  cursus, and app shell sidebar from the original brief — `home.html` is
+  cursus, and app shell sidebar from the original brief — `home` is
   a placeholder landing page for now. These will land as their own
   `portal-member` / `portal-officer` service projects per the topology
   table above.
