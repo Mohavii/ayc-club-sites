@@ -20,6 +20,8 @@ const TARGETS = {
     "api/schools.js",
     "api/session.js",
     "api/portal.js",
+    "api/admin/members.js",
+    "api/admin/roles.js",
   ],
 
   // Filled in as member-facing routes are built.
