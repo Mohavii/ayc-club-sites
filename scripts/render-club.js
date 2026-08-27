@@ -192,7 +192,7 @@ function renderClubPage(club) {
       <a href="#evenements">Événements</a>
       <a href="#bel">Bureau Exécutif Local</a>
       <a href="#partenaires-locaux">Partenaires du club</a>
-      <a href="../../index.html">Site national AYCs</a>
+      <a href="/">Site national AYCs</a>
       </nav>
     </div>
   </div>
@@ -637,7 +637,7 @@ function renderFormPage(club, formId, form, apiBaseUrl) {
       </button>
       <nav class="menu-panel" data-menu-panel aria-label="Navigation du club">
       <a href="../">Retour au club</a>
-      <a href="../../../index.html">Site national AYCs</a>
+      <a href="/">Site national AYCs</a>
       </nav>
     </div>
   </div>
