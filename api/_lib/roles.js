@@ -176,6 +176,75 @@ async function getCapabilityHolders(schoolId, capability) {
     from portal_capability_grants g
     join portal_members m on m.id = g.member_id
     where g.school_id = ${schoolId} and g.capability = ${capability} and g.revoked_at is null
+      and m.status = 'active'
+  `;
+}
+
+// Membership requests are a club-governance workflow. National admins can
+// review every club; an explicit membership_approver grant or the club's
+// current VPC can review requests for that club. Keeping this rule in one
+// helper prevents the list, decision, session shell, and email notice from
+// drifting apart.
+async function canReviewMembership(memberId, schoolId) {
+  const db = sql();
+  const rows = await db`
+    select 1
+    from portal_members m
+    where m.id = ${memberId}
+      and m.status = 'active'
+      and (
+        m.is_national_admin = true
+        or exists (
+          select 1 from portal_capability_grants g
+          where g.member_id = m.id and g.school_id = ${schoolId}
+            and g.capability = 'membership_approver' and g.revoked_at is null
+        )
+        or exists (
+          select 1 from portal_club_display_roles r
+          where r.member_id = m.id and r.school_id = ${schoolId}
+            and r.role = 'vpc' and r.ended_at is null
+        )
+      )
+    limit 1
+  `;
+  return rows.length > 0;
+}
+
+async function canReviewAnyMembership(memberId) {
+  const db = sql();
+  const rows = await db`
+    select 1 from portal_members m
+    where m.id = ${memberId} and m.status = 'active'
+      and (
+        m.is_national_admin = true
+        or exists (select 1 from portal_capability_grants g where g.member_id = m.id and g.capability = 'membership_approver' and g.revoked_at is null)
+        or exists (select 1 from portal_club_display_roles r where r.member_id = m.id and r.role = 'vpc' and r.ended_at is null)
+      )
+    limit 1
+  `;
+  return rows.length > 0;
+}
+
+async function getMembershipReviewers(schoolId) {
+  const db = sql();
+  return db`
+    select distinct m.*
+    from portal_members m
+    where m.status = 'active'
+      and (
+        m.is_national_admin = true
+        or exists (
+          select 1 from portal_capability_grants g
+          where g.member_id = m.id and g.school_id = ${schoolId}
+            and g.capability = 'membership_approver' and g.revoked_at is null
+        )
+        or exists (
+          select 1 from portal_club_display_roles r
+          where r.member_id = m.id and r.school_id = ${schoolId}
+            and r.role = 'vpc' and r.ended_at is null
+        )
+      )
+    order by m.is_national_admin desc, m.display_name asc
   `;
 }
 
@@ -305,6 +374,9 @@ module.exports = {
   hasCapability,
   getMemberCapabilities,
   getCapabilityHolders,
+  canReviewMembership,
+  canReviewAnyMembership,
+  getMembershipReviewers,
   setNationalRole,
   clearNationalRole,
   getMemberNationalRoles,
