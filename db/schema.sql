@@ -494,6 +494,7 @@ alter table portal_minutes add column if not exists closing_at timestamptz;
 alter table portal_minutes add column if not exists duration_minutes integer;
 alter table portal_minutes add column if not exists validated_by uuid references portal_members(id) on delete set null;
 alter table portal_minutes add column if not exists validated_at timestamptz;
+alter table portal_minutes add column if not exists club_presence jsonb not null default '[]'::jsonb;
 
 alter table portal_meeting_attendees add column if not exists attendance_status text not null default 'invited';
 alter table portal_meeting_attendees add column if not exists member_role text;
