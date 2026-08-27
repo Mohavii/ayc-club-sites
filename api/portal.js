@@ -7,6 +7,8 @@ const {
   getMemberRoleHistory,
   getMemberCapabilities,
   getMemberStatusHistory,
+  getCurrentDisplayRole,
+  hasCapability,
   requireCapability,
 } = require("./_lib/roles");
 
@@ -424,6 +426,11 @@ async function syncReportDeadline(db, report) {
 
 async function reports(req, res, member, body) {
   const db = sql();
+  const canCreateReport = async (schoolId) => {
+    if (member.is_national_admin) return true;
+    const role = await getCurrentDisplayRole(member.id, schoolId);
+    return Boolean(role || await hasCapability(member.id, schoolId, "supervision_editor"));
+  };
   if (req.method === "GET") {
     const schoolId = schoolScope(member, req.query?.schoolId);
     if (!schoolId) return json(res, 200, { reports: [] });
@@ -478,6 +485,7 @@ async function reports(req, res, member, body) {
     const existing = await db`select school_id from portal_reports where id = ${body.reportId} and submitted_by = ${member.id}`;
     if (!existing[0]) return json(res, 404, { error: "Rapport introuvable." });
     const schoolId = existing[0].school_id;
+    if (!(await canCreateReport(schoolId))) return json(res, 403, { error: "La rédaction de rapports est réservée aux responsables du club ou aux personnes mandatées." });
     const templateSlug = String(body.templateSlug || body.reportType || "proces_verbal");
     const template = await db`select slug from portal_report_templates where slug = ${templateSlug} and active = true`;
     if (!template[0]) return json(res, 400, { error: "Modèle de rapport invalide." });
@@ -510,6 +518,7 @@ async function reports(req, res, member, body) {
   const schoolId = schoolScope(member, body.schoolId);
   const allowedTypes = ["pre_projet", "post_projet", "proces_verbal", "collaboration", "mise_a_jour", "supervision", "investigation"];
   if (!schoolId || !body.title || !allowedTypes.includes(body.reportType)) return json(res, 400, { error: "Type, club et titre requis." });
+  if (!(await canCreateReport(schoolId))) return json(res, 403, { error: "La rédaction de rapports est réservée aux responsables du club ou aux personnes mandatées." });
   const templateSlug = String(body.templateSlug || body.reportType);
   const template = await db`select slug, validator_departments from portal_report_templates where slug = ${templateSlug} and active = true`;
   if (!template[0]) return json(res, 400, { error: "Modèle de rapport invalide." });
@@ -606,9 +615,16 @@ async function training(req, res, member, body) {
       db`select id, title, issuer, awarded_on, value_tag, description, visibility, created_at from portal_member_awards where member_id = ${member.id} and visibility = 'active_members' order by awarded_on desc nulls last, created_at desc`,
       visibleDocuments(db, member),
     ]);
-    const totals = { received: 0, delivered: 0, facilitation: 0, other: 0, hours: 0 };
-    for (const entry of entries) { totals[entry.category] = (totals[entry.category] || 0) + 1; totals.hours += Number(entry.hours || 0); }
-    return json(res, 200, { entries, trainerProfile: trainerRows[0] || null, awards, documents, totals });
+    const totals = { received: 0, delivered: 0, facilitation: 0, other: 0, hours: 0, declaredHours: 0, validatedHours: 0 };
+    const isVerifiedTrainer = trainerRows[0]?.certification_status === "verified" || member.is_national_admin;
+    for (const entry of entries) {
+      totals[entry.category] = (totals[entry.category] || 0) + 1;
+      const hours = Number(entry.hours || 0);
+      totals.declaredHours += hours;
+      if (isVerifiedTrainer) totals.validatedHours += hours;
+    }
+    totals.hours = totals.validatedHours;
+    return json(res, 200, { entries, trainerProfile: trainerRows[0] || null, awards, documents, totals, access: { isVerifiedTrainer } });
   }
   if (body.action === "trainer_profile") {
     const domains = jsonArrayInput(body.expertiseDomains);
@@ -639,7 +655,11 @@ async function training(req, res, member, body) {
     return json(res, 201, { award: rows[0] });
   }
   if (!body.title || !["received", "delivered", "facilitation", "other"].includes(body.category)) return json(res, 400, { error: "Catégorie et titre requis." });
-  const hours = body.hours === "" || body.hours == null ? null : Number(body.hours);
+  const trainerRows = await db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`;
+  const canEditOfficialTraining = member.is_national_admin || trainerRows[0]?.certification_status === "verified";
+  if (!canEditOfficialTraining && !["received", "other"].includes(body.category)) return json(res, 403, { error: "Les formations dispensées et leurs heures sont réservées aux formateurs homologués ou au VPA." });
+  if (!canEditOfficialTraining && body.hours !== "" && body.hours != null) return json(res, 403, { error: "Un membre peut déclarer une participation, mais ne peut pas renseigner des heures officielles." });
+  const hours = canEditOfficialTraining && body.hours !== "" && body.hours != null ? Number(body.hours) : null;
   if (hours !== null && (!Number.isFinite(hours) || hours < 0 || hours > 10000)) return json(res, 400, { error: "Nombre d'heures invalide." });
   let evidenceId = body.evidenceDocumentId ? String(body.evidenceDocumentId) : null;
   if (evidenceId) {
@@ -904,12 +924,18 @@ async function electionDetail(req, res, member, body) {
 
 async function supervision(req, res, member, body) {
   const db = sql();
+  const canViewSupervision = async (schoolId) => {
+    if (member.is_national_admin) return true;
+    return Boolean(await hasCapability(member.id, schoolId, "supervision_editor") || await hasCapability(member.id, schoolId, "cscy_reviewer"));
+  };
   const requestedSchool = req.method === "GET" ? req.query?.schoolId : body.schoolId;
   const schoolId = schoolScope(member, requestedSchool);
   if (!schoolId && !member.is_national_admin) return json(res, 200, { reports: [], investigations: [] });
   const targetSchool = member.is_national_admin && !requestedSchool ? null : schoolId;
   if (req.method === "GET") {
-    if (!member.is_national_admin && (!schoolId || !(await requireClubCapability(req, res, member, "supervision_editor", schoolId)))) return;
+    if (!member.is_national_admin && (!schoolId || !(await canViewSupervision(schoolId)))) {
+      return json(res, 200, { restricted: true, reports: [], investigations: [] });
+    }
     const reportsRows = targetSchool
       ? await db`select r.id, r.school_id, r.title, r.report_type, r.status, r.created_at, r.submitted_at, r.due_at, s.name as school_name from portal_reports r left join portal_schools s on s.id=r.school_id where r.school_id=${targetSchool} and r.report_type in ('supervision','investigation','mise_a_jour') order by r.created_at desc`
       : await db`select r.id, r.school_id, r.title, r.report_type, r.status, r.created_at, r.submitted_at, r.due_at, s.name as school_name from portal_reports r left join portal_schools s on s.id=r.school_id where r.report_type in ('supervision','investigation','mise_a_jour') order by r.created_at desc`;
@@ -937,7 +963,10 @@ async function investigationDetail(req, res, member, body) {
   const rows = await db`select i.*, s.name as school_name from portal_investigations i left join portal_schools s on s.id=i.school_id where i.id=${id}`;
   const investigation = rows[0];
   if (!investigation || (!member.is_national_admin && (investigation.school_id !== member.school_id || investigation.confidentiality === "national_only"))) return json(res, 404, { error: "Dossier de supervision introuvable." });
-  if (req.method === "GET" || body.action === "investigation") return json(res, 200, { investigation, events: await db`select e.*, m.display_name as actor_name from portal_investigation_events e join portal_members m on m.id=e.actor_id where e.investigation_id=${id} order by e.created_at` });
+  if (req.method === "GET" || body.action === "investigation") {
+    if (!member.is_national_admin && !(await hasCapability(member.id, investigation.school_id, "supervision_editor")) && !(await hasCapability(member.id, investigation.school_id, "cscy_reviewer"))) return json(res, 403, { error: "Ce dossier est réservé au Conseil de Supervision ou aux personnes mandatées." });
+    return json(res, 200, { investigation, events: await db`select e.*, m.display_name as actor_name from portal_investigation_events e join portal_members m on m.id=e.actor_id where e.investigation_id=${id} order by e.created_at` });
+  }
   if (!(await requireClubCapability(req, res, member, "supervision_editor", investigation.school_id))) return;
   if (body.action === "event") {
     const eventType = ["note", "evidence", "hearing", "decision", "restriction", "status_change"].includes(body.eventType) ? body.eventType : "note";

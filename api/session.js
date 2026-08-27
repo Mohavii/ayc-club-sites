@@ -4,7 +4,7 @@
 // HTML pages with no server-side rendering.
 
 const { getSessionMember } = require("./_lib/sessions");
-const { canReviewAnyMembership } = require("./_lib/roles");
+const { canReviewAnyMembership, getMemberPortalAccess } = require("./_lib/roles");
 
 module.exports = async (req, res) => {
   if (req.method !== "GET") {
@@ -18,7 +18,10 @@ module.exports = async (req, res) => {
       res.status(200).json({ member: null });
       return;
     }
-    const canReviewMembership = await canReviewAnyMembership(member.id);
+    const [canReviewMembership, access] = await Promise.all([
+      canReviewAnyMembership(member.id),
+      getMemberPortalAccess(member),
+    ]);
     res.status(200).json({
       member: {
         id: member.id,
@@ -28,6 +31,7 @@ module.exports = async (req, res) => {
         status: member.status,
         isNationalAdmin: member.is_national_admin,
         canReviewMembership,
+        access,
         rejectionNote: member.rejection_note,
       },
     });
