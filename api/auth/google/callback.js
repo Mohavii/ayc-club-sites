@@ -21,14 +21,14 @@ module.exports = async (req, res) => {
   const { code, state, error } = req.query || {};
 
   if (error) {
-    redirect(res, "/portal/login.html?error=google_denied");
+    redirect(res, "/portal/login?error=google_denied");
     return;
   }
 
   try {
     const stateOk = await consumeState(state);
     if (!stateOk) {
-      redirect(res, "/portal/login.html?error=bad_state");
+      redirect(res, "/portal/login?error=bad_state");
       return;
     }
 
@@ -37,21 +37,21 @@ module.exports = async (req, res) => {
 
     if (!existing) {
       await createSignupToken(res, identity);
-      redirect(res, "/portal/onboarding.html");
+      redirect(res, "/portal/onboarding");
       return;
     }
 
     await createSession(res, existing.id, req.headers["user-agent"]);
 
     if (existing.status === "active") {
-      redirect(res, "/portal/home.html");
+      redirect(res, "/portal/home");
     } else if (existing.status === "pending") {
-      redirect(res, "/portal/pending.html");
+      redirect(res, "/portal/pending");
     } else {
-      redirect(res, "/portal/rejected.html");
+      redirect(res, "/portal/rejected");
     }
   } catch (err) {
     console.error("google/callback error:", err);
-    redirect(res, "/portal/login.html?error=auth_failed");
+    redirect(res, "/portal/login?error=auth_failed");
   }
 };
