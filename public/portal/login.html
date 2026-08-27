@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Connexion · Portail YOUTHCLUBber</title>
-<link rel="icon" type="image/png" href="/assets/favicon-32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="../assets/favicon-32.png" sizes="32x32">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/theme.css">
-<link rel="stylesheet" href="/portal/portal.css">
+<link rel="stylesheet" href="../theme.css">
+<link rel="stylesheet" href="portal.css">
 </head>
 <body>
 
@@ -30,7 +30,7 @@
   </div>
 </main>
 
-<script src="/portal/portal-common.js"></script>
+<script src="portal-common.js"></script>
 <script>
   (async function () {
     const params = new URLSearchParams(window.location.search);
@@ -50,9 +50,9 @@
     // skip straight past the login screen.
     const member = await window.AYCPortal.initPortalShell();
     if (member) {
-      if (member.status === "active") window.location.href = "/portal/home";
-      else if (member.status === "pending") window.location.href = "/portal/pending";
-      else if (member.status === "rejected") window.location.href = "/portal/rejected";
+      if (member.status === "active") window.location.href = "home";
+      else if (member.status === "pending") window.location.href = "pending";
+      else if (member.status === "rejected") window.location.href = "rejected";
     }
   })();
 </script>

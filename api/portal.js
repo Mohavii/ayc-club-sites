@@ -301,7 +301,7 @@ async function meetingDetail(req, res, member, body) {
     return json(res, 200, { attendee: result[0] });
   }
   if (body.action === "save_minutes") {
-    if (!canEditPV || !(await requireClubCapability(req, res, member, "pv_editor", meeting.school_id))) return;
+    if (!(await requireClubCapability(req, res, member, "pv_editor", meeting.school_id))) return;
     const mode = body.mode === "assemblee_generale" ? body.mode : "standard";
     const status = ["draft", "sent", "validated"].includes(body.status) ? body.status : "draft";
     const attendance = Array.isArray(body.attendance) ? body.attendance.slice(0, 300) : [];
@@ -783,7 +783,8 @@ async function tasks(req, res, member, body) {
   }
   if (!body.title) return json(res, 400, { error: "Titre requis." });
   const schoolId = schoolScope(member, body.schoolId);
-  if (!schoolId || !(await requireClubCapability(req, res, member, "project_manager", schoolId))) return;
+  if (!schoolId) return json(res, 400, { error: "Club invalide." });
+  if (!(await requireClubCapability(req, res, member, "project_manager", schoolId))) return;
   const assignedTo = String(body.assignedTo || member.id);
   const assigneeRows = await db`select id from portal_members where id=${assignedTo} and status='active' and school_id=${schoolId}`;
   if (!assigneeRows[0]) return json(res, 400, { error: "Membre assigné invalide pour ce club." });
@@ -872,7 +873,8 @@ async function assemblies(req, res, member, body) {
   }
   if (body.action !== "create") return json(res, 400, { error: "Action d’assemblée inconnue." });
   const schoolId = schoolScope(member, body.schoolId);
-  if (!schoolId || !(await requireClubCapability(req, res, member, "meeting_organizer", schoolId))) return;
+  if (!schoolId) return json(res, 400, { error: "Club invalide." });
+  if (!(await requireClubCapability(req, res, member, "meeting_organizer", schoolId))) return;
   const assemblyType = String(body.assemblyType || "");
   if (!ASSEMBLY_TYPES.includes(assemblyType)) return json(res, 400, { error: "Type d’assemblée invalide." });
   const title = String(body.title || ASSEMBLY_LABELS[assemblyType]).trim();
