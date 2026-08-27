@@ -21,6 +21,7 @@
 const { sql } = require("./db");
 
 const DISPLAY_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc", "supco_regional"];
+const BEL_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc"];
 const CAPABILITIES = ["membership_approver", "report_validator", "pv_editor", "meeting_organizer", "project_manager", "supervision_editor", "cscy_reviewer"];
 const NATIONAL_ROLES = ["president_national"];
 const MEMBERSHIP_STATUSES = ["nouveau_adherent", "adherent", "responsable", "senior", "membre_national", "ancien"];
@@ -210,6 +211,38 @@ async function canReviewMembership(memberId, schoolId) {
   return rows.length > 0;
 }
 
+async function getMemberPortalAccess(member) {
+  const db = sql();
+  const schoolId = member.school_id || null;
+  const [roleRows, capabilityRows, trainerRows] = await Promise.all([
+    schoolId ? db`select role from portal_club_display_roles where member_id = ${member.id} and school_id = ${schoolId} and ended_at is null limit 1` : Promise.resolve([]),
+    schoolId ? db`select capability from portal_capability_grants where member_id = ${member.id} and school_id = ${schoolId} and revoked_at is null` : Promise.resolve([]),
+    db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`,
+  ]);
+  const displayRole = roleRows[0]?.role || null;
+  const capabilities = capabilityRows.map(row => row.capability);
+  const isNationalAdmin = Boolean(member.is_national_admin);
+  const isVerifiedTrainer = trainerRows[0]?.certification_status === "verified";
+  const has = capability => isNationalAdmin || capabilities.includes(capability);
+  return {
+    displayRole,
+    capabilities,
+    isClubOfficer: BEL_ROLES.includes(displayRole),
+    isVerifiedTrainer,
+    canCreateMeeting: has("meeting_organizer"),
+    canEditPV: has("pv_editor"),
+    canCreateProject: has("project_manager"),
+    canReviewReports: has("report_validator"),
+    canManageSupervision: has("supervision_editor"),
+    canReviewSupervision: has("supervision_editor"),
+    canCreateAssembly: has("meeting_organizer"),
+    canEditAssemblyAttendance: has("cscy_reviewer"),
+    canCloseAssembly: has("supervision_editor") || has("cscy_reviewer"),
+    canEditTrainingRecord: isNationalAdmin || isVerifiedTrainer,
+    canCreateReport: isNationalAdmin || BEL_ROLES.includes(displayRole) || capabilities.includes("supervision_editor"),
+  };
+}
+
 async function canReviewAnyMembership(memberId) {
   const db = sql();
   const rows = await db`
@@ -360,6 +393,7 @@ function requireDisplayRole(roles) {
 
 module.exports = {
   DISPLAY_ROLES,
+  BEL_ROLES,
   CAPABILITIES,
   NATIONAL_ROLES,
   MEMBERSHIP_STATUSES,
@@ -374,6 +408,7 @@ module.exports = {
   hasCapability,
   getMemberCapabilities,
   getCapabilityHolders,
+  getMemberPortalAccess,
   canReviewMembership,
   canReviewAnyMembership,
   getMembershipReviewers,
