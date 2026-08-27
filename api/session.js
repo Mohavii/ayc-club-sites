@@ -4,6 +4,7 @@
 // HTML pages with no server-side rendering.
 
 const { getSessionMember } = require("./_lib/sessions");
+const { canReviewAnyMembership } = require("./_lib/roles");
 
 module.exports = async (req, res) => {
   if (req.method !== "GET") {
@@ -17,6 +18,7 @@ module.exports = async (req, res) => {
       res.status(200).json({ member: null });
       return;
     }
+    const canReviewMembership = await canReviewAnyMembership(member.id);
     res.status(200).json({
       member: {
         id: member.id,
@@ -25,6 +27,7 @@ module.exports = async (req, res) => {
         profilePictureUrl: member.profile_picture_url,
         status: member.status,
         isNationalAdmin: member.is_national_admin,
+        canReviewMembership,
         rejectionNote: member.rejection_note,
       },
     });
