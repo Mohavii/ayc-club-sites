@@ -50,9 +50,9 @@
     // skip straight past the login screen.
     const member = await window.AYCPortal.initPortalShell();
     if (member) {
-      if (member.status === "active") window.location.href = "/portal/home.html";
-      else if (member.status === "pending") window.location.href = "/portal/pending.html";
-      else if (member.status === "rejected") window.location.href = "/portal/rejected.html";
+      if (member.status === "active") window.location.href = "/portal/home";
+      else if (member.status === "pending") window.location.href = "/portal/pending";
+      else if (member.status === "rejected") window.location.href = "/portal/rejected";
     }
   })();
 </script>

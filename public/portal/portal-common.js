@@ -5,23 +5,23 @@
       {
         label: "Mon espace",
         items: [
-          ["home.html", "⌂", "Accueil"],
-          ["profile.html", "◉", "Mon profil"],
-          ["meetings.html", "▣", "Réunions"],
-          ["assemblies.html", "◇", "Assemblées"],
-          ["training.html", "↗", "Cursus"],
-          ["tasks.html", "☷", "Mes tâches"],
+          ["home", "⌂", "Accueil"],
+          ["profile", "◉", "Mon profil"],
+          ["meetings", "▣", "Réunions"],
+          ["assemblies", "◇", "Assemblées"],
+          ["training", "↗", "Cursus"],
+          ["tasks", "☷", "Mes tâches"],
         ],
       },
     ];
     if (access.canViewClubWork || member?.isNationalAdmin) {
       groups.push({
         label: "Vie du club",
-        items: [["reports.html", "✓", "Rapports & projets"]],
+        items: [["reports", "✓", "Rapports & projets"]],
       });
     }
     if (access.canReviewSupervision || member?.isNationalAdmin) {
-      groups.push({ label: "Gouvernance", items: [["supervision.html", "⚖", "Supervision"]] });
+      groups.push({ label: "Gouvernance", items: [["supervision", "⚖", "Supervision"]] });
     }
     return groups;
   };
@@ -33,7 +33,7 @@
   }
 
   function renderShell(member) {
-    const current = location.pathname.split("/").pop() || "home.html";
+    const current = location.pathname.split("/").pop() || "home";
     const initials = member?.displayName
       ? member.displayName.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase()
       : "";
@@ -46,15 +46,15 @@
     if (topbar) {
       topbar.innerHTML = `
         <header class="topbar">
-          <a class="brand" href="home.html" aria-label="Accueil du portail">
+          <a class="brand" href="home" aria-label="Accueil du portail">
             <img src="../assets/logo-primary-blue.png" alt="Association YOUTH CLUBs" class="brand-logo">
             <span class="brand-divider"></span>
             <span class="brand-tag">Association YOUTH CLUBs</span>
           </a>
           <nav class="public-nav" aria-label="Navigation principale">
-            <a href="../index.html">Actualité</a>
-            <a href="../gouvernance.html">Gouvernance</a>
-            <a href="../contact.html">Contact</a>
+            <a href="../index">Actualité</a>
+            <a href="../gouvernance">Gouvernance</a>
+            <a href="../contact">Contact</a>
           </nav>
           <div class="account-slot">
             ${member ? `${avatar}<span class="account-name">${escapeHtml(member.displayName || member.username)}</span><button class="btn-logout" id="logout-btn" type="button">Se déconnecter</button>` : `<a class="btn btn-primary" href="/api/auth/google/start">Se connecter</a>`}
@@ -70,20 +70,20 @@
           <nav class="sidebar-nav">
             ${groups.map(group => `<section class="sidebar-group"><h2 class="sidebar-group-label">${escapeHtml(group.label)}</h2><div class="sidebar-links">${group.items.map(([href, icon, label]) => `<a class="sidebar-link ${current === href ? "active" : ""}" href="${href}" title="${escapeHtml(label)}"><span class="sidebar-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></a>`).join("")}</div></section>`).join("")}
           </nav>
-          <a class="sidebar-link sidebar-settings" href="profile.html#settings" title="Paramètres"><span class="sidebar-icon" aria-hidden="true">⚙</span><span>Paramètres</span></a>
+          <a class="sidebar-link sidebar-settings" href="profile#settings" title="Paramètres"><span class="sidebar-icon" aria-hidden="true">⚙</span><span>Paramètres</span></a>
         </aside>`;
     }
 
     const navAdmin = document.getElementById("admin-links");
     if (navAdmin && (member?.isNationalAdmin || member?.canReviewMembership)) {
-      navAdmin.innerHTML = `<a class="list-item" href="admin-review.html"><span class="list-item-title">Demandes d’adhésion</span><span class="list-item-meta">${member?.isNationalAdmin ? "Vue nationale" : "Demandes de ton club"}</span></a>${member?.isNationalAdmin ? `<a class="list-item" href="admin-roles.html"><span class="list-item-title">Rôles et permissions</span><span class="list-item-meta">Administration nationale</span></a>` : ""}`;
+      navAdmin.innerHTML = `<a class="list-item" href="admin-review"><span class="list-item-title">Demandes d’adhésion</span><span class="list-item-meta">${member?.isNationalAdmin ? "Vue nationale" : "Demandes de ton club"}</span></a>${member?.isNationalAdmin ? `<a class="list-item" href="admin-roles"><span class="list-item-title">Rôles et permissions</span><span class="list-item-meta">Administration nationale</span></a>` : ""}`;
     }
 
     const logout = document.getElementById("logout-btn");
     if (logout) logout.addEventListener("click", async () => {
       logout.disabled = true;
       await fetch("/api/auth/logout", { method: "POST" });
-      location.href = "login.html";
+      location.href = "login";
     });
   }
 
@@ -147,11 +147,11 @@
     renderShell(member);
     installPortalMotion();
     if (requireActive && !member) {
-      location.href = `login.html?next=${encodeURIComponent(location.pathname.split("/").pop())}`;
+      location.href = `login?next=${encodeURIComponent(location.pathname.split("/").pop())}`;
       return null;
     }
-    if (requireActive && member.status === "pending") { location.href = "pending.html"; return null; }
-    if (requireActive && member.status === "rejected") { location.href = "rejected.html"; return null; }
+    if (requireActive && member.status === "pending") { location.href = "pending"; return null; }
+    if (requireActive && member.status === "rejected") { location.href = "rejected"; return null; }
     return member;
   }
 

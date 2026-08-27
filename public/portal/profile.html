@@ -23,7 +23,7 @@
           <p>Une fiche claire pour ton identité, ton statut et ton parcours YOUTHCLUBber.</p>
         </div>
         <div class="heading-actions">
-          <a class="btn btn-secondary" href="home.html">Retour au tableau de bord</a>
+          <a class="btn btn-secondary" href="home">Retour au tableau de bord</a>
         </div>
       </div>
       <div id="notice"></div>
@@ -143,10 +143,10 @@
             <h2>Dossier de candidature</h2>
             <p class="list-item-meta">Les documents de candidature sont visibles par les membres actifs. Les preuves privées restent réservées à ton dossier et aux admins nationaux.</p>
             <div class="list-stack" style="margin:14px 0">${documents.filter(d => d.document_type === 'candidature').map(d => `<div class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(d.title)}</span><span class="list-item-meta">${esc(d.status || 'en attente')}</span></div><a class="btn btn-secondary btn-sm" href="/api/portal?action=document_download&id=${encodeURIComponent(d.id)}">Voir</a></div>`).join('') || '<span class="list-item-meta">Aucun document de candidature.</span>'}</div>
-            <a class="btn btn-secondary btn-sm" href="training.html">Gérer mon dossier</a>
+            <a class="btn btn-secondary btn-sm" href="training">Gérer mon dossier</a>
           </section>
 
-          ${!isSimpleMember && (m.formateur_track || trainer) ? `<section class="portal-card card-span-8 red-theme"><div class="toolbar"><div><p class="eyebrow">Transmission</p><h2>Portfolio Formateur</h2></div><a class="btn btn-secondary btn-sm" href="training.html">Ouvrir mon portfolio</a></div><div class="quote-block">${esc(trainer?.oath_text || 'Transmettre, faciliter et faire grandir les équipes avec exigence et bienveillance.')}</div><div class="role-badges">${(trainer?.expertise_domains || []).map(x => `<span class="role-badge">${esc(x)}</span>`).join('') || '<span class="list-item-meta">Domaines d’expertise à renseigner</span>'}</div></section>` : ''}
+          ${!isSimpleMember && (m.formateur_track || trainer) ? `<section class="portal-card card-span-8 red-theme"><div class="toolbar"><div><p class="eyebrow">Transmission</p><h2>Portfolio Formateur</h2></div><a class="btn btn-secondary btn-sm" href="training">Ouvrir mon portfolio</a></div><div class="quote-block">${esc(trainer?.oath_text || 'Transmettre, faciliter et faire grandir les équipes avec exigence et bienveillance.')}</div><div class="role-badges">${(trainer?.expertise_domains || []).map(x => `<span class="role-badge">${esc(x)}</span>`).join('') || '<span class="list-item-meta">Domaines d’expertise à renseigner</span>'}</div></section>` : ''}
 
           ${isSimpleMember ? '' : `<section class="portal-card card-span-4"><h2>Valeurs & distinctions</h2><div class="list-stack">${awards.slice(0, 4).map(a => `<div class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(a.title)}</span><span class="list-item-meta">${esc(a.issuer || 'Association YOUTH CLUBs')} · ${AYCPortal.formatDate(a.awarded_on)}</span></div></div>`).join('') || '<span class="list-item-meta">Aucune distinction enregistrée.</span>'}</div></section>`}
         </div>`;

@@ -31,11 +31,11 @@
 (async function () {
   const member = await window.AYCPortal.initPortalShell();
   if (!member) {
-    window.location.href = "login.html";
+    window.location.href = "login";
     return;
   }
-  if (member.status === "active") { window.location.href = "home.html"; return; }
-  if (member.status === "pending") { window.location.href = "pending.html"; return; }
+  if (member.status === "active") { window.location.href = "home"; return; }
+  if (member.status === "pending") { window.location.href = "pending"; return; }
 
   if (member.rejectionNote) {
     document.getElementById("reason-banner").textContent =

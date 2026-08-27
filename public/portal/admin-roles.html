@@ -45,9 +45,9 @@
 <script>
 (async function () {
   const member = await window.AYCPortal.initPortalShell();
-  if (!member) { window.location.href = "login.html"; return; }
+  if (!member) { window.location.href = "login"; return; }
   if (member.status !== "active" || !member.isNationalAdmin) {
-    window.location.href = "home.html";
+    window.location.href = "home";
     return;
   }
 

@@ -71,7 +71,7 @@
     if (!res.ok) throw new Error("no signup session");
     prefill = await res.json();
   } catch {
-    window.location.href = "login.html?error=auth_failed";
+    window.location.href = "login?error=auth_failed";
     return;
   }
 
@@ -212,7 +212,7 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Échec de l'envoi.");
-      window.location.href = "pending.html";
+      window.location.href = "pending";
     } catch (err) {
       formError.textContent = err.message;
       formError.style.display = "block";
