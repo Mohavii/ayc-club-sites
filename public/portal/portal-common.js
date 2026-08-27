@@ -13,11 +13,13 @@
           ["tasks.html", "☷", "Mes tâches"],
         ],
       },
-      {
+    ];
+    if (access.canViewClubWork || member?.isNationalAdmin) {
+      groups.push({
         label: "Vie du club",
         items: [["reports.html", "✓", "Rapports & projets"]],
-      },
-    ];
+      });
+    }
     if (access.canReviewSupervision || member?.isNationalAdmin) {
       groups.push({ label: "Gouvernance", items: [["supervision.html", "⚖", "Supervision"]] });
     }

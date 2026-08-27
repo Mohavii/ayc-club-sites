@@ -31,7 +31,8 @@
             <div><p class="eyebrow">Calendrier de travail</p><h2>Réunions à venir et archivées</h2></div>
             <div class="filter-tabs" id="filters">
               <button class="active" data-filter="all">Toutes</button>
-              <button data-filter="reunion">Réunions</button>
+              <button data-filter="reunion_locale">Réunions locales</button>
+              <button data-filter="reunion_nationale">Réunions nationales</button>
               <button data-filter="assemblee_locale">Assemblées locales</button>
               <button data-filter="assemblee_generale">Assemblées générales</button>
             </div>
@@ -45,7 +46,7 @@
           <form id="meeting-form">
             <div class="form-field"><label for="title">Titre</label><input id="title" required placeholder="Réunion mensuelle"></div>
             <div class="form-grid">
-              <div class="form-field"><label for="meetingType">Type</label><select id="meetingType"><option value="reunion">Réunion</option><option value="assemblee_locale">Assemblée locale</option><option value="assemblee_generale">Assemblée générale</option></select></div>
+              <div class="form-field"><label for="meetingType">Type</label><select id="meetingType"><option value="reunion_locale">Réunion locale</option><option value="reunion_nationale">Réunion nationale</option><option value="assemblee_locale">Assemblée locale</option><option value="assemblee_generale">Assemblée générale</option></select></div>
               <div class="form-field"><label for="status">État</label><select id="status"><option value="planned">Planifiée</option><option value="live">En cours</option><option value="completed">Terminée</option></select></div>
             </div>
             <div class="form-grid"><div class="form-field"><label for="startsAt">Début</label><input id="startsAt" type="datetime-local" required></div><div class="form-field"><label for="endsAt">Fin</label><input id="endsAt" type="datetime-local"></div></div>
@@ -71,7 +72,7 @@
     const detailRoot = document.getElementById('detail-root');
     const agendaEditor = document.getElementById('agenda-editor');
     const esc = AYCPortal.escapeHtml;
-    const label = { reunion: 'Réunion', assemblee_locale: 'Assemblée locale', assemblee_generale: 'Assemblée générale', planned: 'Planifiée', live: 'En cours', completed: 'Terminée', cancelled: 'Annulée' };
+    const label = { reunion_locale: 'Réunion locale', reunion_nationale: 'Réunion nationale', reunion: 'Réunion', assemblee_locale: 'Assemblée locale', assemblee_generale: 'Assemblée générale', planned: 'Planifiée', live: 'En cours', completed: 'Terminée', cancelled: 'Annulée' };
     let allMeetings = [];
     let roster = [];
     let member = null;
@@ -146,6 +147,7 @@
         form.insertAdjacentHTML('beforebegin', '<p class="restricted-note">La publication des réunions est gérée par le Secrétaire Local ou une personne mandatée.</p>');
         document.getElementById('new').querySelector('.eyebrow').textContent = 'Information';
         document.getElementById('new').querySelector('h2').textContent = 'Publication réservée';
+        document.getElementById('new').querySelector('.field-hint')?.remove();
       }
       roster = (await AYCPortal.api('roster')).members || [];
       document.getElementById('chairId').innerHTML = memberOptions('');
