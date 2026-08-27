@@ -13,7 +13,7 @@ const {
 } = require("../_lib/members-store");
 const { createSession } = require("../_lib/sessions");
 const { sendNewRequestNotice } = require("../_lib/mailer");
-const { getCapabilityHolders } = require("../_lib/roles");
+const { getMembershipReviewers } = require("../_lib/roles");
 
 function isTrustedProfileUrl(url) {
   if (typeof url !== "string") return false;
@@ -106,11 +106,12 @@ module.exports = async (req, res) => {
     await createSession(res, member.id, req.headers["user-agent"]);
 
     if (member.status === "pending") {
-      const approvers = await getCapabilityHolders(school.id, "membership_approver");
-      const emails = approvers.map((approver) => approver.email).filter(Boolean);
-      // Keep the first-admin/bootstrap path safe if a club has not yet been
-      // assigned a membership approver.
-      const recipients = emails.length > 0 ? emails : await listNationalAdminEmails();
+      const reviewers = await getMembershipReviewers(school.id);
+      const nationalAdminEmails = await listNationalAdminEmails();
+      const reviewerEmails = reviewers.map((reviewer) => reviewer.email).filter(Boolean);
+      // Always notify national admins as well as the club's responsible VPC
+      // and any explicit membership approver. De-duplicate shared accounts.
+      const recipients = [...new Set([...nationalAdminEmails, ...reviewerEmails])];
       if (recipients.length > 0) await sendNewRequestNotice(recipients, member, school.name);
     }
 
