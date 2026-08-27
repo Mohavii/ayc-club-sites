@@ -8,6 +8,7 @@ const {
   getMemberCapabilities,
   getMemberStatusHistory,
   getCurrentDisplayRole,
+  getMemberPortalAccess,
   hasCapability,
   requireCapability,
 } = require("./_lib/roles");
@@ -238,6 +239,8 @@ async function meetingDetail(req, res, member, body) {
   if (!meeting || (!member.is_national_admin && meeting.school_id !== member.school_id)) {
     return json(res, 404, { error: "Réunion introuvable." });
   }
+  const access = await getMemberPortalAccess(member);
+  const canEditPV = Boolean(member.is_national_admin || access.canEditPV);
   const [agendaItems, attendees, minutes, roster] = await Promise.all([
     db`select * from portal_meeting_agenda_items where meeting_id = ${id} order by position`,
     db`
@@ -245,7 +248,9 @@ async function meetingDetail(req, res, member, body) {
       from portal_meeting_attendees a join portal_members m on m.id = a.member_id
       where a.meeting_id = ${id} order by m.display_name
     `,
-    db`select * from portal_minutes where meeting_id = ${id}`,
+    canEditPV
+      ? db`select * from portal_minutes where meeting_id = ${id}`
+      : db`select * from portal_minutes where meeting_id = ${id} and status in ('sent', 'validated')`,
     db`select id, display_name, username, membership_status from portal_members where school_id = ${meeting.school_id} and status = 'active' order by display_name`,
   ]);
   let structured = { attendance: [], agendaBlocks: [], motions: [] };
@@ -269,7 +274,7 @@ async function meetingDetail(req, res, member, body) {
     return json(res, 200, { attendee: result[0] });
   }
   if (body.action === "save_minutes") {
-    if (!(await requireClubCapability(req, res, member, "pv_editor", meeting.school_id))) return;
+    if (!canEditPV || !(await requireClubCapability(req, res, member, "pv_editor", meeting.school_id))) return;
     const mode = body.mode === "assemblee_generale" ? body.mode : "standard";
     const status = ["draft", "sent", "validated"].includes(body.status) ? body.status : "draft";
     const attendance = Array.isArray(body.attendance) ? body.attendance.slice(0, 300) : [];
@@ -628,11 +633,17 @@ async function documentDownload(req, res, member) {
 
 async function training(req, res, member, body) {
   const db = sql();
+  const access = await getMemberPortalAccess(member);
+  const isSimpleMember = !member.is_national_admin && (access.isOrdinaryMember || access.isNewAdherent);
   if (req.method === "GET") {
     const [entries, trainerRows, awards, documents] = await Promise.all([
-      db`select * from portal_training_entries where member_id = ${member.id} order by held_on desc nulls last, created_at desc`,
+      isSimpleMember
+        ? db`select * from portal_training_entries where member_id = ${member.id} and validation_status = 'validated' order by held_on desc nulls last, created_at desc`
+        : db`select * from portal_training_entries where member_id = ${member.id} order by held_on desc nulls last, created_at desc`,
       db`select * from portal_trainer_profiles where member_id = ${member.id}`,
-      db`select id, title, issuer, awarded_on, value_tag, description, visibility, created_at from portal_member_awards where member_id = ${member.id} and visibility = 'active_members' order by awarded_on desc nulls last, created_at desc`,
+      isSimpleMember
+        ? Promise.resolve([])
+        : db`select id, title, issuer, awarded_on, value_tag, description, visibility, created_at from portal_member_awards where member_id = ${member.id} and visibility = 'active_members' order by awarded_on desc nulls last, created_at desc`,
       visibleDocuments(db, member),
     ]);
     const totals = { hours: 0, declaredHours: 0, validatedHours: 0 };
@@ -644,8 +655,17 @@ async function training(req, res, member, body) {
       if (entry.validation_status === "validated") totals.validatedHours += hours;
     }
     totals.hours = totals.validatedHours;
-    return json(res, 200, { entries: visibleEntries, trainerProfile: trainerRows[0] || null, awards, documents, totals, access: { isVerifiedTrainer }, categoryLabels: MEMBER_TRAINING_LABELS });
+    return json(res, 200, {
+      entries: visibleEntries,
+      trainerProfile: trainerRows[0] || null,
+      awards,
+      documents,
+      totals,
+      access: { isVerifiedTrainer, isSimpleMember },
+      categoryLabels: isSimpleMember ? {} : MEMBER_TRAINING_LABELS,
+    });
   }
+  if (isSimpleMember) return json(res, 403, { error: "Les formations d’un membre sont enregistrées et validées par les responsables compétents." });
   if (body.action === "trainer_profile") {
     const trainerRows = await db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`;
     const canEditTrainerProfile = member.is_national_admin || trainerRows[0]?.certification_status === "verified";
@@ -842,15 +862,29 @@ async function assemblyDetail(req, res, member, body) {
   const assemblyRows = await db`select a.*, m.title, m.starts_at, m.ends_at, m.format, m.location, m.comments, s.name as school_name from portal_assemblies a join portal_meetings m on m.id = a.meeting_id left join portal_schools s on s.id = a.school_id where a.id = ${id}`;
   const assembly = assemblyRows[0];
   if (!assembly || (!member.is_national_admin && assembly.school_id !== member.school_id)) return json(res, 404, { error: "Assemblée introuvable." });
-  const [attendance, roles, motions, elections] = await Promise.all([
+  const access = await getMemberPortalAccess(member);
+  const canEditPV = Boolean(member.is_national_admin || access.canEditPV);
+  const [attendance, roles, motions, elections, minutes] = await Promise.all([
     db`select a.*, m.display_name, m.username, m.membership_status from portal_assembly_attendance a join portal_members m on m.id = a.member_id where a.assembly_id = ${id} order by m.display_name`,
     db`select ar.*, m.display_name, m.username from portal_assembly_roles ar join portal_members m on m.id = ar.member_id where ar.assembly_id = ${id} order by m.display_name`,
     db`select * from portal_assembly_motions where assembly_id = ${id} order by position`,
     db`select * from portal_elections where assembly_id = ${id} order by created_at`,
+    canEditPV
+      ? db`select * from portal_minutes where meeting_id = ${assembly.meeting_id}`
+      : db`select * from portal_minutes where meeting_id = ${assembly.meeting_id} and status in ('sent', 'validated')`,
   ]);
+  let minutesStructured = { attendance: [], agendaBlocks: [], motions: [] };
+  if (minutes[0]) {
+    const [minutesAttendance, agendaBlocks, minutesMotions] = await Promise.all([
+      db`select a.*, m.display_name, m.username from portal_minutes_attendance a join portal_members m on m.id = a.member_id where a.minutes_id = ${minutes[0].id} order by m.display_name`,
+      db`select * from portal_minutes_agenda_blocks where minutes_id = ${minutes[0].id} order by position`,
+      db`select * from portal_minutes_motions where minutes_id = ${minutes[0].id} order by position`,
+    ]);
+    minutesStructured = { attendance: minutesAttendance, agendaBlocks, motions: minutesMotions };
+  }
   const presentCount = attendance.filter(row => ["present", "late"].includes(row.attendance_status)).length;
   const quorumMet = assembly.scope === "local" ? presentCount >= assembly.quorum_required : null;
-  if (req.method === "GET" || body.action === "assembly") return json(res, 200, { assembly: { ...assembly, assembly_label: ASSEMBLY_LABELS[assembly.assembly_type] || assembly.assembly_type, present_count: presentCount, quorum_met_live: quorumMet }, attendance, roles, motions, elections });
+  if (req.method === "GET" || body.action === "assembly") return json(res, 200, { assembly: { ...assembly, assembly_label: ASSEMBLY_LABELS[assembly.assembly_type] || assembly.assembly_type, present_count: presentCount, quorum_met_live: quorumMet }, attendance, roles, motions, elections, minutes: minutes[0] || null, minutesStructured });
   if (body.action === "attendance") {
     if (!(await requireClubCapability(req, res, member, "cscy_reviewer", assembly.school_id))) return;
     const target = attendance.find(row => row.member_id === body.memberId);
