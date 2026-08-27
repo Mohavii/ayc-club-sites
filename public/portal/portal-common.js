@@ -58,8 +58,8 @@
     }
 
     const navAdmin = document.getElementById("admin-links");
-    if (navAdmin && member?.isNationalAdmin) {
-      navAdmin.innerHTML = `<a href="admin-review.html">Demandes d'adhésion</a><a href="admin-roles.html">Rôles et permissions</a>`;
+    if (navAdmin && (member?.isNationalAdmin || member?.canReviewMembership)) {
+      navAdmin.innerHTML = `<a href="admin-review.html">Demandes d'adhésion</a>${member?.isNationalAdmin ? `<a href="admin-roles.html">Rôles et permissions</a>` : ""}`;
     }
 
     const logout = document.getElementById("logout-btn");

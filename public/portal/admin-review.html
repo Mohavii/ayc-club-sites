@@ -19,7 +19,8 @@
 <main class="portal-shell wide">
   <div class="portal-card">
     <h1 class="portal-title">Demandes d'adhésion en attente</h1>
-    <p class="portal-subtitle">Validation réservée aux admins nationaux.</p>
+    <p class="portal-subtitle">Les admins nationaux voient toutes les demandes. Chaque VPC voit les demandes de son club.</p>
+    <div id="scope-note" class="status-banner" hidden></div>
     <div id="list"></div>
   </div>
 </main>
@@ -29,21 +30,26 @@
 (async function () {
   const member = await window.AYCPortal.initPortalShell();
   if (!member) { window.location.href = "login.html"; return; }
-  if (member.status !== "active" || !member.isNationalAdmin) {
+  if (member.status !== "active") {
     window.location.href = "home.html";
     return;
   }
 
   const listEl = document.getElementById("list");
+  const scopeNote = document.getElementById("scope-note");
 
   async function load() {
     listEl.innerHTML = '<div class="empty-state">Chargement…</div>';
-    const res = await fetch("/api/admin/members/pending");
+    const res = await fetch("/api/admin/members?action=pending");
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      listEl.innerHTML = '<div class="empty-state">Impossible de charger les demandes.</div>';
+      listEl.innerHTML = `<div class="empty-state"><strong>${window.AYCPortal.escapeHtml(data.error || "Impossible de charger les demandes.")}</strong><span>Si tu es VPC, vérifie que ton poste est actuellement attribué à ce club.</span></div>`;
       return;
     }
-    const data = await res.json();
+    scopeNote.hidden = false;
+    scopeNote.textContent = data.scope === "national"
+      ? "Vue nationale : toutes les demandes en attente."
+      : "Vue club : seules les demandes de ton club sont affichées.";
     if (data.pending.length === 0) {
       listEl.innerHTML = '<div class="empty-state">Aucune demande en attente.</div>';
       return;
@@ -56,7 +62,7 @@
         ${m.profilePictureUrl ? `<img src="${m.profilePictureUrl}" alt="">` : `<img src="../assets/logo-secondary-color.png" alt="">`}
         <div class="who">
           <strong>${window.AYCPortal.escapeHtml(m.displayName)}</strong>
-          <span>@${window.AYCPortal.escapeHtml(m.username)} · ${window.AYCPortal.escapeHtml(m.schoolName || "—")} · ${window.AYCPortal.escapeHtml(m.email)}</span>
+          <span>@${window.AYCPortal.escapeHtml(m.username)} · Club : ${window.AYCPortal.escapeHtml(m.schoolName || "—")} · ${window.AYCPortal.escapeHtml(m.email)}</span>
         </div>
         <div class="actions">
           <button class="btn-approve" data-id="${m.id}" data-decision="approve">Approuver</button>
@@ -80,7 +86,7 @@
 
     btn.closest(".review-row").style.opacity = "0.5";
     try {
-      const res = await fetch("/api/admin/members/decide", {
+      const res = await fetch("/api/admin/members", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ memberId, decision, rejectionNote }),
