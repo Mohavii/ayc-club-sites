@@ -74,6 +74,7 @@
     const label = { reunion: 'Réunion', assemblee_locale: 'Assemblée locale', assemblee_generale: 'Assemblée générale', planned: 'Planifiée', live: 'En cours', completed: 'Terminée', cancelled: 'Annulée' };
     let allMeetings = [];
     let roster = [];
+    let member = null;
     let activeFilter = 'all';
 
     const apiError = error => AYCPortal.renderError(notice, error);
@@ -107,6 +108,12 @@
 
     function renderEditor(data) {
       const m = data.meeting;
+      if (!member?.access?.canEditPV && !member?.isNationalAdmin) {
+        detailRoot.innerHTML = `<section class="portal-card meeting-detail-card"><div class="toolbar"><div><p class="eyebrow">${esc(label[m.meeting_type] || m.meeting_type)}</p><h2>${esc(m.title)}</h2><p class="list-item-meta">${AYCPortal.formatDate(m.starts_at, true)} · ${esc(m.location || 'Format en ligne')} · ${esc(label[m.status] || m.status || 'Planifiée')}</p></div><button class="btn btn-secondary btn-sm" id="close-detail">Fermer</button></div><div class="meeting-detail-grid"><div><h3>Ordre du jour</h3><div class="list-stack">${(data.agendaItems || []).length ? data.agendaItems.map(i => `<div class="list-item"><div class="meeting-date"><strong>${i.position + 1}</strong><span>${i.duration_minutes ? `${i.duration_minutes} min` : ''}</span></div><div class="list-item-main"><span class="list-item-title">${esc(i.title)}</span><span class="list-item-meta">${esc(i.notes || '')}</span></div></div>`).join('') : AYCPortal.renderEmpty('Ordre du jour à compléter')}</div></div><div><h3>Ma présence</h3><p class="field-hint">Confirme ta présence pour cette réunion.</p><div class="form-actions"><button class="btn btn-secondary btn-sm" data-rsvp="present">Je serai présent·e</button><button class="btn btn-secondary btn-sm" data-rsvp="absent">Je serai absent·e</button></div></div></div></section>`;
+        document.getElementById('close-detail').onclick = () => { detailRoot.innerHTML = ''; };
+        detailRoot.querySelectorAll('[data-rsvp]').forEach(btn => btn.onclick = async () => { try { await AYCPortal.api('meeting', { method: 'POST', body: { action: 'rsvp', meetingId: m.id, rsvp: btn.dataset.rsvp } }); btn.textContent = 'Réponse enregistrée'; } catch (error) { apiError(error); } });
+        return;
+      }
       const saved = data.minutes || {};
       const structured = data.structured || {};
       const attendanceById = new Map((structured.attendance || []).map(a => [a.member_id, a]));
@@ -130,8 +137,16 @@
     }
 
     try {
-      const member = await AYCPortal.initPortalShell({ requireActive: true });
+      member = await AYCPortal.initPortalShell({ requireActive: true });
       if (!member) return;
+      const canCreateMeeting = Boolean(member.access?.canCreateMeeting || member.isNationalAdmin);
+      if (!canCreateMeeting) {
+        const form = document.getElementById('meeting-form');
+        form.hidden = true;
+        form.insertAdjacentHTML('beforebegin', '<p class="restricted-note">La publication des réunions est gérée par le Secrétaire Local ou une personne mandatée.</p>');
+        document.getElementById('new').querySelector('.eyebrow').textContent = 'Information';
+        document.getElementById('new').querySelector('h2').textContent = 'Publication réservée';
+      }
       roster = (await AYCPortal.api('roster')).members || [];
       document.getElementById('chairId').innerHTML = memberOptions('');
       document.getElementById('secretaryId').innerHTML = memberOptions('');

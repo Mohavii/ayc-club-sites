@@ -1,14 +1,28 @@
 (() => {
-  const NAV = [
-    ["home.html", "⌂", "Accueil"],
-    ["profile.html", "◉", "Mon profil"],
-    ["meetings.html", "▣", "Réunions"],
-    ["assemblies.html", "◇", "Assemblées"],
-    ["reports.html", "✓", "Rapports"],
-    ["supervision.html", "⚖", "Supervision"],
-    ["training.html", "↗", "Cursus"],
-    ["tasks.html", "☷", "Mes tâches"],
-  ];
+  const NAV_GROUPS = (member) => {
+    const access = member?.access || {};
+    const groups = [
+      {
+        label: "Mon espace",
+        items: [
+          ["home.html", "⌂", "Accueil"],
+          ["profile.html", "◉", "Mon profil"],
+          ["meetings.html", "▣", "Réunions"],
+          ["assemblies.html", "◇", "Assemblées"],
+          ["training.html", "↗", "Cursus"],
+          ["tasks.html", "☷", "Mes tâches"],
+        ],
+      },
+      {
+        label: "Vie du club",
+        items: [["reports.html", "✓", "Rapports & projets"]],
+      },
+    ];
+    if (access.canReviewSupervision || member?.isNationalAdmin) {
+      groups.push({ label: "Gouvernance", items: [["supervision.html", "⚖", "Supervision"]] });
+    }
+    return groups;
+  };
 
   function escapeHtml(value) {
     const div = document.createElement("div");
@@ -24,6 +38,7 @@
     const avatar = member?.profilePictureUrl
       ? `<img src="${escapeHtml(member.profilePictureUrl)}" alt="${escapeHtml(member.displayName)}" class="auth-avatar">`
       : `<span class="auth-avatar auth-initials">${escapeHtml(initials)}</span>`;
+    const groups = NAV_GROUPS(member);
 
     const topbar = document.getElementById("topbar-root");
     if (topbar) {
@@ -50,16 +65,16 @@
       sidebar.innerHTML = `
         <aside class="icon-sidebar" aria-label="Espace membre">
           <div class="sidebar-mark">Y</div>
-          <div class="sidebar-links">
-            ${NAV.map(([href, icon, label]) => `<a class="sidebar-link ${current === href ? "active" : ""}" href="${href}" title="${label}"><span class="sidebar-icon">${icon}</span><span>${label}</span></a>`).join("")}
-          </div>
-          <a class="sidebar-link sidebar-settings" href="profile.html#settings" title="Paramètres"><span class="sidebar-icon">⚙</span><span>Paramètres</span></a>
+          <nav class="sidebar-nav">
+            ${groups.map(group => `<section class="sidebar-group"><h2 class="sidebar-group-label">${escapeHtml(group.label)}</h2><div class="sidebar-links">${group.items.map(([href, icon, label]) => `<a class="sidebar-link ${current === href ? "active" : ""}" href="${href}" title="${escapeHtml(label)}"><span class="sidebar-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></a>`).join("")}</div></section>`).join("")}
+          </nav>
+          <a class="sidebar-link sidebar-settings" href="profile.html#settings" title="Paramètres"><span class="sidebar-icon" aria-hidden="true">⚙</span><span>Paramètres</span></a>
         </aside>`;
     }
 
     const navAdmin = document.getElementById("admin-links");
     if (navAdmin && (member?.isNationalAdmin || member?.canReviewMembership)) {
-      navAdmin.innerHTML = `<a href="admin-review.html">Demandes d'adhésion</a>${member?.isNationalAdmin ? `<a href="admin-roles.html">Rôles et permissions</a>` : ""}`;
+      navAdmin.innerHTML = `<a class="list-item" href="admin-review.html"><span class="list-item-title">Demandes d’adhésion</span><span class="list-item-meta">${member?.isNationalAdmin ? "Vue nationale" : "Demandes de ton club"}</span></a>${member?.isNationalAdmin ? `<a class="list-item" href="admin-roles.html"><span class="list-item-title">Rôles et permissions</span><span class="list-item-meta">Administration nationale</span></a>` : ""}`;
     }
 
     const logout = document.getElementById("logout-btn");
@@ -107,7 +122,7 @@
             entry.target.classList.add("is-visible");
             io.unobserve(entry.target);
           });
-        }, { threshold: 0.12, rootMargin: "0px 0px -32px 0px" });
+        }, { threshold: 0.04, rootMargin: "0px 0px 64px 0px" });
 
     mark(document.body);
     const mutations = new MutationObserver((records) => {
