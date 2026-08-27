@@ -20,7 +20,7 @@
         <div>
           <p class="eyebrow">Espace personnel</p>
           <h1>Mon profil</h1>
-          <p>Une fiche unique pour ton identité, ton parcours, tes responsabilités et tes formations YOUTHCLUBber.</p>
+          <p>Une fiche claire pour ton identité, ton statut et ton parcours YOUTHCLUBber.</p>
         </div>
         <div class="heading-actions">
           <a class="btn btn-secondary" href="home.html">Retour au tableau de bord</a>
@@ -51,6 +51,7 @@
     try {
       const sessionMember = await AYCPortal.initPortalShell({ requireActive: true });
       if (!sessionMember) return;
+      const isSimpleMember = Boolean(sessionMember.access?.isOrdinaryMember || sessionMember.access?.isNewAdherent);
       const data = await AYCPortal.api('profile');
       const m = data.member || sessionMember;
       const initials = (m.display_name || m.displayName || '').split(/\s+/).map(x => x[0]).slice(0, 2).join('').toUpperCase();
@@ -120,11 +121,11 @@
             </form>
           </section>
 
-          <section class="portal-card card-span-6">
+          ${isSimpleMember ? '' : `<section class="portal-card card-span-6">
             <h2>Responsabilités actuelles</h2>
             <div class="role-badges">${capabilities || '<span class="list-item-meta">Aucune capacité particulière attribuée.</span>'}</div>
             <div class="quote-block" style="margin-top:20px">Les capacités sont attribuées individuellement par les admins nationaux et ne sont jamais déduites d'un titre général.</div>
-          </section>
+          </section>`}
 
           <section class="portal-card card-span-6">
             <h2>Statut d'adhésion</h2>
@@ -145,9 +146,9 @@
             <a class="btn btn-secondary btn-sm" href="training.html">Gérer mon dossier</a>
           </section>
 
-          ${m.formateur_track || trainer ? `<section class="portal-card card-span-8 red-theme"><div class="toolbar"><div><p class="eyebrow">Transmission</p><h2>Portfolio Formateur</h2></div><a class="btn btn-secondary btn-sm" href="training.html">Ouvrir mon portfolio</a></div><div class="quote-block">${esc(trainer?.oath_text || 'Transmettre, faciliter et faire grandir les équipes avec exigence et bienveillance.')}</div><div class="role-badges">${(trainer?.expertise_domains || []).map(x => `<span class="role-badge">${esc(x)}</span>`).join('') || '<span class="list-item-meta">Domaines d’expertise à renseigner</span>'}</div></section>` : ''}
+          ${!isSimpleMember && (m.formateur_track || trainer) ? `<section class="portal-card card-span-8 red-theme"><div class="toolbar"><div><p class="eyebrow">Transmission</p><h2>Portfolio Formateur</h2></div><a class="btn btn-secondary btn-sm" href="training.html">Ouvrir mon portfolio</a></div><div class="quote-block">${esc(trainer?.oath_text || 'Transmettre, faciliter et faire grandir les équipes avec exigence et bienveillance.')}</div><div class="role-badges">${(trainer?.expertise_domains || []).map(x => `<span class="role-badge">${esc(x)}</span>`).join('') || '<span class="list-item-meta">Domaines d’expertise à renseigner</span>'}</div></section>` : ''}
 
-          <section class="portal-card card-span-4"><h2>Valeurs & distinctions</h2><div class="list-stack">${awards.slice(0, 4).map(a => `<div class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(a.title)}</span><span class="list-item-meta">${esc(a.issuer || 'Association YOUTH CLUBs')} · ${AYCPortal.formatDate(a.awarded_on)}</span></div></div>`).join('') || '<span class="list-item-meta">Aucune distinction enregistrée.</span>'}</div></section>
+          ${isSimpleMember ? '' : `<section class="portal-card card-span-4"><h2>Valeurs & distinctions</h2><div class="list-stack">${awards.slice(0, 4).map(a => `<div class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(a.title)}</span><span class="list-item-meta">${esc(a.issuer || 'Association YOUTH CLUBs')} · ${AYCPortal.formatDate(a.awarded_on)}</span></div></div>`).join('') || '<span class="list-item-meta">Aucune distinction enregistrée.</span>'}</div></section>`}
         </div>`;
 
       if (m.cover_photo_url) document.getElementById('profile-cover').style.backgroundImage = `url("${m.cover_photo_url.replace(/"/g, '')}")`;
