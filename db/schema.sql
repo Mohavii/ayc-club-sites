@@ -220,7 +220,7 @@ create table if not exists portal_capability_grants (
   school_id   integer not null references portal_schools(id) on delete cascade,
   capability  text not null check (capability in (
                 'membership_approver', 'report_validator', 'pv_editor',
-                'meeting_organizer', 'project_manager'
+                'meeting_organizer', 'project_manager', 'supervision_editor', 'cscy_reviewer'
               )),
   granted_by  uuid references portal_members(id),
   granted_at  timestamptz not null default now(),
@@ -239,7 +239,7 @@ do $$
 begin
   alter table portal_capability_grants drop constraint if exists portal_capability_grants_capability_check;
   alter table portal_capability_grants add constraint portal_capability_grants_capability_check
-    check (capability in ('membership_approver', 'report_validator', 'pv_editor', 'meeting_organizer', 'project_manager'));
+    check (capability in ('membership_approver', 'report_validator', 'pv_editor', 'meeting_organizer', 'project_manager', 'supervision_editor', 'cscy_reviewer'));
 exception when duplicate_object then null;
 end $$;
 
@@ -635,3 +635,219 @@ create table if not exists portal_report_deadlines (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_portal_report_deadlines_scope on portal_report_deadlines(school_id, due_at);
+
+
+-- =======================================================================
+-- SUPERVISION, ASSEMBLIES, ELECTIONS, AND GOVERNANCE AUDIT (PHASE 5)
+-- These tables are deliberately additive. Existing meetings, minutes, reports,
+-- roles, and member data remain compatible while gaining structured governance
+-- records and immutable snapshots for portal traceability.
+-- =======================================================================
+
+create table if not exists portal_role_catalog (
+  slug text primary key,
+  display_name text not null,
+  scope text not null check (scope in ('club','regional','national','advisory','supervision','constitutional')),
+  description text,
+  voting_scope text,
+  active boolean not null default true
+);
+
+insert into portal_role_catalog (slug, display_name, scope, description, voting_scope) values
+  ('bel', 'Bureau Exécutif Local', 'club', 'Instance exécutive locale.', 'club'),
+  ('ben', 'Bureau Exécutif National', 'national', 'Instance exécutive nationale.', 'ag'),
+  ('supco_local', 'Conseil de Supervision Local', 'supervision', 'Instance indépendante de supervision locale.', 'none'),
+  ('supco_national', 'Conseil de Supervision National', 'supervision', 'Instance indépendante de supervision nationale.', 'none'),
+  ('cns', 'Conseil National des Seniors', 'advisory', 'Instance consultative nationale.', 'ag_single'),
+  ('cls', 'Conseil Local des Seniors', 'advisory', 'Instance consultative locale.', 'none'),
+  ('cscy', 'Conseil de Sauvegarde de la Constitution Youth', 'constitutional', 'Conseil chargé des droits de vote et de la conformité des motions.', 'none'),
+  ('gdt', 'Groupe de Travail', 'advisory', 'Groupe de travail mandaté par une instance.', 'none'),
+  ('coordinateur_regional', 'Coordinateur Stratégique Régional', 'regional', 'Coordination stratégique régionale.', 'regional'),
+  ('president', 'Président', 'club', 'Présidence du bureau exécutif local ou national.', 'club'),
+  ('secretaire', 'Secrétaire', 'club', 'Secrétariat du bureau exécutif local ou national.', 'club'),
+  ('tresorier', 'Trésorier', 'club', 'Trésorerie du bureau exécutif local ou national.', 'club'),
+  ('vpi', 'VPI', 'club', 'Vice-présidence interne locale.', 'club'),
+  ('vpe', 'VPE', 'club', 'Vice-présidence externe locale.', 'club'),
+  ('vpc', 'VPC', 'club', 'Vice-présidence communication locale.', 'club')
+on conflict (slug) do nothing;
+
+create table if not exists portal_role_training_requirements (
+  role_slug text not null references portal_role_catalog(slug) on delete cascade,
+  department text not null,
+  required boolean not null default true,
+  description text,
+  primary key (role_slug, department)
+);
+
+insert into portal_role_training_requirements (role_slug, department, description) values
+  ('president', 'coordination_strategique', 'Formation COSTRA requise.'),
+  ('secretaire', 'secretariat', 'Formation Secrétariat requise.'),
+  ('tresorier', 'tresorerie', 'Formation Trésorerie requise.'),
+  ('vpi', 'ressources_humaines', 'Formation RH requise.'),
+  ('vpe', 'relations_exterieures', 'Formation RELEX requise.'),
+  ('vpc', 'communication', 'Formation COM requise.'),
+  ('cscy', 'supervision', 'Formation de conformité constitutionnelle requise.')
+on conflict do nothing;
+
+create table if not exists portal_assemblies (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid unique not null references portal_meetings(id) on delete cascade,
+  school_id integer references portal_schools(id) on delete cascade,
+  assembly_type text not null check (assembly_type in ('alofm','adhesion','validation','aloe','dissolution','ag_ordinaire','ag_extraordinaire')),
+  scope text not null default 'local' check (scope in ('local','national')),
+  status text not null default 'planned' check (status in ('planned','open','closed','cancelled')),
+  member_snapshot_count integer not null default 0,
+  quorum_required integer not null default 0,
+  eligible_voter_count integer not null default 0,
+  quorum_met boolean,
+  voter_snapshot jsonb not null default '[]'::jsonb,
+  project_url text,
+  database_url text,
+  outcome_summary text,
+  created_by uuid not null references portal_members(id),
+  opened_at timestamptz,
+  closed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_assemblies_school on portal_assemblies(school_id, status, created_at desc);
+
+create table if not exists portal_assembly_roles (
+  assembly_id uuid not null references portal_assemblies(id) on delete cascade,
+  member_id uuid not null references portal_members(id) on delete cascade,
+  role text not null,
+  note text,
+  primary key (assembly_id, member_id, role)
+);
+
+create table if not exists portal_assembly_attendance (
+  id uuid primary key default gen_random_uuid(),
+  assembly_id uuid not null references portal_assemblies(id) on delete cascade,
+  member_id uuid not null references portal_members(id) on delete cascade,
+  attendance_status text not null default 'invited' check (attendance_status in ('invited','present','absent','excused','late')),
+  voting_rights boolean not null default false,
+  eligibility_basis text,
+  assigned_by uuid references portal_members(id),
+  note text,
+  unique (assembly_id, member_id)
+);
+create index if not exists idx_portal_assembly_attendance_assembly on portal_assembly_attendance(assembly_id, attendance_status);
+
+create table if not exists portal_assembly_motions (
+  id uuid primary key default gen_random_uuid(),
+  assembly_id uuid not null references portal_assemblies(id) on delete cascade,
+  position integer not null default 0,
+  motion_type text not null default 'decision',
+  title text not null,
+  majority_type text not null default 'simple' check (majority_type in ('simple','absolute','relative','two_thirds')),
+  required_motion boolean not null default false,
+  votes_for integer not null default 0,
+  votes_against integer not null default 0,
+  abstentions integer not null default 0,
+  result text,
+  consequence text,
+  created_at timestamptz not null default now(),
+  unique (assembly_id, position)
+);
+
+create table if not exists portal_investigations (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer references portal_schools(id) on delete set null,
+  subject_member_id uuid references portal_members(id) on delete set null,
+  opened_by uuid not null references portal_members(id),
+  level text not null default 'local' check (level in ('local','national')),
+  category text not null check (category in ('communication','personal_conflict','regulation','law','other')),
+  title text not null,
+  summary text,
+  status text not null default 'open' check (status in ('open','under_review','decision','closed','dismissed')),
+  confidentiality text not null default 'supervision' check (confidentiality in ('supervision','national_only')),
+  decision text,
+  restriction_summary text,
+  decision_assembly_id uuid references portal_assemblies(id) on delete set null,
+  opened_at timestamptz not null default now(),
+  closed_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_investigations_scope on portal_investigations(school_id, level, status, opened_at desc);
+
+create table if not exists portal_investigation_events (
+  id uuid primary key default gen_random_uuid(),
+  investigation_id uuid not null references portal_investigations(id) on delete cascade,
+  actor_id uuid not null references portal_members(id),
+  event_type text not null check (event_type in ('note','evidence','hearing','decision','restriction','status_change')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_portal_investigation_events_case on portal_investigation_events(investigation_id, created_at);
+
+create table if not exists portal_elections (
+  id uuid primary key default gen_random_uuid(),
+  assembly_id uuid not null references portal_assemblies(id) on delete cascade,
+  office text not null,
+  scope text not null check (scope in ('local','national','regional')),
+  status text not null default 'planned' check (status in ('planned','open','completed','no_election')),
+  majority_type text not null default 'absolute' check (majority_type in ('simple','absolute','relative','two_thirds')),
+  winner_member_id uuid references portal_members(id) on delete set null,
+  outcome text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_elections_assembly on portal_elections(assembly_id, status);
+
+create table if not exists portal_election_candidates (
+  id uuid primary key default gen_random_uuid(),
+  election_id uuid not null references portal_elections(id) on delete cascade,
+  member_id uuid not null references portal_members(id) on delete cascade,
+  eligibility_status text not null default 'pending' check (eligibility_status in ('pending','eligible','ineligible')),
+  statement text,
+  unique (election_id, member_id)
+);
+
+create table if not exists portal_election_rounds (
+  id uuid primary key default gen_random_uuid(),
+  election_id uuid not null references portal_elections(id) on delete cascade,
+  round_number integer not null,
+  discussion_minutes integer,
+  tie_note text,
+  status text not null default 'planned' check (status in ('planned','open','closed')),
+  created_at timestamptz not null default now(),
+  unique (election_id, round_number)
+);
+
+create table if not exists portal_election_tallies (
+  round_id uuid not null references portal_election_rounds(id) on delete cascade,
+  candidate_id uuid not null references portal_election_candidates(id) on delete cascade,
+  votes_for integer not null default 0,
+  abstentions integer not null default 0,
+  primary key (round_id, candidate_id)
+);
+
+create table if not exists portal_mandates (
+  id uuid primary key default gen_random_uuid(),
+  member_id uuid not null references portal_members(id) on delete cascade,
+  school_id integer references portal_schools(id) on delete cascade,
+  scope text not null check (scope in ('local','national','regional')),
+  office text not null,
+  assembly_id uuid references portal_assemblies(id) on delete set null,
+  starts_on date,
+  ends_on date,
+  status text not null default 'proposed' check (status in ('proposed','active','completed','rejected')),
+  handover_notes text,
+  approved_by uuid references portal_members(id),
+  approved_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_portal_mandates_member on portal_mandates(member_id, status, starts_on desc);
+
+create table if not exists portal_audit_events (
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid references portal_members(id) on delete set null,
+  action text not null,
+  entity_type text not null,
+  entity_id uuid,
+  before_data jsonb,
+  after_data jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_portal_audit_events_entity on portal_audit_events(entity_type, entity_id, created_at desc);
+create index if not exists idx_portal_audit_events_actor on portal_audit_events(actor_id, created_at desc);
