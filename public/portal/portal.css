@@ -296,7 +296,7 @@ body.portal-page:before{
 @keyframes axisFloat { from{transform:translateY(2px) rotate(-2deg)} to{transform:translateY(-7px) rotate(2deg)} }
 .report-stats { grid-template-columns:repeat(5,1fr); margin-bottom:18px; }
 .section-note { color:#78849b; font-size:.75rem; font-weight:700; }
-.project-create-form, .task-create-form { margin-top:18px; padding-top:18px; border-top:1px solid #edf0f6; }
+.project-create-form { margin-top:18px; padding-top:18px; border-top:1px solid #edf0f6; }
 .project-item { min-height:58px; }
 .report-detail-row td { padding:0; background:#fbfdff; }
 .report-detail { padding:18px; border-left:4px solid #e5b942; display:grid; gap:10px; }
@@ -350,33 +350,6 @@ body.portal-page:before{
 @media(prefers-reduced-motion:reduce){.portal-reveal{opacity:1!important;transform:none!important}}
 
 
-/* Journal des tâches — banner card matching the reference mockup */
-.task-journal{padding:0;overflow:hidden;border-top:4px solid var(--portal-blue)}
-.task-journal-banner{background:linear-gradient(180deg,#eaf0fb,#e3eaf9);padding:28px 30px 22px;text-align:center}
-.task-journal-banner h2{margin:0;color:var(--portal-blue);font:400 clamp(1.5rem,2.6vw,2.1rem)/1.1 "Fjalla One",sans-serif}
-.task-journal-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:20px 30px 0}
-.task-journal-toolbar h3{margin:0;color:var(--portal-navy);font:400 1.2rem/1 "Fjalla One",sans-serif}
-.task-table-wrap{padding:16px 30px 26px;overflow-x:auto}
-.task-table{width:100%;border-collapse:separate;border-spacing:0 10px;font-size:.83rem}
-.task-table thead th{text-align:left;color:#77819a;font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;padding:0 14px 8px;font-weight:800}
-.task-table tbody tr{background:#f8fafd}
-.task-table tbody td{padding:14px;border-top:1px solid var(--portal-line);border-bottom:1px solid var(--portal-line);color:#3d4861;vertical-align:middle}
-.task-table tbody td:first-child{border-left:1px solid var(--portal-line);border-radius:10px 0 0 10px}
-.task-table tbody td:last-child{border-right:1px solid var(--portal-line);border-radius:0 10px 10px 0}
-.task-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:7px 14px;font-size:.72rem;font-weight:800;border:none;cursor:default}
-.task-pill.pill-executee{background:#e0f4e8;color:#1c8f4f}
-.task-pill.pill-hors_delai{background:#e8543f;color:#fff}
-.task-pill.pill-a_faire,.task-pill.pill-soumis{background:#2855a6;color:#fff}
-button.task-pill{cursor:pointer}
-button.task-pill:hover{filter:brightness(1.06)}
-.task-empty-row td{padding:36px 14px;text-align:center;color:#7a849a}
-.task-empty-row strong{display:block;color:var(--portal-navy);margin-bottom:4px;font-size:.95rem}
-.task-modal-backdrop{position:fixed;inset:0;background:rgba(20,26,46,.45);display:flex;align-items:center;justify-content:center;padding:20px;z-index:200}
-.task-modal{background:#fff;border-radius:18px;max-width:460px;width:100%;padding:26px;box-shadow:0 24px 60px rgba(20,26,46,.28)}
-.task-modal h3{margin:0 0 6px;color:var(--portal-navy);font:400 1.3rem "Fjalla One",sans-serif}
-.task-modal p{margin:0 0 16px;color:#68738d;font-size:.82rem}
-@media(max-width:640px){.task-journal-banner,.task-journal-toolbar,.task-table-wrap{padding-left:18px;padding-right:18px}.task-table{min-width:640px}}
-
 /* PV editor refinement — calm two-part document workspace */
 .pv-editor-shell{border-top:4px solid #e5b942;padding:0;overflow:hidden;background:#fff}
 .pv-editor-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:26px 30px 20px;background:linear-gradient(180deg,#fbfdff,#f5f8fc);border-bottom:1px solid #e5eaf2}
@@ -403,3 +376,51 @@ button.task-pill:hover{filter:brightness(1.06)}
 .pv-footer-actions{display:flex;justify-content:flex-end;gap:10px;padding:0 30px 30px}.pv-footer-actions .btn{min-width:170px}
 @media(max-width:900px){.pv-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pv-block-fields,.pv-motion .pv-block-fields{grid-template-columns:1fr 1fr}.pv-block-fields label:first-child{grid-column:1/-1}}
 @media(max-width:620px){.pv-editor-header{padding:20px;display:grid}.pv-summary-grid{grid-template-columns:1fr;padding:18px 20px 0}.pv-editor-toolbar{padding:22px 20px 14px;display:grid}.pv-save-hint{text-align:left}.pv-section{margin:0 20px 16px;padding:15px}.pv-section-heading{display:grid}.pv-block-fields,.pv-motion .pv-block-fields{grid-template-columns:1fr}.pv-block-fields label:first-child{grid-column:auto}.pv-club-row{grid-template-columns:1fr}.pv-footer-actions{padding:0 20px 22px;display:grid}.pv-footer-actions .btn{width:100%;min-width:0}.pv-attendance-table{min-width:0}.pv-attendance-table th:nth-child(2),.pv-attendance-table td:nth-child(2){display:none}}
+
+
+/* Member task journal — reference-aligned table surface */
+.task-page-heading{margin-bottom:22px}
+.task-journal-card{padding:0;overflow:hidden;border:1px solid #e5e8f0;border-top:4px solid var(--portal-blue);border-radius:22px;background:#fff;box-shadow:0 18px 42px rgba(31,42,90,.09)}
+.task-journal-header{padding:22px 28px 18px;background:linear-gradient(180deg,#fbfcff 0%,#f5f7fc 100%);border-bottom:1px solid #e5e8f0}
+.task-journal-header h2{margin:0;color:var(--portal-blue);font-family:"Fjalla One",sans-serif;font-size:clamp(1.6rem,2.5vw,2.2rem);font-weight:400;letter-spacing:.01em}
+.task-journal-header p{max-width:720px;margin:7px 0 0;color:#77819a;font-size:.8rem;line-height:1.55}
+.task-journal-scroller{overflow-x:auto;overflow-y:hidden;padding:8px 22px 14px;scrollbar-color:#aeb8cb #f1f3f8;scrollbar-width:thin}
+.task-journal-scroller:focus-visible{outline:3px solid rgba(40,85,166,.24);outline-offset:-3px}
+.task-journal-table{min-width:1080px;border-collapse:separate;border-spacing:0;font-size:.78rem}
+.task-journal-table th{padding:14px 12px 12px;color:#343d54;font-size:.73rem;font-weight:800;letter-spacing:0;text-transform:none;white-space:nowrap;border-bottom:2px solid #d9deeb;background:#fff}
+.task-journal-table td{padding:13px 12px;color:#647089;vertical-align:middle;border-bottom:2px solid #e5e8f0;white-space:nowrap}
+.task-journal-table tbody tr:last-child td{border-bottom:0}
+.task-journal-table tbody tr:hover{background:#fbfcff}
+.task-journal-table th:first-child,.task-journal-table td:first-child{padding-left:18px}
+.task-journal-table th:last-child,.task-journal-table td:last-child{padding-right:18px}
+.task-id-cell{color:#4b566e!important}
+.task-id-cell strong{font-size:.8rem;letter-spacing:.03em}
+.task-project{display:inline-block;max-width:150px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;color:#6f7890}
+.task-description-cell{min-width:190px;white-space:normal!important}
+.task-description-cell strong{display:block;max-width:235px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#4c5870;font-size:.8rem}
+.task-description-cell small{display:block;max-width:235px;margin-top:4px;overflow:hidden;color:#8992a5;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
+.task-priority{display:inline-flex;align-items:center;min-width:64px;color:#68738b;font-weight:800}
+.task-priority-haute,.task-priority-urgente{color:#9a6710}
+.task-status-control{display:inline-flex}
+.task-status-select{appearance:none;min-width:118px;padding:7px 27px 7px 12px;border:1px solid transparent;border-radius:999px;background-color:#edf1f8;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 13px) 50%,calc(100% - 9px) 50%;background-size:4px 4px,4px 4px;background-repeat:no-repeat;color:#68738b;font:inherit;font-size:.72rem;font-weight:800;cursor:pointer;transition:transform .2s var(--portal-spring),box-shadow .2s var(--portal-ease),filter .2s var(--portal-ease)}
+.task-status-select:hover{transform:translateY(-1px);filter:brightness(.98);box-shadow:0 7px 14px -12px rgba(31,42,90,.65)}
+.task-status-select:focus-visible{outline:3px solid rgba(40,85,166,.2);outline-offset:2px}
+.task-status-select:disabled{cursor:wait;opacity:.62;transform:none}
+.task-status-todo{background-color:#eef1f7;color:#68738b}
+.task-status-submitted{background-color:#dce8ff;color:#2855a6}
+.task-status-done{background-color:#d9f3e2;color:#2f9c5f}
+.task-status-overdue{background-color:#ffe1df;color:#d94335}
+.task-comments-cell{max-width:210px;overflow:hidden;color:#7a849a!important;text-overflow:ellipsis}
+.task-journal-loading{display:flex;gap:8px;align-items:center;justify-content:center;padding:42px 18px;color:#a1abc0}
+.task-journal-loading span{width:8px;height:8px;border-radius:50%;background:#b8c8e9;animation:taskJournalPulse 1s ease-in-out infinite}
+.task-journal-loading span:nth-child(2){animation-delay:.14s}.task-journal-loading span:nth-child(3){animation-delay:.28s}
+@keyframes taskJournalPulse{0%,80%,100%{opacity:.35;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+@media(max-width:600px){.task-journal-card{border-radius:16px}.task-journal-header{padding:18px 18px 16px}.task-journal-scroller{padding:5px 4px 10px}.task-journal-table{min-width:1080px}.task-journal-table th:first-child,.task-journal-table td:first-child{padding-left:14px}.task-journal-table th:last-child,.task-journal-table td:last-child{padding-right:14px}}
+@media(prefers-reduced-motion:reduce){.task-journal-loading span{animation:none}.task-status-select{transition:none}}
+
+/* Project directory and team workflow */
+.project-directory{display:grid;gap:10px}.project-directory-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:16px;border:1px solid #edf0f6;border-radius:14px;background:#fff;transition:transform .25s var(--portal-spring),box-shadow .25s var(--portal-ease),border-color .25s var(--portal-ease)}.project-directory-row:hover{transform:translateX(3px);border-color:#c4d2eb;box-shadow:0 10px 24px -20px rgba(31,42,90,.4)}.project-scope-mark{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;background:var(--portal-blue)}.project-scope-mark.national{background:linear-gradient(135deg,#1f2a5a,#b15a76)}.project-scope-mark.local{background:linear-gradient(135deg,#2855a6,#3ab8ea)}.project-create-card{margin-top:18px}.project-form-grid{align-items:end}.project-detail-card{margin-top:18px}.project-detail-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.project-detail-summary>div{display:grid;gap:5px;padding:14px;border:1px solid var(--portal-line);border-radius:12px;background:var(--portal-pale)}.project-detail-summary strong{font-size:1.5rem;color:var(--portal-navy)}.project-detail-summary span{font-size:.74rem;color:#68738d}.project-description{padding:14px;border-left:4px solid var(--gold);background:#fffaf0;color:#56617a;line-height:1.55}.project-section-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:24px 0 12px}.project-section-heading h3{margin:0}.project-team-card{padding:16px;border:1px solid var(--portal-line);border-radius:14px;background:#fbfdff}.project-team-card+.project-team-card{margin-top:10px}.project-team-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.project-member-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}.project-member-chip{padding:6px 9px;border-radius:999px;background:#eaf0ff;color:var(--portal-blue);font-size:.72rem;font-weight:800}.project-team-actions{display:grid;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--portal-line)}.project-inline-form{display:grid;grid-template-columns:minmax(130px,1fr) minmax(150px,1.5fr) auto;gap:8px;align-items:center}.project-inline-form input,.project-inline-form select{box-sizing:border-box;width:100%;border:1px solid #d9dfeb;border-radius:10px;background:#fff;padding:9px 10px;color:#36415a;font:inherit;font-size:.8rem}.assign-member-form{grid-template-columns:minmax(180px,1fr) auto}.create-task-form{grid-template-columns:minmax(130px,1fr) minmax(180px,1.6fr) minmax(130px,1fr) minmax(125px,auto) auto}.project-team-create{margin-top:18px;padding:16px;border-radius:14px;background:var(--portal-pale);border:1px solid var(--portal-line)}.project-tasks-section{margin-top:22px}.project-tasks-section .table-wrap{border:1px solid #edf0f6;border-radius:12px}.status-draft,.status-a_faire{background:#eef2f8;color:#526078}.status-in_progress{background:#eaf0ff;color:var(--portal-blue)}
+@media(max-width:760px){.project-directory-row{grid-template-columns:auto minmax(0,1fr);align-items:start}.project-directory-row>.status-badge,.project-directory-row>.btn{grid-column:2;justify-self:start}.project-detail-summary{grid-template-columns:1fr}.project-inline-form,.assign-member-form,.create-task-form{grid-template-columns:1fr}.project-team-header{display:block}.project-team-header>.status-badge{margin-top:10px}.project-section-heading{display:block}.project-section-heading .btn,.project-section-heading .section-note{display:inline-flex;margin-top:10px}}
+
+.task-team-name{display:block;margin-top:5px;color:#7a849a;font-size:.7rem}
+.archived-meeting-detail{border-top:4px solid #8b96ad}.archived-meeting-detail + .meeting-minutes-card{border-top:4px solid var(--portal-green)}

@@ -8,6 +8,8 @@
           ["home", "⌂", "Accueil"],
           ["profile", "◉", "Mon profil"],
           ["meetings", "▣", "Réunions"],
+          ["assemblies", "◇", "Assemblées"],
+          ["projects", "▤", "Projets"],
           ["training", "↗", "Cursus"],
           ["tasks", "☷", "Mes tâches"],
         ],
