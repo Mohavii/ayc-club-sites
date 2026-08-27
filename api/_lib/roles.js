@@ -145,6 +145,52 @@ async function revokeCapability({ memberId, schoolId, capability }) {
   `;
 }
 
+async function grantNationalCapability({ memberId, capability, grantedBy }) {
+  if (capability !== 'national_projects') throw new Error(`Capacité nationale inconnue : ${capability}`);
+  const db = sql();
+  await db`
+    update portal_national_capability_grants
+    set revoked_at = now()
+    where member_id = ${memberId} and capability = ${capability} and revoked_at is null
+  `;
+  const rows = await db`
+    insert into portal_national_capability_grants (member_id, capability, granted_by)
+    values (${memberId}, ${capability}, ${grantedBy})
+    returning *
+  `;
+  return rows[0];
+}
+
+async function revokeNationalCapability({ memberId, capability }) {
+  if (capability !== 'national_projects') throw new Error(`Capacité nationale inconnue : ${capability}`);
+  const db = sql();
+  await db`
+    update portal_national_capability_grants
+    set revoked_at = now()
+    where member_id = ${memberId} and capability = ${capability} and revoked_at is null
+  `;
+}
+
+async function hasNationalCapability(memberId, capability) {
+  if (capability !== 'national_projects') throw new Error(`Capacité nationale inconnue : ${capability}`);
+  const db = sql();
+  const rows = await db`
+    select 1 from portal_national_capability_grants
+    where member_id = ${memberId} and capability = ${capability} and revoked_at is null
+    limit 1
+  `;
+  return rows.length > 0;
+}
+
+async function getMemberNationalCapabilities(memberId) {
+  const db = sql();
+  return db`
+    select * from portal_national_capability_grants
+    where member_id = ${memberId} and revoked_at is null
+    order by granted_at desc
+  `;
+}
+
 async function hasCapability(memberId, schoolId, capability) {
   assertValidCapability(capability);
   const db = sql();
@@ -214,16 +260,19 @@ async function canReviewMembership(memberId, schoolId) {
 async function getMemberPortalAccess(member) {
   const db = sql();
   const schoolId = member.school_id || null;
-  const [roleRows, capabilityRows, trainerRows] = await Promise.all([
+  const [roleRows, capabilityRows, nationalCapabilityRows, trainerRows] = await Promise.all([
     schoolId ? db`select role from portal_club_display_roles where member_id = ${member.id} and school_id = ${schoolId} and ended_at is null limit 1` : Promise.resolve([]),
     schoolId ? db`select capability from portal_capability_grants where member_id = ${member.id} and school_id = ${schoolId} and revoked_at is null` : Promise.resolve([]),
+    db`select capability from portal_national_capability_grants where member_id = ${member.id} and revoked_at is null`,
     db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`,
   ]);
   const displayRole = roleRows[0]?.role || null;
   const capabilities = capabilityRows.map(row => row.capability);
   const isNationalAdmin = Boolean(member.is_national_admin);
   const isVerifiedTrainer = trainerRows[0]?.certification_status === "verified";
+  const nationalCapabilities = nationalCapabilityRows.map(row => row.capability);
   const has = capability => isNationalAdmin || capabilities.includes(capability);
+  const hasNational = capability => isNationalAdmin || nationalCapabilities.includes(capability);
   const isNewAdherent = member.membership_status === "nouveau_adherent";
   const isOrdinaryMember = !isNationalAdmin && !BEL_ROLES.includes(displayRole) && capabilities.length === 0;
   const canManageClubWork = isNationalAdmin || capabilities.some(capability => ["meeting_organizer", "pv_editor", "project_manager", "report_validator"].includes(capability));
@@ -238,6 +287,8 @@ async function getMemberPortalAccess(member) {
     canCreateMeeting: has("meeting_organizer"),
     canEditPV: has("pv_editor"),
     canCreateProject: has("project_manager"),
+    canCreateNationalProject: hasNational("national_projects"),
+    nationalCapabilities,
     canReviewReports: has("report_validator"),
     canManageSupervision: has("supervision_editor"),
     canReviewSupervision: has("supervision_editor") || has("cscy_reviewer"),
@@ -413,6 +464,10 @@ module.exports = {
   grantCapability,
   revokeCapability,
   hasCapability,
+  grantNationalCapability,
+  revokeNationalCapability,
+  hasNationalCapability,
+  getMemberNationalCapabilities,
   getMemberCapabilities,
   getCapabilityHolders,
   getMemberPortalAccess,

@@ -70,6 +70,7 @@
     { value: "cscy_reviewer", label: "Référent CSCY" },
   ];
   const NATIONAL_ROLES = [{ value: "president_national", label: "Président National" }];
+  const NATIONAL_CAPABILITIES = [{ value: "national_projects", label: "Créer et piloter des projets nationaux" }];
   const MEMBERSHIP_STATUSES = [
     { value: "nouveau_adherent", label: "Nouveau adhérent" },
     { value: "adherent", label: "Adhérent / membre" },
@@ -150,6 +151,7 @@
     const activeCapsForSchool = data.capabilities.filter((c) => c.school_id === currentSchoolId);
     const activeCapValues = new Set(activeCapsForSchool.map((c) => c.capability));
     const activeNationalValues = new Set(data.nationalRoles.map((r) => r.role));
+    const activeNationalCapabilityValues = new Set((data.nationalCapabilities || []).map((c) => c.capability));
 
     detailPanel.innerHTML = `
       <div class="role-section-label">Statut officiel d'adhésion</div>
@@ -183,6 +185,14 @@
         <div class="form-actions"><button class="btn btn-primary btn-sm" id="save-trainer-status" type="button">Enregistrer</button></div>
       </div>
       <div class="list-stack" style="margin-bottom:18px;">${(data.documents || []).length ? data.documents.map(d => `<div class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(d.title)}</span><span class="list-item-meta">${esc(d.document_type)} · ${esc(d.status)}</span></div></div>`).join("") : '<p class="field-hint">Aucun document dans le dossier.</p>'}</div>
+
+      <div class="role-section-label">Permissions nationales</div>
+      <p class="field-hint" style="margin:-4px 0 10px;">Permissions transversales, sans lien avec le club sélectionné.</p>
+      <div class="role-chip-row" id="national-capability-chips">
+        ${NATIONAL_CAPABILITIES.map(
+          (c) => `<button class="role-chip${activeNationalCapabilityValues.has(c.value) ? " granted" : ""}" data-national-capability="${c.value}">${c.label}${activeNationalCapabilityValues.has(c.value) ? " ✓" : ""}</button>`
+        ).join("")}
+      </div>
 
       <div class="role-section-label">Rôles nationaux</div>
       <p class="field-hint" style="margin:-4px 0 10px;">Portée nationale, indépendante de ce club et du statut d'admin national.</p>
@@ -252,6 +262,15 @@
       const capability = chip.dataset.capability;
       const action = activeCapValues.has(capability) ? "revokeCapability" : "grantCapability";
       await callRoles({ action, memberId: currentMemberId, schoolId: currentSchoolId, capability });
+      await renderDetail();
+    });
+
+    document.getElementById("national-capability-chips").addEventListener("click", async (e) => {
+      const chip = e.target.closest(".role-chip[data-national-capability]");
+      if (!chip) return;
+      const capability = chip.dataset.nationalCapability;
+      const action = activeNationalCapabilityValues.has(capability) ? "revokeNationalCapability" : "grantNationalCapability";
+      await callRoles({ action, memberId: currentMemberId, capability });
       await renderDetail();
     });
 

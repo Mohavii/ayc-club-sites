@@ -30,7 +30,7 @@
           <div class="toolbar">
             <div><p class="eyebrow">Calendrier de travail</p><h2>Réunions à venir et archivées</h2></div>
             <div class="filter-tabs" id="filters">
-              <button class="active" data-filter="all">Toutes</button>
+              <button class="active" data-filter="all">Toutes</button><button data-filter="upcoming">À venir</button><button data-filter="archived">Archives</button>
               <button data-filter="reunion_locale">Réunions locales</button>
               <button data-filter="reunion_nationale">Réunions nationales</button>
               <button data-filter="assemblee_locale">Assemblées locales</button>
@@ -96,7 +96,7 @@
     }
 
     function groupedMeetings(filter) {
-      const rows = filter === 'all' ? allMeetings : allMeetings.filter(x => x.meeting_type === filter);
+      const rows = filter === 'all' ? allMeetings : filter === 'upcoming' ? allMeetings.filter(x => !x.is_archived) : filter === 'archived' ? allMeetings.filter(x => x.is_archived) : allMeetings.filter(x => x.meeting_type === filter);
       const groups = new Map();
       rows.forEach(m => { const key = new Date(m.starts_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }); if (!groups.has(key)) groups.set(key, []); groups.get(key).push(m); });
       return groups;
@@ -105,7 +105,7 @@
     function renderMeetings() {
       const groups = groupedMeetings(activeFilter);
       if (!groups.size) { list.innerHTML = AYCPortal.renderEmpty('Aucune réunion dans cette vue'); return; }
-      list.innerHTML = [...groups.entries()].map(([month, rows]) => `<div class="month-group"><div class="month-heading"><span>${esc(month.charAt(0).toUpperCase() + month.slice(1))}</span><span class="list-item-meta">${rows.length} rendez-vous</span></div>${rows.map(m => `<article class="list-item meeting-row" data-id="${m.id}"><div class="meeting-date"><strong>${new Date(m.starts_at).toLocaleDateString('fr-FR', { day: '2-digit' })}</strong><span>${new Date(m.starts_at).toLocaleDateString('fr-FR', { weekday: 'short' })}</span></div><div class="list-item-main"><span class="list-item-title">${esc(m.title)}</span><span class="list-item-meta">${new Date(m.starts_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${esc(m.school_name || 'Mon club')} · ${esc(m.location || (m.format === 'en_ligne' ? 'En ligne' : 'Lieu à préciser'))}</span><span class="list-item-meta">${m.agenda_items?.length || 0} point(s) à l'ordre du jour${m.chair_name ? ` · présidence : ${esc(m.chair_name)}` : ''}</span></div><div class="heading-actions"><span class="status-badge">${esc(label[m.meeting_type] || m.meeting_type)}</span><button class="btn btn-secondary btn-sm" data-open="${m.id}">Ouvrir</button></div></article>`).join('')}</div>`).join('');
+      list.innerHTML = [...groups.entries()].map(([month, rows]) => `<div class="month-group"><div class="month-heading"><span>${esc(month.charAt(0).toUpperCase() + month.slice(1))}</span><span class="list-item-meta">${rows.length} rendez-vous</span></div>${rows.map(m => `<article class="list-item meeting-row" data-id="${m.id}"><div class="meeting-date"><strong>${new Date(m.starts_at).toLocaleDateString('fr-FR', { day: '2-digit' })}</strong><span>${new Date(m.starts_at).toLocaleDateString('fr-FR', { weekday: 'short' })}</span></div><div class="list-item-main"><span class="list-item-title">${esc(m.title)}</span><span class="list-item-meta">${new Date(m.starts_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${esc(m.school_name || 'Mon club')} · ${esc(m.location || (m.format === 'en_ligne' ? 'En ligne' : 'Lieu à préciser'))}</span><span class="list-item-meta">${m.is_archived ? 'Réunion archivée · accès au PV uniquement' : `${m.agenda_items?.length || 0} point(s) à l'ordre du jour${m.chair_name ? ` · présidence : ${esc(m.chair_name)}` : ''}`}</span></div><div class="heading-actions"><span class="status-badge">${m.is_archived ? 'Archivée' : esc(label[m.meeting_type] || m.meeting_type)}</span><button class="btn btn-secondary btn-sm" data-open="${m.id}">${m.is_archived ? 'Voir le PV' : 'Ouvrir'}</button></div></article>`).join('')}</div>`).join('');
     }
 
     function renderPublishedMinutes(data) {
@@ -124,6 +124,12 @@
 
     function renderEditor(data) {
       const m = data.meeting;
+      if (data.archived || m.is_archived) {
+        detailRoot.innerHTML = `<section class="portal-card meeting-detail-card"><div class="toolbar"><div><p class="eyebrow">Réunion archivée</p><h2>${esc(m.title)}</h2><p class="list-item-meta">${AYCPortal.formatDate(m.starts_at, true)} · ${esc(m.school_name || 'Mon club')}</p></div><button class="btn btn-secondary btn-sm" id="close-detail">Fermer</button></div>${renderPublishedMinutes(data)}</section>`;
+        detailRoot.querySelector('#close-detail').onclick = () => { detailRoot.innerHTML = ''; };
+        detailRoot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
       nationalClubs = data.nationalClubs || [];
       if (!member?.access?.canEditPV && !member?.isNationalAdmin) {
         const pvPublished = Boolean(data.minutes && ['sent', 'validated'].includes(data.minutes.status));

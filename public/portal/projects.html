@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Projets · Portail YOUTHCLUBber</title>
+  <link rel="icon" href="../assets/favicon-32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../theme.css"><link rel="stylesheet" href="portal.css">
+</head>
+<body><div id="topbar-root"></div><div class="workspace"><div id="sidebar-root"></div>
+<main class="portal-content">
+  <div class="portal-heading"><div><p class="eyebrow">Organisation collective</p><h1>Projets</h1><p>Retrouve les projets locaux et nationaux, leurs équipes, leurs superviseurs et les missions qui te concernent.</p></div><div class="heading-actions" id="header-actions"></div></div>
+  <div id="notice"></div>
+  <section class="portal-card" id="project-create-card" hidden>
+    <div class="toolbar"><div><p class="eyebrow">Nouveau projet</p><h2>Créer un projet</h2></div><span class="section-note">Le créateur devient automatiquement Président du projet.</span></div>
+    <form id="project-create-form" class="form-grid">
+      <div class="form-field"><label for="project-scope">Portée</label><select id="project-scope"><option value="local">Projet local</option><option value="national">Projet national</option></select></div>
+      <div class="form-field"><label for="project-title">Nom du projet</label><input id="project-title" required placeholder="Ex. Forum santé 4D"></div>
+      <div class="form-field"><label for="project-type">Type</label><input id="project-type" placeholder="Campagne, action, partenariat…"></div>
+      <div class="form-field"><label for="project-start">Début</label><input id="project-start" type="date"></div>
+      <div class="form-field"><label for="project-end">Fin</label><input id="project-end" type="date"></div>
+      <div class="form-field full"><label for="project-description">Description</label><textarea id="project-description" placeholder="Présente le projet et son objectif."></textarea></div>
+      <div class="form-actions full"><button class="btn btn-primary" type="submit">Créer le projet</button></div>
+    </form>
+  </section>
+
+  <section class="portal-card">
+    <div class="toolbar"><div><p class="eyebrow">Portefeuille</p><h2>Projets disponibles</h2></div><div class="filter-tabs" id="project-filters"><button class="active" data-filter="all">Tous</button><button data-filter="local">Locaux</button><button data-filter="national">Nationaux</button></div></div>
+    <div id="project-list" class="list-stack"></div>
+  </section>
+  <div id="project-detail"></div>
+</main></div>
+<script src="portal-common.js"></script><script>
+(async () => {
+  const esc = AYCPortal.escapeHtml;
+  const notice = document.getElementById('notice');
+  const list = document.getElementById('project-list');
+  const detail = document.getElementById('project-detail');
+  const createCard = document.getElementById('project-create-card');
+  const form = document.getElementById('project-create-form');
+  let member = null, projects = [], activeFilter = 'all', selectedProjectId = null;
+
+  const showError = err => AYCPortal.renderError(notice, err);
+  const toast = text => notice.innerHTML = `<div class="alert alert-success">${esc(text)}</div>`;
+
+  function canCreateProject() { return Boolean(member?.access?.canCreateProject || member?.isNationalAdmin); }
+  function canCreateNationalProject() { return Boolean(member?.access?.canCreateNationalProject || member?.isNationalAdmin); }
+
+  function renderList() {
+    const rows = activeFilter === 'all' ? projects : projects.filter(p => p.scope === activeFilter);
+    if (!rows.length) { list.innerHTML = AYCPortal.renderEmpty('Aucun projet dans cette vue'); return; }
+    list.innerHTML = rows.map(p => `<article class="list-item" data-open-project="${p.id}" style="cursor:pointer">
+      <div class="meeting-date"><strong>${p.scope === 'national' ? 'N' : 'L'}</strong><span>${p.scope === 'national' ? 'National' : 'Local'}</span></div>
+      <div class="list-item-main"><span class="list-item-title">${esc(p.title)}</span>
+      <span class="list-item-meta">${esc(p.school_name || 'Association YOUTH CLUBs')} · Président : ${esc(p.president_name || '—')}</span>
+      <span class="list-item-meta">${esc(p.status || 'in_progress')} · ${p.team_count || 0} équipe(s) · ${p.member_count || 0} membre(s)</span></div>
+      <div class="heading-actions"><span class="status-badge">${p.scope === 'national' ? 'National' : 'Local'}</span><button class="btn btn-secondary btn-sm" data-open="${p.id}">Ouvrir</button></div>
+    </article>`).join('');
+  }
+
+  function optionList(rows, selected='') { return `<option value="">Choisir…</option>${rows.map(m => `<option value="${m.id}"${m.id === selected ? ' selected' : ''}>${esc(m.display_name || m.username)}</option>`).join('')}`; }
+
+  async function openProject(id) {
+    selectedProjectId = id;
+    try {
+      const data = await AYCPortal.api('projects', { query: { projectId: id } });
+      const p = data.project, teams = data.teams || [], roster = data.roster || [];
+      const canManage = Boolean(data.canManage), isPresident = Boolean(data.isPresident);
+      const teamMemberIds = new Set(teams.flatMap(t => (t.members || []).map(m => m.id)));
+      const teamHtml = teams.length ? teams.map((team, i) => {
+        const memberRows = (team.members || []).map(m => `<div class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(m.display_name || m.username)}</span><span class="list-item-meta">Membre de l'équipe</span></div>${team.supervisor_id === member.id ? '' : ''}${(canManage || team.supervisor_id === member.id) ? `<button class="btn btn-quiet btn-sm" data-remove-member="${team.id}" data-member="${m.id}">Retirer</button>` : ''}</div>`).join('');
+        return `<section class="portal-card project-team-card"><div class="toolbar"><div><p class="eyebrow">Équipe ${i + 1}</p><h3>${esc(team.name)}</h3><p class="list-item-meta">Superviseur : <strong>${esc(team.supervisor_name || '—')}</strong> · ${team.member_count || 0} membre(s)</p></div>${isPresident ? `<div class="form-actions"><select data-supervisor-select="${team.id}">${optionList(roster, team.supervisor_id || '')}</select><button class="btn btn-secondary btn-sm" data-change-supervisor="${team.id}">Enregistrer</button></div>` : ''}</div>
+          <div class="list-stack">${memberRows || AYCPortal.renderEmpty('Aucun membre assigné à cette équipe')}</div>
+          ${(canManage || team.supervisor_id === member.id) ? `<div class="form-grid" style="margin-top:14px"><div class="form-field"><label>Ajouter un membre</label><select id="member-${team.id}">${optionList(roster.filter(m => !teamMemberIds.has(m.id)))}</select></div><div class="form-actions"><button class="btn btn-secondary btn-sm" data-add-member="${team.id}">Ajouter</button></div></div>` : ''}
+          ${team.supervisor_id === member.id || isPresident || member.isNationalAdmin ? `<form class="task-inline form-grid" data-task-team="${team.id}" style="margin-top:14px"><div class="form-field"><label>Attribuer une tâche</label><select data-task-member required><option value="">Choisir un membre…</option>${(team.members || []).map(m => `<option value="${m.id}">${esc(m.display_name || m.username)}</option>`).join('')}</select></div><div class="form-field"><label>Titre de la tâche</label><input data-task-title required placeholder="Action à réaliser"></div><div class="form-field"><label>Délai</label><input data-task-deadline type="date"></div><div class="form-field"><label>Priorité</label><select data-task-priority><option value="normale">Normale</option><option value="basse">Faible</option><option value="haute">Élevée</option><option value="urgente">Urgente</option></select></div><div class="form-actions"><button class="btn btn-primary btn-sm" type="submit">Assigner</button></div></form>` : ''}
+        </section>`;
+      }).join('') : AYCPortal.renderEmpty('Aucune équipe créée pour le moment');
+      detail.innerHTML = `<section class="portal-card project-detail-card"><div class="toolbar"><div><p class="eyebrow">${p.scope === 'national' ? 'Projet national' : 'Projet local'}</p><h2>${esc(p.title)}</h2><p class="list-item-meta">Président du projet : <strong>${esc(p.president_name || p.creator_name || '—')}</strong> · ${esc(p.school_name || '')}</p></div><button class="btn btn-secondary btn-sm" id="close-project">Fermer</button></div><div class="report-hero"><div><p>${esc(p.description || p.objectives || 'Aucune description détaillée pour le moment.')}</p></div><div class="axis-orbit"><span>${teams.length} équipes</span><span>${roster.length} membres disponibles</span></div></div>${isPresident || member.isNationalAdmin ? `<div class="portal-card"><div class="toolbar"><div><p class="eyebrow">Présidence</p><h3>Créer une équipe</h3><p class="list-item-meta">Le Président du projet peut créer autant d'équipes que nécessaire et désigner leur superviseur.</p></div></div><form id="team-form" class="form-grid"><div class="form-field"><label>Nom de l'équipe</label><input id="team-name" required placeholder="Ex. Logistique"></div><div class="form-field"><label>Superviseur</label><select id="team-supervisor" required>${optionList(roster)}</select></div><div class="form-actions"><button class="btn btn-primary" type="submit">Créer l'équipe</button></div></form></div>` : ''}${teamHtml}</section>`;
+      document.getElementById('close-project').onclick = () => { detail.innerHTML = ''; selectedProjectId = null; };
+      document.getElementById('team-form')?.addEventListener('submit', async e => { e.preventDefault(); try { await AYCPortal.api('projects',{method:'POST',body:{action:'create_team',projectId:id,name:document.getElementById('team-name').value.trim(),supervisorId:document.getElementById('team-supervisor').value}}); toast('Équipe créée.'); await openProject(id); } catch(err){ showError(err); } });
+      detail.querySelectorAll('[data-change-supervisor]').forEach(btn => btn.onclick = async () => { const teamId=btn.dataset.changeSupervisor; const value=detail.querySelector(`[data-supervisor-select=\"${teamId}\"]`)?.value; if(!value)return; try{await AYCPortal.api('projects',{method:'POST',body:{action:'assign_supervisor',projectId:id,teamId,supervisorId:value}});toast('Superviseur mis à jour.');await openProject(id);}catch(err){showError(err);} });
+      detail.querySelectorAll('[data-add-member]').forEach(btn => btn.onclick = async () => { const teamId=btn.dataset.addMember; const select=document.getElementById(`member-${teamId}`); if(!select.value)return; try{await AYCPortal.api('projects',{method:'POST',body:{action:'assign_member',projectId:id,teamId,memberId:select.value}});await openProject(id);}catch(err){showError(err);} });
+      detail.querySelectorAll('[data-remove-member]').forEach(btn => btn.onclick = async () => { try{await AYCPortal.api('projects',{method:'POST',body:{action:'remove_member',projectId:id,teamId:btn.dataset.removeMember,memberId:btn.dataset.member}});await openProject(id);}catch(err){showError(err);} });
+      detail.querySelectorAll('[data-task-team]').forEach(f => f.addEventListener('submit', async e => { e.preventDefault(); const taskMember=f.querySelector('[data-task-member]').value, title=f.querySelector('[data-task-title]').value.trim(); if(!taskMember||!title)return; try{await AYCPortal.api('tasks',{method:'POST',body:{projectId:id,assignedTo:taskMember,title,priority:f.querySelector('[data-task-priority]').value,deadline:f.querySelector('[data-task-deadline]').value || null,description:'Tâche assignée dans le cadre du projet.'}}); toast('Tâche assignée. Elle est maintenant visible dans l’onglet Mes tâches du membre.'); f.reset();}catch(err){showError(err);} }));
+      detail.scrollIntoView({behavior:'smooth',block:'start'});
+    } catch (err) { showError(err); }
+  }
+
+  async function load() { projects = (await AYCPortal.api('projects')).projects || []; renderList(); }
+
+  try {
+    member = await AYCPortal.initPortalShell({requireActive:true}); if(!member)return;
+    const localCreate = canCreateProject(); const nationalCreate = canCreateNationalProject();
+    if (localCreate || nationalCreate) {
+      createCard.hidden = false;
+      if (!nationalCreate) document.getElementById('project-scope').innerHTML = '<option value="local">Projet local</option>';
+      if (!localCreate && nationalCreate) document.getElementById('project-scope').innerHTML = '<option value="national">Projet national</option>';
+      document.getElementById('header-actions').innerHTML = '<a class="btn btn-primary" href="#project-create-card">Nouveau projet</a>';
+    }
+    form.addEventListener('submit', async e => { e.preventDefault(); const scope=document.getElementById('project-scope').value; try { await AYCPortal.api('projects',{method:'POST',body:{scope,title:document.getElementById('project-title').value.trim(),projectType:document.getElementById('project-type').value.trim(),startsAt:document.getElementById('project-start').value||null,endsAt:document.getElementById('project-end').value||null,description:document.getElementById('project-description').value.trim()}}); form.reset(); toast('Projet créé. Tu es automatiquement désigné comme Président du projet.'); await load(); } catch(err){showError(err);} });
+    document.getElementById('project-filters').addEventListener('click', e => {const b=e.target.closest('[data-filter]'); if(!b)return; activeFilter=b.dataset.filter; document.querySelectorAll('#project-filters button').forEach(x=>x.classList.toggle('active',x===b)); renderList();});
+    list.addEventListener('click', e => { const b=e.target.closest('[data-open]'); const row=e.target.closest('[data-open-project]'); const id=b?.dataset.open || row?.dataset.openProject; if(id)openProject(id); });
+    await load();
+  } catch(err) { showError(err); }
+})();
+</script></body></html>

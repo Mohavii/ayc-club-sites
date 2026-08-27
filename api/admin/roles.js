@@ -37,6 +37,9 @@ const {
   setNationalRole,
   clearNationalRole,
   getMemberNationalRoles,
+  getMemberNationalCapabilities,
+  grantNationalCapability,
+  revokeNationalCapability,
   setMembershipStatus,
 } = require("../_lib/roles");
 
@@ -102,10 +105,11 @@ module.exports = async (req, res) => {
           getMemberRoleHistory(memberId),
           getMemberCapabilities(memberId),
           getMemberNationalRoles(memberId),
+          getMemberNationalCapabilities(memberId),
           sql()`select * from portal_trainer_profiles where member_id = ${memberId}`,
           sql()`select id, document_type, title, original_filename, visibility, status, created_at from portal_member_documents where member_id = ${memberId} and status <> 'archived' order by created_at desc`,
         ]);
-        res.status(200).json({ ok: true, roleHistory, capabilities, nationalRoles, membershipStatus: target.membership_status, trainerProfile: trainerRows[0] || null, documents });
+        res.status(200).json({ ok: true, roleHistory, capabilities, nationalRoles, nationalCapabilities, membershipStatus: target.membership_status, trainerProfile: trainerRows[0] || null, documents });
         return;
       }
 
@@ -202,6 +206,30 @@ module.exports = async (req, res) => {
           return;
         }
         await revokeCapability({ memberId, schoolId, capability });
+        res.status(200).json({ ok: true });
+        return;
+      }
+
+      case "grantNationalCapability": {
+        if (capability !== "national_projects") {
+          res.status(400).json({ error: "Capacité nationale invalide." });
+          return;
+        }
+        const target = await requireActiveTarget(res, memberId);
+        if (!target) return;
+        const grant = await grantNationalCapability({ memberId, capability, grantedBy: admin.id });
+        res.status(200).json({ ok: true, grant });
+        return;
+      }
+
+      case "revokeNationalCapability": {
+        if (capability !== "national_projects") {
+          res.status(400).json({ error: "Capacité nationale invalide." });
+          return;
+        }
+        const target = await requireActiveTarget(res, memberId);
+        if (!target) return;
+        await revokeNationalCapability({ memberId, capability });
         res.status(200).json({ ok: true });
         return;
       }
