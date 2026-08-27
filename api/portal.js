@@ -9,6 +9,7 @@ const {
   getMemberStatusHistory,
   getCurrentDisplayRole,
   getMemberPortalAccess,
+  BEL_ROLES,
   hasCapability,
   requireCapability,
 } = require("./_lib/roles");
@@ -176,6 +177,7 @@ async function listMeetings(member, query) {
       left join portal_members chair on chair.id = m.chair_id
       left join portal_members secretary on secretary.id = m.secretary_id
     where m.school_id = ${schoolId}
+       or m.meeting_type in ('reunion_nationale', 'assemblee_generale')
     order by m.starts_at desc
   `;
 }
@@ -236,12 +238,13 @@ async function meetingDetail(req, res, member, body) {
   const db = sql();
   const rows = await db`select * from portal_meetings where id = ${id}`;
   const meeting = rows[0];
-  if (!meeting || (!member.is_national_admin && meeting.school_id !== member.school_id)) {
+  const isNationalMeeting = ["reunion_nationale", "assemblee_generale"].includes(meeting?.meeting_type);
+  if (!meeting || (!member.is_national_admin && !isNationalMeeting && meeting.school_id !== member.school_id)) {
     return json(res, 404, { error: "Réunion introuvable." });
   }
   const access = await getMemberPortalAccess(member);
   const canEditPV = Boolean(member.is_national_admin || access.canEditPV);
-  const [agendaItems, attendees, minutes, roster] = await Promise.all([
+  const [agendaItems, attendees, minutes, roster, nationalClubs] = await Promise.all([
     db`select * from portal_meeting_agenda_items where meeting_id = ${id} order by position`,
     db`
       select a.*, m.display_name, m.username, m.profile_picture_url, m.membership_status
@@ -251,7 +254,31 @@ async function meetingDetail(req, res, member, body) {
     canEditPV
       ? db`select * from portal_minutes where meeting_id = ${id}`
       : db`select * from portal_minutes where meeting_id = ${id} and status in ('sent', 'validated')`,
-    db`select id, display_name, username, membership_status from portal_members where school_id = ${meeting.school_id} and status = 'active' order by display_name`,
+    isNationalMeeting
+      ? db`
+          select distinct m.id, m.display_name, m.username, m.membership_status
+          from portal_club_display_roles r
+          join portal_members m on m.id = r.member_id
+          where r.role in ('president', 'tresorier', 'secretaire', 'vpi', 'vpe', 'vpc')
+            and r.ended_at is null and m.status = 'active'
+          order by m.display_name
+        `
+      : db`select id, display_name, username, membership_status from portal_members where school_id = ${meeting.school_id} and status = 'active' order by display_name`,
+    isNationalMeeting
+      ? db`
+          select s.id as school_id, s.name as school_name,
+            coalesce((
+              select json_agg(json_build_object('id', m.id, 'displayName', m.display_name, 'username', m.username, 'role', r.role) order by r.role, m.display_name)
+              from portal_club_display_roles r
+              join portal_members m on m.id = r.member_id
+              where r.school_id = s.id and r.role in ('president', 'tresorier', 'secretaire', 'vpi', 'vpe', 'vpc')
+                and r.ended_at is null and m.status = 'active'
+            ), '[]'::json) as representatives
+          from portal_schools s
+          where s.is_active = true
+          order by s.name
+        `
+      : Promise.resolve([]),
   ]);
   let structured = { attendance: [], agendaBlocks: [], motions: [] };
   if (minutes[0]) {
@@ -262,7 +289,7 @@ async function meetingDetail(req, res, member, body) {
     ]);
     structured = { attendance, agendaBlocks, motions };
   }
-  if (req.method === "GET" || body.action === "meeting") return json(res, 200, { meeting, agendaItems, attendees, roster, minutes: minutes[0] || null, structured });
+  if (req.method === "GET" || body.action === "meeting") return json(res, 200, { meeting, agendaItems, attendees, roster, nationalClubs, minutes: minutes[0] || null, structured });
   if (body.action === "rsvp") {
     const rsvp = ["pending", "present", "absent"].includes(body.rsvp) ? body.rsvp : "pending";
     const result = await db`
@@ -281,26 +308,48 @@ async function meetingDetail(req, res, member, body) {
     const agendaBlocks = Array.isArray(body.agendaBlocks) ? body.agendaBlocks.slice(0, 50) : [];
     const motions = Array.isArray(body.motions) ? body.motions.slice(0, 100) : [];
     const activeIds = new Set(roster.map(row => row.id));
-    const normalizedAttendance = attendance.filter(row => activeIds.has(row.memberId)).map((row, index) => ({
-      memberId: row.memberId,
-      attendanceStatus: ["present", "absent", "excused", "late"].includes(row.attendanceStatus) ? row.attendanceStatus : "present",
-      votingRights: Boolean(row.votingRights),
-      memberRole: row.memberRole ? String(row.memberRole).slice(0, 160) : null,
-      note: row.note ? String(row.note).slice(0, 500) : null,
-      position: index,
-    }));
+    const normalizedAttendance = isNationalMeeting ? [] : attendance.filter(row => activeIds.has(row.memberId)).map((row, index) => {
+      const member = roster.find(candidate => candidate.id === row.memberId);
+      const canVoteLocally = member?.membership_status !== 'nouveau_adherent';
+      return {
+        memberId: row.memberId,
+        attendanceStatus: ["present", "absent", "excused", "late"].includes(row.attendanceStatus) ? row.attendanceStatus : "present",
+        votingRights: canVoteLocally,
+        memberRole: row.memberRole ? String(row.memberRole).slice(0, 160) : null,
+        note: row.note ? String(row.note).slice(0, 500) : null,
+        position: index,
+      };
+    });
+    const clubPresence = [];
+    if (isNationalMeeting) {
+      const clubMap = new Map(nationalClubs.map(club => [String(club.school_id), club]));
+      const seenClubs = new Set();
+      for (const row of (Array.isArray(body.clubPresence) ? body.clubPresence : []).slice(0, 100)) {
+        const schoolId = String(Number(row.schoolId));
+        const club = clubMap.get(schoolId);
+        const representativeId = String(row.representativeId || '');
+        const representative = club?.representatives?.find(candidate => String(candidate.id) === representativeId);
+        if (!club || seenClubs.has(schoolId)) continue;
+        if (!representative || !BEL_ROLES.includes(representative.role)) {
+          return json(res, 400, { error: `Le représentant du club ${club.school_name} doit être un membre BEL actif.` });
+        }
+        seenClubs.add(schoolId);
+        clubPresence.push({ schoolId: Number(schoolId), schoolName: club.school_name, representativeId: representative.id, representativeName: representative.displayName, representativeRole: representative.role });
+        activeIds.add(representative.id);
+      }
+    }
     const savedMinutes = await db`
       insert into portal_minutes
-        (meeting_id, mode, mandate, organizer, drafted_at, sent_at, closing_at, duration_minutes, redactors, attendance, agenda_blocks, motions, status, created_by)
+        (meeting_id, mode, mandate, organizer, drafted_at, sent_at, closing_at, duration_minutes, redactors, attendance, agenda_blocks, motions, club_presence, status, created_by)
       values (${id}, ${mode}, ${body.mandate || null}, ${body.organizer || null}, ${body.draftedAt || null}, ${body.sentAt || null},
         ${body.closingAt || null}, ${body.durationMinutes ? Number(body.durationMinutes) : null},
         ${JSON.stringify(body.redactors || [])}::jsonb, ${JSON.stringify(normalizedAttendance)}::jsonb,
-        ${JSON.stringify(agendaBlocks)}::jsonb, ${JSON.stringify(motions)}::jsonb, ${status}, ${member.id})
+        ${JSON.stringify(agendaBlocks)}::jsonb, ${JSON.stringify(motions)}::jsonb, ${JSON.stringify(clubPresence)}::jsonb, ${status}, ${member.id})
       on conflict (meeting_id) do update set
         mode = excluded.mode, mandate = excluded.mandate, organizer = excluded.organizer,
         drafted_at = excluded.drafted_at, sent_at = excluded.sent_at, closing_at = excluded.closing_at,
         duration_minutes = excluded.duration_minutes, redactors = excluded.redactors, attendance = excluded.attendance,
-        agenda_blocks = excluded.agenda_blocks, motions = excluded.motions, status = excluded.status, updated_at = now()
+        agenda_blocks = excluded.agenda_blocks, motions = excluded.motions, club_presence = excluded.club_presence, status = excluded.status, updated_at = now()
       returning *
     `;
     const minutesId = savedMinutes[0].id;
