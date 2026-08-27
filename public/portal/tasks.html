@@ -48,7 +48,7 @@
     const rows = filter === 'all' ? all : all.filter(t => t.status === filter);
     rowsEl.innerHTML = rows.length ? rows.map(t => `<tr>
       <td><strong>#${esc(t.id.slice(0, 8))}</strong></td>
-      <td>${esc(t.project_title || 'Sans projet')}</td>
+      <td><span class="task-project">${esc(t.project_title || 'Sans projet')}</span>${t.team_name ? `<small class="task-team-name">${esc(t.project_scope === 'national' ? 'National' : 'Local')} · ${esc(t.team_name)}</small>` : ''}</td>
       <td><strong>${esc(t.title)}</strong>${t.description ? `<br><small>${esc(t.description)}</small>` : ''}</td>
       <td>${esc(priorityLabel[t.priority] || t.priority)}</td>
       <td>${AYCPortal.formatDate(t.assigned_at)}</td>

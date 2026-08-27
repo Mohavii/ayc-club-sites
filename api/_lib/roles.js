@@ -22,7 +22,7 @@ const { sql } = require("./db");
 
 const DISPLAY_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc", "supco_regional"];
 const BEL_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc"];
-const CAPABILITIES = ["membership_approver", "report_validator", "pv_editor", "meeting_organizer", "project_manager", "supervision_editor", "cscy_reviewer"];
+const CAPABILITIES = ["membership_approver", "report_validator", "pv_editor", "meeting_organizer", "project_manager", "national_projects", "supervision_editor", "cscy_reviewer"];
 const NATIONAL_ROLES = ["president_national"];
 const MEMBERSHIP_STATUSES = ["nouveau_adherent", "adherent", "responsable", "senior", "membre_national", "ancien"];
 
@@ -238,6 +238,7 @@ async function getMemberPortalAccess(member) {
     canCreateMeeting: has("meeting_organizer"),
     canEditPV: has("pv_editor"),
     canCreateProject: has("project_manager"),
+    canCreateNationalProject: has("national_projects"),
     canReviewReports: has("report_validator"),
     canManageSupervision: has("supervision_editor"),
     canReviewSupervision: has("supervision_editor") || has("cscy_reviewer"),

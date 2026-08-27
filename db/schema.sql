@@ -220,7 +220,7 @@ create table if not exists portal_capability_grants (
   school_id   integer not null references portal_schools(id) on delete cascade,
   capability  text not null check (capability in (
                 'membership_approver', 'report_validator', 'pv_editor',
-                'meeting_organizer', 'project_manager', 'supervision_editor', 'cscy_reviewer'
+                'meeting_organizer', 'project_manager', 'national_projects', 'supervision_editor', 'cscy_reviewer'
               )),
   granted_by  uuid references portal_members(id),
   granted_at  timestamptz not null default now(),
@@ -239,7 +239,7 @@ do $$
 begin
   alter table portal_capability_grants drop constraint if exists portal_capability_grants_capability_check;
   alter table portal_capability_grants add constraint portal_capability_grants_capability_check
-    check (capability in ('membership_approver', 'report_validator', 'pv_editor', 'meeting_organizer', 'project_manager', 'supervision_editor', 'cscy_reviewer'));
+    check (capability in ('membership_approver', 'report_validator', 'pv_editor', 'meeting_organizer', 'project_manager', 'national_projects', 'supervision_editor', 'cscy_reviewer'));
 exception when duplicate_object then null;
 end $$;
 
@@ -297,6 +297,49 @@ create table if not exists portal_projects (
   updated_at timestamptz not null default now()
 );
 create index if not exists idx_portal_projects_school on portal_projects(school_id, starts_at);
+
+-- Project ownership and team workflow. Existing projects remain local by default;
+-- national projects are explicitly marked and use national_projects authorization.
+alter table portal_projects add column if not exists scope text not null default 'local';
+alter table portal_projects add column if not exists president_id uuid references portal_members(id) on delete restrict;
+alter table portal_projects add column if not exists created_by_role text;
+
+do $$
+begin
+  alter table portal_projects drop constraint if exists portal_projects_scope_check;
+  alter table portal_projects add constraint portal_projects_scope_check check (scope in ('local', 'national'));
+exception when duplicate_object then null;
+end $$;
+
+create index if not exists idx_portal_projects_scope on portal_projects(scope, starts_at);
+create index if not exists idx_portal_projects_president on portal_projects(president_id);
+
+create table if not exists portal_project_teams (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references portal_projects(id) on delete cascade,
+  name text not null,
+  description text,
+  supervisor_id uuid references portal_members(id) on delete set null,
+  created_by uuid not null references portal_members(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (project_id, name)
+);
+create index if not exists idx_portal_project_teams_project on portal_project_teams(project_id);
+create index if not exists idx_portal_project_teams_supervisor on portal_project_teams(supervisor_id);
+
+create table if not exists portal_project_team_members (
+  team_id uuid not null references portal_project_teams(id) on delete cascade,
+  member_id uuid not null references portal_members(id) on delete cascade,
+  assigned_by uuid not null references portal_members(id),
+  assigned_at timestamptz not null default now(),
+  primary key (team_id, member_id)
+);
+create index if not exists idx_portal_project_team_members_member on portal_project_team_members(member_id);
+
+alter table portal_tasks add column if not exists team_id uuid references portal_project_teams(id) on delete set null;
+alter table portal_tasks add column if not exists assigned_by uuid references portal_members(id) on delete set null;
+create index if not exists idx_portal_tasks_team on portal_tasks(team_id, assigned_to);
 
 create table if not exists portal_meetings (
   id uuid primary key default gen_random_uuid(),
