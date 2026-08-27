@@ -458,10 +458,12 @@ create table if not exists portal_tasks (
   deadline date,
   status text not null default 'a_faire' check (status in ('a_faire','soumis','executee','hors_delai')),
   comments text,
+  submission_note text,
   created_by uuid not null references portal_members(id),
   updated_at timestamptz not null default now()
 );
 create index if not exists idx_portal_tasks_assignee on portal_tasks(assigned_to, deadline);
+alter table portal_tasks add column if not exists submission_note text;
 
 create table if not exists portal_responsibilities (
   id uuid primary key default gen_random_uuid(),

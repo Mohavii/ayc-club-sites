@@ -778,7 +778,7 @@ async function tasks(req, res, member, body) {
   }
   if (body.action === "status") {
     const status = ["a_faire", "soumis", "executee", "hors_delai"].includes(body.status) ? body.status : "a_faire";
-    const rows = await db`update portal_tasks set status=${status}, comments=${body.comments || null}, updated_at=now() where id=${body.taskId} and assigned_to=${member.id} returning *`;
+    const rows = await db`update portal_tasks set status=${status}, submission_note=${body.submissionNote || null}, updated_at=now() where id=${body.taskId} and assigned_to=${member.id} returning *`;
     return json(res, rows[0] ? 200 : 404, rows[0] ? { task: rows[0] } : { error: "Tâche introuvable." });
   }
   if (!body.title) return json(res, 400, { error: "Titre requis." });

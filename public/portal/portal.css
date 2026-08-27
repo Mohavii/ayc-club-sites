@@ -350,6 +350,33 @@ body.portal-page:before{
 @media(prefers-reduced-motion:reduce){.portal-reveal{opacity:1!important;transform:none!important}}
 
 
+/* Journal des tâches — banner card matching the reference mockup */
+.task-journal{padding:0;overflow:hidden;border-top:4px solid var(--portal-blue)}
+.task-journal-banner{background:linear-gradient(180deg,#eaf0fb,#e3eaf9);padding:28px 30px 22px;text-align:center}
+.task-journal-banner h2{margin:0;color:var(--portal-blue);font:400 clamp(1.5rem,2.6vw,2.1rem)/1.1 "Fjalla One",sans-serif}
+.task-journal-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:20px 30px 0}
+.task-journal-toolbar h3{margin:0;color:var(--portal-navy);font:400 1.2rem/1 "Fjalla One",sans-serif}
+.task-table-wrap{padding:16px 30px 26px;overflow-x:auto}
+.task-table{width:100%;border-collapse:separate;border-spacing:0 10px;font-size:.83rem}
+.task-table thead th{text-align:left;color:#77819a;font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;padding:0 14px 8px;font-weight:800}
+.task-table tbody tr{background:#f8fafd}
+.task-table tbody td{padding:14px;border-top:1px solid var(--portal-line);border-bottom:1px solid var(--portal-line);color:#3d4861;vertical-align:middle}
+.task-table tbody td:first-child{border-left:1px solid var(--portal-line);border-radius:10px 0 0 10px}
+.task-table tbody td:last-child{border-right:1px solid var(--portal-line);border-radius:0 10px 10px 0}
+.task-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:7px 14px;font-size:.72rem;font-weight:800;border:none;cursor:default}
+.task-pill.pill-executee{background:#e0f4e8;color:#1c8f4f}
+.task-pill.pill-hors_delai{background:#e8543f;color:#fff}
+.task-pill.pill-a_faire,.task-pill.pill-soumis{background:#2855a6;color:#fff}
+button.task-pill{cursor:pointer}
+button.task-pill:hover{filter:brightness(1.06)}
+.task-empty-row td{padding:36px 14px;text-align:center;color:#7a849a}
+.task-empty-row strong{display:block;color:var(--portal-navy);margin-bottom:4px;font-size:.95rem}
+.task-modal-backdrop{position:fixed;inset:0;background:rgba(20,26,46,.45);display:flex;align-items:center;justify-content:center;padding:20px;z-index:200}
+.task-modal{background:#fff;border-radius:18px;max-width:460px;width:100%;padding:26px;box-shadow:0 24px 60px rgba(20,26,46,.28)}
+.task-modal h3{margin:0 0 6px;color:var(--portal-navy);font:400 1.3rem "Fjalla One",sans-serif}
+.task-modal p{margin:0 0 16px;color:#68738d;font-size:.82rem}
+@media(max-width:640px){.task-journal-banner,.task-journal-toolbar,.task-table-wrap{padding-left:18px;padding-right:18px}.task-table{min-width:640px}}
+
 /* PV editor refinement — calm two-part document workspace */
 .pv-editor-shell{border-top:4px solid #e5b942;padding:0;overflow:hidden;background:#fff}
 .pv-editor-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:26px 30px 20px;background:linear-gradient(180deg,#fbfdff,#f5f8fc);border-bottom:1px solid #e5eaf2}
