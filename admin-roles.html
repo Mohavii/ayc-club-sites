@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestion des rôles · Portail YOUTHCLUBber</title>
+<link rel="icon" type="image/png" href="../assets/favicon-32.png" sizes="32x32">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../theme.css">
+<link rel="stylesheet" href="portal.css">
+</head>
+<body>
+
+<div class="pattern-veil"></div>
+<div id="topbar-root"></div>
+
+<main class="portal-shell wide">
+  <div class="portal-card">
+    <h1 class="portal-title">Gestion des rôles</h1>
+    <p class="portal-subtitle">Attribuez les rôles d'affichage (Président, Secrétaire…), les capacités
+      internes (validation de rapports, édition des PV…) et les rôles nationaux. Réservé aux admins
+      nationaux.</p>
+
+    <div class="field" style="max-width:360px;">
+      <label for="school-select">Club</label>
+      <select id="school-select"><option value="">Choisissez un club…</option></select>
+    </div>
+
+    <div class="role-two-col" id="two-col" style="display:none;">
+      <div class="role-col-members">
+        <div class="role-section-label">Membres actifs</div>
+        <div id="member-list"></div>
+      </div>
+
+      <div class="role-col-detail" id="detail-panel">
+        <div class="empty-state">Sélectionnez un membre à gauche.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="portal-common.js"></script>
+<script>
+(async function () {
+  const member = await window.AYCPortal.initPortalShell();
+  if (!member) { window.location.href = "login"; return; }
+  if (member.status !== "active" || !member.isNationalAdmin) {
+    window.location.href = "home";
+    return;
+  }
+
+  const DISPLAY_ROLES = [
+    { value: "president", label: "Président" },
+    { value: "tresorier", label: "Trésorier" },
+    { value: "secretaire", label: "Secrétaire" },
+    { value: "vpi", label: "VPI" },
+    { value: "vpe", label: "VPE" },
+    { value: "vpc", label: "VPC" },
+    { value: "supco_regional", label: "SupCo Régional" },
+  ];
+  const CAPABILITIES = [
+    { value: "membership_approver", label: "Approbateur d'adhésions" },
+    { value: "report_validator", label: "Validateur de rapports" },
+    { value: "pv_editor", label: "Éditeur de PV" },
+    { value: "meeting_organizer", label: "Organisateur de réunions" },
+    { value: "project_manager", label: "Responsable de projets locaux" },
+    { value: "national_projects", label: "Création de projets nationaux" },
+    { value: "supervision_editor", label: "Responsable de supervision" },
+    { value: "cscy_reviewer", label: "Référent CSCY" },
+  ];
+  const NATIONAL_ROLES = [{ value: "president_national", label: "Président National" }];
+  const MEMBERSHIP_STATUSES = [
+    { value: "nouveau_adherent", label: "Nouveau adhérent" },
+    { value: "adherent", label: "Adhérent / membre" },
+    { value: "responsable", label: "Responsable" },
+    { value: "senior", label: "Senior" },
+    { value: "membre_national", label: "Membre national" },
+    { value: "ancien", label: "Ancien" },
+  ];
+
+  const schoolSelect = document.getElementById("school-select");
+  const twoCol = document.getElementById("two-col");
+  const memberListEl = document.getElementById("member-list");
+  const detailPanel = document.getElementById("detail-panel");
+
+  const esc = window.AYCPortal.escapeHtml;
+  let schools = [];
+  let currentSchoolId = null;
+  let currentMemberId = null;
+
+  async function callRoles(body) {
+    const res = await fetch("/api/admin/roles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Échec de la requête.");
+    return data;
+  }
+
+  async function loadSchools() {
+    const data = await callRoles({ action: "browse" });
+    schools = data.schools;
+    schoolSelect.innerHTML =
+      '<option value="">Choisissez un club…</option>' +
+      schools.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
+  }
+
+  async function loadMembers(schoolId) {
+    memberListEl.innerHTML = '<div class="empty-state">Chargement…</div>';
+    const data = await callRoles({ action: "browse", schoolId });
+    if (data.members.length === 0) {
+      memberListEl.innerHTML = '<div class="empty-state">Aucun membre actif dans ce club.</div>';
+      return;
+    }
+    memberListEl.innerHTML = "";
+    for (const m of data.members) {
+      const row = document.createElement("div");
+      row.className = "member-pick-row";
+      row.dataset.id = m.id;
+      row.innerHTML = `
+        ${m.profilePictureUrl ? `<img src="${m.profilePictureUrl}" alt="">` : `<img src="../assets/logo-secondary-color.png" alt="">`}
+        <div class="who">
+          <strong>${esc(m.displayName)}</strong>
+          <span>@${esc(m.username)}</span>
+        </div>
+      `;
+      row.addEventListener("click", () => selectMember(m.id, row));
+      memberListEl.appendChild(row);
+    }
+  }
+
+  async function selectMember(memberId, rowEl) {
+    currentMemberId = memberId;
+    memberListEl.querySelectorAll(".member-pick-row").forEach((r) => r.classList.remove("active"));
+    rowEl.classList.add("active");
+    await renderDetail();
+  }
+
+  async function renderDetail() {
+    detailPanel.innerHTML = '<div class="empty-state">Chargement…</div>';
+    const data = await callRoles({ action: "list", memberId: currentMemberId });
+
+    const currentDisplay = data.roleHistory.find(
+      (r) => !r.ended_at && r.school_id === currentSchoolId
+    );
+    const pastForSchool = data.roleHistory.filter((r) => r.school_id === currentSchoolId);
+    const activeCapsForSchool = data.capabilities.filter((c) => c.school_id === currentSchoolId);
+    const activeCapValues = new Set(activeCapsForSchool.map((c) => c.capability));
+    const activeNationalValues = new Set(data.nationalRoles.map((r) => r.role));
+
+    detailPanel.innerHTML = `
+      <div class="role-section-label">Statut officiel d'adhésion</div>
+      <div class="form-grid" style="align-items:end; margin-bottom:18px;">
+        <div class="form-field"><label for="membership-status">Statut</label><select id="membership-status">${MEMBERSHIP_STATUSES.map(s => `<option value="${s.value}"${data.membershipStatus === s.value ? " selected" : ""}>${s.label}</option>`).join("")}</select></div>
+        <div class="form-field"><label for="membership-reason">Motif / source (optionnel)</label><input id="membership-reason" placeholder="Assemblée, validation, mandat…"></div>
+        <div class="form-actions"><button class="btn btn-primary btn-sm" id="save-membership-status" type="button">Enregistrer le statut</button></div>
+      </div>
+
+      <div class="role-section-label">Rôle d'affichage pour ce club</div>
+      <div class="role-chip-row" id="display-chips">
+        ${DISPLAY_ROLES.map(
+          (r) => `<button class="role-chip${currentDisplay && currentDisplay.role === r.value ? " selected" : ""}"
+                    data-role="${r.value}">${r.label}</button>`
+        ).join("")}
+        ${currentDisplay ? `<button class="role-chip" id="clear-display-role" style="color:#B23A3A;">Retirer le rôle actuel</button>` : ""}
+      </div>
+
+      <div class="role-section-label">Capacités internes pour ce club</div>
+      <p class="field-hint" style="margin:-4px 0 10px;">Cumulables, indépendantes du rôle d'affichage ci-dessus.</p>
+      <div class="role-chip-row" id="capability-chips">
+        ${CAPABILITIES.map(
+          (c) => `<button class="role-chip${activeCapValues.has(c.value) ? " granted" : ""}"
+                    data-capability="${c.value}">${c.label}${activeCapValues.has(c.value) ? " ✓" : ""}</button>`
+        ).join("")}
+      </div>
+
+      <div class="role-section-label">Validation Formateur</div>
+      <div class="form-grid" style="align-items:end; margin-bottom:12px;">
+        <div class="form-field"><label for="trainer-status">Statut d'homologation</label><select id="trainer-status"><option value="pending">En attente</option><option value="verified">Homologué</option><option value="suspended">Suspendu</option></select></div>
+        <div class="form-actions"><button class="btn btn-primary btn-sm" id="save-trainer-status" type="button">Enregistrer</button></div>
+      </div>
+      <div class="list-stack" style="margin-bottom:18px;">${(data.documents || []).length ? data.documents.map(d => `<div class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(d.title)}</span><span class="list-item-meta">${esc(d.document_type)} · ${esc(d.status)}</span></div></div>`).join("") : '<p class="field-hint">Aucun document dans le dossier.</p>'}</div>
+
+      <div class="role-section-label">Rôles nationaux</div>
+      <p class="field-hint" style="margin:-4px 0 10px;">Portée nationale, indépendante de ce club et du statut d'admin national.</p>
+      <div class="role-chip-row" id="national-chips">
+        ${NATIONAL_ROLES.map(
+          (r) => `<button class="role-chip${activeNationalValues.has(r.value) ? " granted" : ""}"
+                    data-national="${r.value}">${r.label}${activeNationalValues.has(r.value) ? " ✓" : ""}</button>`
+        ).join("")}
+      </div>
+
+      <div class="role-section-label">Historique des postes (ce club)</div>
+      ${
+        pastForSchool.length === 0
+          ? '<p class="field-hint">Aucun historique pour ce club.</p>'
+          : pastForSchool
+              .map((r) => {
+                const label = DISPLAY_ROLES.find((d) => d.value === r.role)?.label || r.role;
+                const start = new Date(r.started_at).toLocaleDateString("fr-FR");
+                const end = r.ended_at ? new Date(r.ended_at).toLocaleDateString("fr-FR") : "aujourd'hui";
+                return `<div class="history-row${!r.ended_at ? " current" : ""}">
+                  <span class="role-name">${esc(label)}</span>
+                  <span class="dates">${start} – ${end}</span>
+                </div>`;
+              })
+              .join("")
+      }
+    `;
+
+    const trainerStatus = document.getElementById("trainer-status");
+    if (data.trainerProfile) trainerStatus.value = data.trainerProfile.certification_status || "pending";
+    document.getElementById("save-trainer-status").addEventListener("click", async () => {
+      await callRoles({ action: "setTrainerStatus", memberId: currentMemberId, certificationStatus: trainerStatus.value });
+      await renderDetail();
+    });
+
+    document.getElementById("save-membership-status").addEventListener("click", async () => {
+      await callRoles({
+        action: "setMembershipStatus",
+        memberId: currentMemberId,
+        membershipStatus: document.getElementById("membership-status").value,
+        reason: document.getElementById("membership-reason").value,
+      });
+      await renderDetail();
+    });
+
+    document.getElementById("display-chips").addEventListener("click", async (e) => {
+      const clear = e.target.closest("#clear-display-role");
+      if (clear) {
+        await callRoles({ action: "clearDisplayRole", memberId: currentMemberId, schoolId: currentSchoolId });
+        await renderDetail();
+        return;
+      }
+      const chip = e.target.closest(".role-chip[data-role]");
+      if (!chip) return;
+      await callRoles({
+        action: "setDisplayRole",
+        memberId: currentMemberId,
+        schoolId: currentSchoolId,
+        role: chip.dataset.role,
+      });
+      await renderDetail();
+    });
+
+    document.getElementById("capability-chips").addEventListener("click", async (e) => {
+      const chip = e.target.closest(".role-chip[data-capability]");
+      if (!chip) return;
+      const capability = chip.dataset.capability;
+      const action = activeCapValues.has(capability) ? "revokeCapability" : "grantCapability";
+      await callRoles({ action, memberId: currentMemberId, schoolId: currentSchoolId, capability });
+      await renderDetail();
+    });
+
+    document.getElementById("national-chips").addEventListener("click", async (e) => {
+      const chip = e.target.closest(".role-chip[data-national]");
+      if (!chip) return;
+      const role = chip.dataset.national;
+      const action = activeNationalValues.has(role) ? "clearNationalRole" : "setNationalRole";
+      await callRoles({ action, memberId: currentMemberId, role });
+      await renderDetail();
+    });
+  }
+
+  schoolSelect.addEventListener("change", async () => {
+    currentSchoolId = schoolSelect.value ? Number(schoolSelect.value) : null;
+    currentMemberId = null;
+    detailPanel.innerHTML = '<div class="empty-state">Sélectionnez un membre à gauche.</div>';
+    if (!currentSchoolId) {
+      twoCol.style.display = "none";
+      return;
+    }
+    twoCol.style.display = "flex";
+    await loadMembers(currentSchoolId);
+  });
+
+  await loadSchools();
+})();
+</script>
+</body>
+</html>
