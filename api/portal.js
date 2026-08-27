@@ -773,6 +773,13 @@ async function training(req, res, member, body) {
 async function tasks(req, res, member, body) {
   const db = sql();
   if (req.method === "GET") {
+    if (req.query?.scope === "club") {
+      const schoolId = schoolScope(member, req.query?.schoolId);
+      if (!schoolId) return json(res, 200, { tasks: [] });
+      if (!(await requireClubCapability(req, res, member, "project_manager", schoolId))) return;
+      const rows = await db`select t.*, p.title as project_title, m.display_name as assignee_name from portal_tasks t left join portal_projects p on p.id=t.project_id left join portal_members m on m.id=t.assigned_to where t.school_id=${schoolId} order by t.deadline nulls last, t.assigned_at desc`;
+      return json(res, 200, { tasks: rows });
+    }
     const rows = await db`select t.*, p.title as project_title, s.name as school_name from portal_tasks t left join portal_projects p on p.id=t.project_id left join portal_schools s on s.id=t.school_id where t.assigned_to=${member.id} order by t.deadline nulls last, t.assigned_at desc`;
     return json(res, 200, { tasks: rows });
   }

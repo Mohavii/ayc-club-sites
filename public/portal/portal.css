@@ -296,7 +296,7 @@ body.portal-page:before{
 @keyframes axisFloat { from{transform:translateY(2px) rotate(-2deg)} to{transform:translateY(-7px) rotate(2deg)} }
 .report-stats { grid-template-columns:repeat(5,1fr); margin-bottom:18px; }
 .section-note { color:#78849b; font-size:.75rem; font-weight:700; }
-.project-create-form { margin-top:18px; padding-top:18px; border-top:1px solid #edf0f6; }
+.project-create-form, .task-create-form { margin-top:18px; padding-top:18px; border-top:1px solid #edf0f6; }
 .project-item { min-height:58px; }
 .report-detail-row td { padding:0; background:#fbfdff; }
 .report-detail { padding:18px; border-left:4px solid #e5b942; display:grid; gap:10px; }
