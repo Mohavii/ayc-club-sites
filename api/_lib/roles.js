@@ -224,22 +224,29 @@ async function getMemberPortalAccess(member) {
   const isNationalAdmin = Boolean(member.is_national_admin);
   const isVerifiedTrainer = trainerRows[0]?.certification_status === "verified";
   const has = capability => isNationalAdmin || capabilities.includes(capability);
+  const isNewAdherent = member.membership_status === "nouveau_adherent";
+  const isOrdinaryMember = !isNationalAdmin && !BEL_ROLES.includes(displayRole) && capabilities.length === 0;
+  const canManageClubWork = isNationalAdmin || capabilities.some(capability => ["meeting_organizer", "pv_editor", "project_manager", "report_validator"].includes(capability));
   return {
     displayRole,
     capabilities,
+    isNewAdherent,
+    isOrdinaryMember,
     isClubOfficer: BEL_ROLES.includes(displayRole),
     isVerifiedTrainer,
+    canViewClubWork: canManageClubWork,
     canCreateMeeting: has("meeting_organizer"),
     canEditPV: has("pv_editor"),
     canCreateProject: has("project_manager"),
     canReviewReports: has("report_validator"),
     canManageSupervision: has("supervision_editor"),
-    canReviewSupervision: has("supervision_editor"),
+    canReviewSupervision: has("supervision_editor") || has("cscy_reviewer"),
     canCreateAssembly: has("meeting_organizer"),
     canEditAssemblyAttendance: has("cscy_reviewer"),
     canCloseAssembly: has("supervision_editor") || has("cscy_reviewer"),
     canEditTrainingRecord: isNationalAdmin || isVerifiedTrainer,
-    canCreateReport: isNationalAdmin || BEL_ROLES.includes(displayRole) || capabilities.includes("supervision_editor"),
+    canSubmitTrainingParticipation: !isNationalAdmin && !isVerifiedTrainer,
+    canCreateReport: isNationalAdmin || capabilities.includes("report_validator") || capabilities.includes("supervision_editor"),
   };
 }
 
