@@ -303,7 +303,7 @@ create table if not exists portal_meetings (
   school_id integer not null references portal_schools(id) on delete cascade,
   created_by uuid not null references portal_members(id),
   title text not null,
-  meeting_type text not null check (meeting_type in ('reunion','assemblee_locale','assemblee_generale')),
+  meeting_type text not null check (meeting_type in ('reunion_locale','reunion_nationale','reunion','assemblee_locale','assemblee_generale')),
   starts_at timestamptz not null,
   ends_at timestamptz,
   format text not null default 'presentiel' check (format in ('presentiel','en_ligne','hybride')),
@@ -423,13 +423,16 @@ create index if not exists idx_portal_awards_member on portal_member_awards(memb
 create table if not exists portal_training_entries (
   id uuid primary key default gen_random_uuid(),
   member_id uuid not null references portal_members(id) on delete cascade,
-  category text not null check (category in ('received','delivered','facilitation','other')),
+  category text not null check (category in ('niveau_youthclubeur','coordination_strategique','relations_externes','ressources_humaines','tresorerie','secretariat','communication','received','delivered','facilitation','other')),
   title text not null,
   host text,
   held_on date,
   location text,
   booklet_url text,
   hours numeric(8,2),
+  validation_status text not null default 'pending' check (validation_status in ('pending','validated','rejected')),
+  validated_by uuid references portal_members(id),
+  validated_at timestamptz,
   notes text,
   evidence_document_id uuid references portal_member_documents(id) on delete set null,
   created_at timestamptz not null default now(),
@@ -438,6 +441,9 @@ create table if not exists portal_training_entries (
 create index if not exists idx_portal_training_member on portal_training_entries(member_id, held_on desc);
 
 alter table portal_training_entries add column if not exists evidence_document_id uuid references portal_member_documents(id) on delete set null;
+alter table portal_training_entries add column if not exists validation_status text not null default 'pending';
+alter table portal_training_entries add column if not exists validated_by uuid references portal_members(id);
+alter table portal_training_entries add column if not exists validated_at timestamptz;
 alter table portal_training_entries add column if not exists updated_at timestamptz not null default now();
 
 create table if not exists portal_tasks (
