@@ -47,6 +47,26 @@ function jsonArrayInput(value) {
   return [];
 }
 
+const MEETING_TYPES = ["reunion_locale", "reunion_nationale", "reunion", "assemblee_locale", "assemblee_generale"];
+const MEMBER_TRAINING_CATEGORIES = [
+  "niveau_youthclubeur",
+  "coordination_strategique",
+  "relations_externes",
+  "ressources_humaines",
+  "tresorerie",
+  "secretariat",
+  "communication",
+];
+  const MEMBER_TRAINING_LABELS = {
+  niveau_youthclubeur: "Niveau YOUTHCLUBeur",
+  coordination_strategique: "Coordination Stratégique",
+  relations_externes: "Relations Externes",
+  ressources_humaines: "Ressources Humaines",
+  tresorerie: "Trésorerie",
+  secretariat: "Secrétariat",
+  communication: "Communication",
+};
+
 function schoolScope(member, requested) {
   const id = Number(requested || member.school_id);
   return Number.isInteger(id) && id > 0 ? id : null;
@@ -179,7 +199,7 @@ async function createMeeting(req, res, member, body) {
   if (!(await requireClubCapability(req, res, member, "meeting_organizer", schoolId))) return;
   const title = String(body.title || "").trim();
   const startsAt = String(body.startsAt || "").trim();
-  const allowedTypes = ["reunion", "assemblee_locale", "assemblee_generale"];
+  const allowedTypes = MEETING_TYPES;
   const allowedFormats = ["presentiel", "en_ligne", "hybride"];
   const allowedStatuses = ["planned", "live", "completed", "cancelled"];
   const format = allowedFormats.includes(body.format) ? body.format : "presentiel";
@@ -615,18 +635,21 @@ async function training(req, res, member, body) {
       db`select id, title, issuer, awarded_on, value_tag, description, visibility, created_at from portal_member_awards where member_id = ${member.id} and visibility = 'active_members' order by awarded_on desc nulls last, created_at desc`,
       visibleDocuments(db, member),
     ]);
-    const totals = { received: 0, delivered: 0, facilitation: 0, other: 0, hours: 0, declaredHours: 0, validatedHours: 0 };
+    const totals = { hours: 0, declaredHours: 0, validatedHours: 0 };
     const isVerifiedTrainer = trainerRows[0]?.certification_status === "verified" || member.is_national_admin;
-    for (const entry of entries) {
-      totals[entry.category] = (totals[entry.category] || 0) + 1;
+    const visibleEntries = isVerifiedTrainer ? entries : entries.filter(entry => MEMBER_TRAINING_CATEGORIES.includes(entry.category));
+    for (const entry of visibleEntries) {
       const hours = Number(entry.hours || 0);
       totals.declaredHours += hours;
-      if (isVerifiedTrainer) totals.validatedHours += hours;
+      if (entry.validation_status === "validated") totals.validatedHours += hours;
     }
     totals.hours = totals.validatedHours;
-    return json(res, 200, { entries, trainerProfile: trainerRows[0] || null, awards, documents, totals, access: { isVerifiedTrainer } });
+    return json(res, 200, { entries: visibleEntries, trainerProfile: trainerRows[0] || null, awards, documents, totals, access: { isVerifiedTrainer }, categoryLabels: MEMBER_TRAINING_LABELS });
   }
   if (body.action === "trainer_profile") {
+    const trainerRows = await db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`;
+    const canEditTrainerProfile = member.is_national_admin || trainerRows[0]?.certification_status === "verified";
+    if (!canEditTrainerProfile) return json(res, 403, { error: "La fiche Formateur est réservée aux formateurs homologués et aux responsables de formation." });
     const domains = jsonArrayInput(body.expertiseDomains);
     const oathText = String(body.oathText || "").trim().slice(0, 3000) || null;
     const otherActivity = String(body.otherActivity || "").trim().slice(0, 2000) || null;
@@ -640,6 +663,9 @@ async function training(req, res, member, body) {
     return json(res, 200, { trainerProfile: rows[0] });
   }
   if (body.action === "award") {
+    const trainerRows = await db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`;
+    const canEditAwards = member.is_national_admin || trainerRows[0]?.certification_status === "verified";
+    if (!canEditAwards) return json(res, 403, { error: "Les distinctions sont ajoutées par le parcours de validation prévu par l’association." });
     const title = String(body.title || "").trim().slice(0, 200);
     if (!title) return json(res, 400, { error: "Intitulé de distinction requis." });
     let evidenceId = body.evidenceDocumentId ? String(body.evidenceDocumentId) : null;
@@ -654,11 +680,12 @@ async function training(req, res, member, body) {
     `;
     return json(res, 201, { award: rows[0] });
   }
-  if (!body.title || !["received", "delivered", "facilitation", "other"].includes(body.category)) return json(res, 400, { error: "Catégorie et titre requis." });
+  if (!body.title) return json(res, 400, { error: "Catégorie et titre requis." });
   const trainerRows = await db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`;
   const canEditOfficialTraining = member.is_national_admin || trainerRows[0]?.certification_status === "verified";
-  if (!canEditOfficialTraining && !["received", "other"].includes(body.category)) return json(res, 403, { error: "Les formations dispensées et leurs heures sont réservées aux formateurs homologués ou au VPA." });
-  if (!canEditOfficialTraining && body.hours !== "" && body.hours != null) return json(res, 403, { error: "Un membre peut déclarer une participation, mais ne peut pas renseigner des heures officielles." });
+  const category = String(body.category || "").trim();
+  if (!canEditOfficialTraining && !MEMBER_TRAINING_CATEGORIES.includes(category)) return json(res, 400, { error: "Choisis une des sept formations officielles du parcours YOUTHCLUBber." });
+  if (!canEditOfficialTraining && body.hours !== "" && body.hours != null) return json(res, 403, { error: "Une participation membre est enregistrée sans heures officielles. Les heures sont saisies et validées par le responsable de formation." });
   const hours = canEditOfficialTraining && body.hours !== "" && body.hours != null ? Number(body.hours) : null;
   if (hours !== null && (!Number.isFinite(hours) || hours < 0 || hours > 10000)) return json(res, 400, { error: "Nombre d'heures invalide." });
   let evidenceId = body.evidenceDocumentId ? String(body.evidenceDocumentId) : null;
@@ -668,7 +695,7 @@ async function training(req, res, member, body) {
   }
   const rows = await db`
     insert into portal_training_entries (member_id, category, title, host, held_on, location, booklet_url, hours, notes, evidence_document_id)
-    values (${member.id}, ${body.category}, ${String(body.title).trim()}, ${body.host || null}, ${body.heldOn || null}, ${body.location || null}, ${body.bookletUrl || null}, ${hours}, ${body.notes || null}, ${evidenceId})
+    values (${member.id}, ${category}, ${String(body.title).trim()}, ${body.host || null}, ${body.heldOn || null}, ${body.location || null}, ${body.bookletUrl || null}, ${hours}, ${body.notes || null}, ${evidenceId})
     returning *
   `;
   return json(res, 201, { entry: rows[0] });
@@ -705,6 +732,9 @@ async function tasks(req, res, member, body) {
 async function responsibilities(req, res, member, body) {
   const db = sql();
   if (req.method === "GET") return json(res, 200, { responsibilities: await db`select r.*, s.name as school_name from portal_responsibilities r left join portal_schools s on s.id=r.school_id where r.member_id=${member.id} order by r.held_on desc nulls last, r.created_at desc` });
+  const role = member.school_id ? await getCurrentDisplayRole(member.id, member.school_id) : null;
+  const canProposeResponsibility = Boolean(member.is_national_admin || role || await hasCapability(member.id, member.school_id, "project_manager"));
+  if (!canProposeResponsibility) return json(res, 403, { error: "Les responsabilités officielles sont proposées par les responsables désignés." });
   if (!body.title) return json(res, 400, { error: "Titre requis." });
   const rows = await db`insert into portal_responsibilities (member_id, school_id, title, description, project_url, database_url, held_on, status) values (${member.id}, ${member.school_id}, ${String(body.title).trim()}, ${body.description || null}, ${body.projectUrl || null}, ${body.databaseUrl || null}, ${body.heldOn || null}, 'proposed') returning *`;
   return json(res, 201, { responsibility: rows[0] });
