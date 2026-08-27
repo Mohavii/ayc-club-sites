@@ -348,3 +348,31 @@ body.portal-page:before{
 @media(max-width:920px){.sidebar-nav{display:flex;gap:12px;min-width:max-content}.sidebar-group{display:flex;align-items:center;gap:7px}.sidebar-group-label{display:none}.sidebar-settings{display:none}.icon-sidebar{overflow-x:auto;scrollbar-width:thin}.quick-links{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.quick-links{grid-template-columns:1fr}.heading-actions{align-items:stretch}.heading-actions .btn{width:100%}.portal-table{min-width:620px}.portal-heading h1{overflow-wrap:anywhere}.portal-card{overflow:hidden}}
 @media(prefers-reduced-motion:reduce){.portal-reveal{opacity:1!important;transform:none!important}}
+
+
+/* PV editor refinement — calm two-part document workspace */
+.pv-editor-shell{border-top:4px solid #e5b942;padding:0;overflow:hidden;background:#fff}
+.pv-editor-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:26px 30px 20px;background:linear-gradient(180deg,#fbfdff,#f5f8fc);border-bottom:1px solid #e5eaf2}
+.pv-editor-header h2{margin:5px 0 7px;color:var(--portal-navy);font:400 clamp(1.55rem,2.7vw,2.25rem)/1.08 "Fjalla One",sans-serif}
+.pv-editor-header p{margin:0;color:#72809a;font-size:.78rem}
+.pv-kicker{display:inline-block;color:#b1841d;font-size:.66rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+.pv-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:22px 30px 4px}
+.pv-summary-grid label,.pv-block-fields label,.pv-club-row label{display:grid;gap:7px;color:#526078;font-size:.7rem;font-weight:900;letter-spacing:.04em}
+.pv-summary-grid input,.pv-summary-grid select,.pv-block-fields input,.pv-block-fields textarea,.pv-club-row select{width:100%;border:1px solid #dce3ef;border-radius:10px;background:#fff;color:#263653;padding:10px 11px;font:inherit;font-size:.78rem;outline:none;transition:border-color .18s ease,box-shadow .18s ease}
+.pv-summary-grid input:focus,.pv-summary-grid select:focus,.pv-block-fields input:focus,.pv-block-fields textarea:focus,.pv-club-row select:focus{border-color:#5b82d0;box-shadow:0 0 0 3px rgba(91,130,208,.12)}
+.pv-editor-toolbar{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:28px 30px 16px}
+.pv-editor-toolbar h3{margin:0;color:var(--portal-navy);font:400 1.3rem "Fjalla One",sans-serif}
+.pv-editor-toolbar p{margin:5px 0 0;color:#77839a;font-size:.76rem}
+.pv-save-hint{color:#7b879b;font-size:.7rem;font-weight:800;text-align:right}
+.pv-section{margin:0 30px 22px;padding:20px;border:1px solid #e3e8f0;border-radius:14px;background:#fbfcfe}
+.pv-section-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:15px}
+.pv-section-heading h3{margin:0;color:var(--portal-navy);font:400 1.15rem "Fjalla One",sans-serif}
+.pv-section-heading p{margin:5px 0 0;max-width:680px;color:#7a869a;font-size:.74rem;line-height:1.5}
+.pv-section-count{flex:none;padding:6px 9px;border-radius:999px;background:#edf3ff;color:#4166a6;font-size:.68rem;font-weight:900}
+.pv-attendance-table{margin-top:6px}.pv-attendance-table td{vertical-align:middle}.pv-attendance-table td:first-child{display:grid;gap:3px}.pv-attendance-table .list-item-meta{font-size:.65rem}.pv-attendance-table select{min-width:130px;border:1px solid #dce3ef;border-radius:8px;padding:8px;color:#44516a;background:#fff;font:inherit;font-size:.74rem}
+.membership-pill{display:inline-flex;width:max-content;padding:4px 7px;border-radius:999px;font-size:.63rem;font-weight:900}.membership-active{background:#e8f6ed;color:#2c8b54}.membership-new{background:#fff3d7;color:#9b7417}
+.pv-block-list,.pv-motion-list,.pv-club-list{display:grid;gap:10px}.pv-editor-row{display:grid;grid-template-columns:34px minmax(0,1fr);gap:14px;align-items:start;padding:15px;background:#fff;border:1px solid #e2e8f1;border-radius:11px}.pv-block-number{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#e9f0ff;color:#416bc1;font-weight:900;font-size:.77rem}.pv-block-fields{display:grid;grid-template-columns:1fr 1.15fr 1.15fr;gap:12px}.pv-block-fields label:first-child{grid-column:1/-1}.pv-block-fields textarea{min-height:104px;resize:vertical;line-height:1.45}.pv-motion .pv-block-fields{grid-template-columns:1fr 1.2fr}.pv-empty-blocks,.pv-empty-clubs{padding:16px;border:1px dashed #d5ddea;border-radius:10px;color:#8792a6;font-size:.75rem;text-align:center;background:#fff}
+.pv-club-row{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;padding:13px;background:#fff;border:1px solid #e2e8f1;border-radius:11px}.pv-club-row .form-field{display:grid;gap:7px}.btn-quiet{border:1px solid #dce3ef;background:#fff;color:#64718a}.btn-quiet:hover{border-color:#c3cede;color:#315baf}
+.pv-footer-actions{display:flex;justify-content:flex-end;gap:10px;padding:0 30px 30px}.pv-footer-actions .btn{min-width:170px}
+@media(max-width:900px){.pv-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pv-block-fields,.pv-motion .pv-block-fields{grid-template-columns:1fr 1fr}.pv-block-fields label:first-child{grid-column:1/-1}}
+@media(max-width:620px){.pv-editor-header{padding:20px;display:grid}.pv-summary-grid{grid-template-columns:1fr;padding:18px 20px 0}.pv-editor-toolbar{padding:22px 20px 14px;display:grid}.pv-save-hint{text-align:left}.pv-section{margin:0 20px 16px;padding:15px}.pv-section-heading{display:grid}.pv-block-fields,.pv-motion .pv-block-fields{grid-template-columns:1fr}.pv-block-fields label:first-child{grid-column:auto}.pv-club-row{grid-template-columns:1fr}.pv-footer-actions{padding:0 20px 22px;display:grid}.pv-footer-actions .btn{width:100%;min-width:0}.pv-attendance-table{min-width:0}.pv-attendance-table th:nth-child(2),.pv-attendance-table td:nth-child(2){display:none}}
