@@ -142,22 +142,16 @@ async function dashboard(member) {
       from portal_reports where submitted_by = ${member.id}
     `,
     db`
-      select id, title, meeting_type, starts_at, ends_at, format, location,
-        (starts_at::date < current_date) as is_archived
+      select id, title, meeting_type, starts_at, ends_at, format, location
       from portal_meetings
-      where (school_id = ${schoolId} or meeting_type in ('reunion_nationale', 'assemblee_generale'))
-        and starts_at >= now()
+      where school_id = ${schoolId} and starts_at >= now()
       order by starts_at asc limit 6
     `,
     db`
-      select p.id, p.title, p.project_type, p.scope, p.starts_at, p.ends_at, p.status,
-        s.name as school_name, president.display_name as president_name
-      from portal_projects p
-        left join portal_schools s on s.id = p.school_id
-        left join portal_members president on president.id = p.president_id
-      where p.status <> 'cancelled'
-        and (${member.is_national_admin} or p.scope = 'national' or p.school_id = ${schoolId})
-      order by case when p.scope = 'national' then 0 else 1 end, coalesce(p.starts_at, p.created_at) asc limit 6
+      select id, title, project_type, starts_at, ends_at, status
+      from portal_projects
+      where school_id = ${schoolId} and status <> 'cancelled'
+      order by coalesce(starts_at, created_at) asc limit 6
     `,
     db`
       select id, title, priority, deadline, status, project_id
@@ -173,7 +167,7 @@ async function listMeetings(member, query) {
   const schoolId = schoolScope(member, query.schoolId);
   if (!schoolId) return [];
   return db`
-    select m.*, (m.starts_at::date < current_date) as is_archived, s.name as school_name,
+    select m.*, s.name as school_name,
       chair.display_name as chair_name, secretary.display_name as secretary_name,
       (select count(*)::int from portal_meeting_attendees a where a.meeting_id = m.id) as attendee_count,
       (select coalesce(json_agg(json_build_object('id', i.id, 'position', i.position, 'title', i.title, 'durationMinutes', i.duration_minutes, 'notes', i.notes) order by i.position), '[]'::json)
@@ -245,7 +239,6 @@ async function meetingDetail(req, res, member, body) {
   const rows = await db`select * from portal_meetings where id = ${id}`;
   const meeting = rows[0];
   const isNationalMeeting = ["reunion_nationale", "assemblee_generale"].includes(meeting?.meeting_type);
-  const isArchived = Boolean(meeting && new Date(meeting.starts_at).toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10));
   if (!meeting || (!member.is_national_admin && !isNationalMeeting && meeting.school_id !== member.school_id)) {
     return json(res, 404, { error: "Réunion introuvable." });
   }
@@ -296,9 +289,8 @@ async function meetingDetail(req, res, member, body) {
     ]);
     structured = { attendance, agendaBlocks, motions };
   }
-  if (req.method === "GET" || body.action === "meeting") return json(res, 200, { meeting: { ...meeting, is_archived: isArchived }, agendaItems, attendees, roster, nationalClubs, minutes: minutes[0] || null, structured });
+  if (req.method === "GET" || body.action === "meeting") return json(res, 200, { meeting, agendaItems, attendees, roster, nationalClubs, minutes: minutes[0] || null, structured });
   if (body.action === "rsvp") {
-    if (isArchived) return json(res, 403, { error: "Cette réunion est archivée. Le PV publié est consultable, mais les réponses de présence sont fermées." });
     const rsvp = ["pending", "present", "absent"].includes(body.rsvp) ? body.rsvp : "pending";
     const result = await db`
       insert into portal_meeting_attendees (meeting_id, member_id, rsvp)
@@ -309,7 +301,7 @@ async function meetingDetail(req, res, member, body) {
     return json(res, 200, { attendee: result[0] });
   }
   if (body.action === "save_minutes") {
-    if (!canEditPV || !(await requireClubCapability(req, res, member, "pv_editor", meeting.school_id))) return;
+    if (!(await requireClubCapability(req, res, member, "pv_editor", meeting.school_id))) return;
     const mode = body.mode === "assemblee_generale" ? body.mode : "standard";
     const status = ["draft", "sent", "validated"].includes(body.status) ? body.status : "draft";
     const attendance = Array.isArray(body.attendance) ? body.attendance.slice(0, 300) : [];
@@ -410,189 +402,44 @@ async function reportTemplates(req, res) {
   return json(res, 200, { templates });
 }
 
-async function projectRecord(db, projectId) {
-  const rows = await db`
-    select p.*, s.name as school_name, president.display_name as president_name, president.username as president_username,
-      a.name as axis_name, sa.name as sub_axis_name,
-      (select count(*)::int from portal_project_teams t where t.project_id = p.id) as team_count,
-      (select count(*)::int from portal_project_team_members tm join portal_project_teams t on t.id = tm.team_id where t.project_id = p.id) as member_count,
-      (select count(*)::int from portal_tasks task where task.project_id = p.id) as task_count
-    from portal_projects p
-      left join portal_schools s on s.id = p.school_id
-      left join portal_members president on president.id = p.president_id
-      left join portal_strategic_axes a on a.slug = p.axis_slug
-      left join portal_strategic_sub_axes sa on sa.slug = p.sub_axis_slug
-    where p.id = ${projectId}
-  `;
-  return rows[0] || null;
-}
-
-async function projectVisibleToMember(project, member) {
-  if (!project) return false;
-  if (member.is_national_admin || project.scope === "national") return true;
-  return project.school_id === member.school_id;
-}
-
-async function projectDetail(db, project, member) {
-  const canManage = Boolean(member.is_national_admin || project.president_id === member.id);
-  const [teams, tasks, eligibleMembers] = await Promise.all([
-    db`
-      select t.*, supervisor.display_name as supervisor_name, supervisor.username as supervisor_username,
-        (select count(*)::int from portal_project_team_members team_count where team_count.team_id = t.id) as member_count,
-        coalesce(json_agg(json_build_object('id', tm.member_id, 'displayName', assigned.display_name, 'username', assigned.username, 'membershipStatus', assigned.membership_status) order by assigned.display_name) filter (where tm.member_id is not null and (${canManage} or t.supervisor_id = ${member.id} or tm.member_id = ${member.id})), '[]'::json) as members
-      from portal_project_teams t
-        left join portal_members supervisor on supervisor.id = t.supervisor_id
-        left join portal_project_team_members tm on tm.team_id = t.id
-        left join portal_members assigned on assigned.id = tm.member_id
-      where t.project_id = ${project.id}
-      group by t.id, supervisor.display_name, supervisor.username
-      order by t.created_at asc
-    `,
-    db`
-      select task.*, assigned.display_name as assigned_name, assigned.username as assigned_username,
-        team.name as team_name, creator.display_name as assigned_by_name
-      from portal_tasks task
-        left join portal_members assigned on assigned.id = task.assigned_to
-        left join portal_project_teams team on team.id = task.team_id
-        left join portal_members creator on creator.id = task.assigned_by
-      where task.project_id = ${project.id}
-        and (${canManage} or team.supervisor_id = ${member.id} or task.assigned_to = ${member.id})
-      order by task.deadline nulls last, task.assigned_at desc
-    `,
-    db`
-      select id, display_name, username, membership_status, school_id
-      from portal_members
-      where status = 'active' and (${project.scope} = 'national' or school_id = ${project.school_id})
-        and (${canManage} or exists (select 1 from portal_project_teams eligible_team where eligible_team.project_id = ${project.id} and eligible_team.supervisor_id = ${member.id}))
-      order by display_name
-    `,
-  ]);
-  return { project, teams, tasks, eligibleMembers };
-}
-
-async function activeProjectMember(db, memberId, project) {
-  const rows = await db`
-    select id, display_name, username, membership_status, school_id
-    from portal_members
-    where id = ${memberId} and status = 'active'
-      and (${project.scope} = 'national' or school_id = ${project.school_id})
-  `;
-  return rows[0] || null;
-}
-
 async function projects(req, res, member, body) {
   const db = sql();
-  const requestedProjectId = req.query?.projectId || body.projectId;
   if (req.method === "GET") {
-    if (requestedProjectId) {
-      const project = await projectRecord(db, requestedProjectId);
-      if (!(await projectVisibleToMember(project, member))) return json(res, 404, { error: "Projet introuvable." });
-      const detail = await projectDetail(db, project, member);
-      return json(res, 200, { ...detail, canManage: Boolean(member.is_national_admin || project.president_id === member.id), canCreateTeam: Boolean(member.is_national_admin || project.president_id === member.id) });
-    }
-    const schoolId = member.is_national_admin ? schoolScope(member, req.query?.schoolId) : member.school_id;
+    const schoolId = schoolScope(member, req.query?.schoolId);
+    if (!schoolId) return json(res, 200, { projects: [] });
     const rows = await db`
-      select p.*, s.name as school_name, president.display_name as president_name,
-        a.name as axis_name, sa.name as sub_axis_name,
-        (select count(*)::int from portal_project_teams t where t.project_id = p.id) as team_count,
-        (select count(*)::int from portal_project_team_members tm join portal_project_teams t on t.id = tm.team_id where t.project_id = p.id) as member_count,
-        (select count(*)::int from portal_tasks task where task.project_id = p.id) as task_count
+      select p.*, a.name as axis_name, sa.name as sub_axis_name,
+        (select count(*)::int from portal_reports r where r.project_id = p.id) as report_count
       from portal_projects p
-        left join portal_schools s on s.id = p.school_id
-        left join portal_members president on president.id = p.president_id
-        left join portal_strategic_axes a on a.slug = p.axis_slug
-        left join portal_strategic_sub_axes sa on sa.slug = p.sub_axis_slug
-      where p.status <> 'cancelled'
-        and (${member.is_national_admin} or p.scope = 'national' or p.school_id = ${schoolId})
-      order by case when p.scope = 'national' then 0 else 1 end, coalesce(p.starts_at, p.created_at) desc
+      left join portal_strategic_axes a on a.slug = p.axis_slug
+      left join portal_strategic_sub_axes sa on sa.slug = p.sub_axis_slug
+      where p.school_id = ${schoolId} and p.status <> 'cancelled'
+      order by coalesce(p.starts_at, p.created_at) desc
     `;
     return json(res, 200, { projects: rows });
   }
-
-  const action = String(body.action || "create");
-  if (action === "create") {
-    const scope = body.scope === "national" ? "national" : "local";
-    const schoolId = schoolScope(member, body.schoolId);
-    const capability = scope === "national" ? "national_projects" : "project_manager";
-    if (!schoolId || !(await requireClubCapability(req, res, member, capability, schoolId))) return;
-    const title = String(body.title || "").trim();
-    if (!title) return json(res, 400, { error: "Club et titre de projet requis." });
-    const axisSlug = body.axisSlug ? String(body.axisSlug).trim() : null;
-    if (axisSlug) {
-      const axis = await db`select slug from portal_strategic_axes where slug = ${axisSlug}`;
-      if (!axis[0]) return json(res, 400, { error: "Axe stratégique invalide." });
-    }
-    const projectType = String(body.projectType || "projet").slice(0, 80);
-    const result = await db`
-      insert into portal_projects
-        (school_id, created_by, president_id, created_by_role, scope, title, description, project_type, starts_at, ends_at, status, axis_slug, sub_axis_slug, objectives, expected_results, evaluation_method, stakeholders, indicators)
-      values
-        (${schoolId}, ${member.id}, ${member.id}, ${scope === "national" ? "national_project_president" : "project_president"}, ${scope}, ${title}, ${body.description || null}, ${projectType}, ${body.startsAt || null}, ${body.endsAt || null},
-         ${["draft", "in_progress", "completed", "cancelled"].includes(body.status) ? body.status : "draft"}, ${axisSlug}, ${body.subAxisSlug || null},
-         ${body.objectives || null}, ${body.expectedResults || null}, ${body.evaluationMethod || null},
-         ${JSON.stringify(Array.isArray(body.stakeholders) ? body.stakeholders : [])}::jsonb,
-         ${JSON.stringify(Array.isArray(body.indicators) ? body.indicators : [])}::jsonb)
-      returning *
-    `;
-    return json(res, 201, { project: result[0] });
+  if (!(await requireClubCapability(req, res, member, "project_manager", schoolScope(member, body.schoolId)))) return;
+  const schoolId = schoolScope(member, body.schoolId);
+  const title = String(body.title || "").trim();
+  if (!schoolId || !title) return json(res, 400, { error: "Club et titre de projet requis." });
+  const axisSlug = body.axisSlug ? String(body.axisSlug).trim() : null;
+  if (axisSlug) {
+    const axis = await db`select slug from portal_strategic_axes where slug = ${axisSlug}`;
+    if (!axis[0]) return json(res, 400, { error: "Axe stratégique invalide." });
   }
-
-  const project = await projectRecord(db, body.projectId);
-  if (!(await projectVisibleToMember(project, member))) return json(res, 404, { error: "Projet introuvable." });
-  const isPresident = Boolean(member.is_national_admin || project.president_id === member.id);
-  if (action === "create_team") {
-    if (!isPresident) return json(res, 403, { error: "Seul le président du projet peut créer les équipes." });
-    const name = String(body.name || "").trim().slice(0, 160);
-    const supervisorId = String(body.supervisorId || "");
-    if (!name || !supervisorId) return json(res, 400, { error: "Nom d’équipe et superviseur requis." });
-    const supervisor = await activeProjectMember(db, supervisorId, project);
-    if (!supervisor) return json(res, 400, { error: "Superviseur actif invalide pour ce projet." });
-    const rows = await db`
-      insert into portal_project_teams (project_id, name, description, supervisor_id, created_by)
-      values (${project.id}, ${name}, ${body.description || null}, ${supervisor.id}, ${member.id})
-      returning *
-    `;
-    return json(res, 201, { team: rows[0] });
-  }
-  const teamRows = await db`
-    select t.*, p.scope, p.school_id, p.president_id
-    from portal_project_teams t join portal_projects p on p.id = t.project_id
-    where t.id = ${body.teamId} and t.project_id = ${project.id}
+  const projectType = String(body.projectType || "projet").slice(0, 80);
+  const result = await db`
+    insert into portal_projects
+      (school_id, created_by, title, description, project_type, starts_at, ends_at, status, axis_slug, sub_axis_slug, objectives, expected_results, evaluation_method, stakeholders, indicators)
+    values
+      (${schoolId}, ${member.id}, ${title}, ${body.description || null}, ${projectType}, ${body.startsAt || null}, ${body.endsAt || null},
+       ${["draft", "in_progress", "completed", "cancelled"].includes(body.status) ? body.status : "draft"}, ${axisSlug}, ${body.subAxisSlug || null},
+       ${body.objectives || null}, ${body.expectedResults || null}, ${body.evaluationMethod || null},
+       ${JSON.stringify(Array.isArray(body.stakeholders) ? body.stakeholders : [])}::jsonb,
+       ${JSON.stringify(Array.isArray(body.indicators) ? body.indicators : [])}::jsonb)
+    returning *
   `;
-  const team = teamRows[0];
-  if (!team) return json(res, 404, { error: "Équipe introuvable." });
-  const isSupervisor = team.supervisor_id === member.id;
-  if (action === "assign_member") {
-    if (!isSupervisor && !member.is_national_admin) return json(res, 403, { error: "Seul le superviseur de l’équipe peut affecter des membres." });
-    const target = await activeProjectMember(db, String(body.memberId || ""), project);
-    if (!target) return json(res, 400, { error: "Membre actif invalide pour ce projet." });
-    const rows = await db`
-      insert into portal_project_team_members (team_id, member_id, assigned_by)
-      values (${team.id}, ${target.id}, ${member.id})
-      on conflict (team_id, member_id) do update set assigned_by = excluded.assigned_by, assigned_at = now()
-      returning *
-    `;
-    return json(res, 200, { membership: rows[0] });
-  }
-  if (action === "create_task") {
-    if (!isSupervisor && !member.is_national_admin) return json(res, 403, { error: "Seul le superviseur de l’équipe peut créer une tâche." });
-    const assigneeId = String(body.assignedTo || "");
-    const target = await activeProjectMember(db, assigneeId, project);
-    if (!target) return json(res, 400, { error: "Membre assigné invalide pour ce projet." });
-    const membership = await db`select 1 from portal_project_team_members where team_id = ${team.id} and member_id = ${target.id}`;
-    if (!membership[0]) return json(res, 400, { error: "Le membre doit d’abord être affecté à cette équipe." });
-    const title = String(body.title || "").trim();
-    if (!title) return json(res, 400, { error: "Titre de tâche requis." });
-    const priority = ["basse", "normale", "haute", "urgente"].includes(body.priority) ? body.priority : "normale";
-    const rows = await db`
-      insert into portal_tasks (school_id, assigned_to, assigned_by, team_id, project_id, title, description, priority, deadline, comments, created_by)
-      values (${project.school_id}, ${target.id}, ${member.id}, ${team.id}, ${project.id}, ${title}, ${body.description || null}, ${priority}, ${body.deadline || null}, ${body.comments || null}, ${member.id})
-      returning *
-    `;
-    await recordAudit(db, { actorId: member.id, action: "project.task.created", entityType: "task", entityId: rows[0].id, afterData: rows[0] });
-    return json(res, 201, { task: rows[0] });
-  }
-  return json(res, 400, { error: "Action de projet inconnue." });
+  return json(res, 201, { project: result[0] });
 }
 
 function reportDeadlineStatus(report) {
@@ -930,10 +777,10 @@ async function tasks(req, res, member, body) {
       const schoolId = schoolScope(member, req.query?.schoolId);
       if (!schoolId) return json(res, 200, { tasks: [] });
       if (!(await requireClubCapability(req, res, member, "project_manager", schoolId))) return;
-      const rows = await db`select t.*, p.title as project_title, p.scope as project_scope, team.name as team_name, m.display_name as assignee_name from portal_tasks t left join portal_projects p on p.id=t.project_id left join portal_project_teams team on team.id=t.team_id left join portal_members m on m.id=t.assigned_to where t.school_id=${schoolId} order by t.deadline nulls last, t.assigned_at desc`;
+      const rows = await db`select t.*, p.title as project_title, m.display_name as assignee_name from portal_tasks t left join portal_projects p on p.id=t.project_id left join portal_members m on m.id=t.assigned_to where t.school_id=${schoolId} order by t.deadline nulls last, t.assigned_at desc`;
       return json(res, 200, { tasks: rows });
     }
-    const rows = await db`select t.*, p.title as project_title, p.scope as project_scope, team.name as team_name, supervisor.display_name as supervisor_name, s.name as school_name from portal_tasks t left join portal_projects p on p.id=t.project_id left join portal_project_teams team on team.id=t.team_id left join portal_members supervisor on supervisor.id=team.supervisor_id left join portal_schools s on s.id=t.school_id where t.assigned_to=${member.id} order by t.deadline nulls last, t.assigned_at desc`;
+    const rows = await db`select t.*, p.title as project_title, s.name as school_name from portal_tasks t left join portal_projects p on p.id=t.project_id left join portal_schools s on s.id=t.school_id where t.assigned_to=${member.id} order by t.deadline nulls last, t.assigned_at desc`;
     return json(res, 200, { tasks: rows });
   }
   if (body.action === "status") {
@@ -943,7 +790,8 @@ async function tasks(req, res, member, body) {
   }
   if (!body.title) return json(res, 400, { error: "Titre requis." });
   const schoolId = schoolScope(member, body.schoolId);
-  if (!schoolId || !(await requireClubCapability(req, res, member, "project_manager", schoolId))) return;
+  if (!schoolId) return json(res, 400, { error: "Club invalide." });
+  if (!(await requireClubCapability(req, res, member, "project_manager", schoolId))) return;
   const assignedTo = String(body.assignedTo || member.id);
   const assigneeRows = await db`select id from portal_members where id=${assignedTo} and status='active' and school_id=${schoolId}`;
   if (!assigneeRows[0]) return json(res, 400, { error: "Membre assigné invalide pour ce club." });
@@ -1032,7 +880,8 @@ async function assemblies(req, res, member, body) {
   }
   if (body.action !== "create") return json(res, 400, { error: "Action d’assemblée inconnue." });
   const schoolId = schoolScope(member, body.schoolId);
-  if (!schoolId || !(await requireClubCapability(req, res, member, "meeting_organizer", schoolId))) return;
+  if (!schoolId) return json(res, 400, { error: "Club invalide." });
+  if (!(await requireClubCapability(req, res, member, "meeting_organizer", schoolId))) return;
   const assemblyType = String(body.assemblyType || "");
   if (!ASSEMBLY_TYPES.includes(assemblyType)) return json(res, 400, { error: "Type d’assemblée invalide." });
   const title = String(body.title || ASSEMBLY_LABELS[assemblyType]).trim();
