@@ -3,7 +3,9 @@
     ["home.html", "⌂", "Accueil"],
     ["profile.html", "◉", "Mon profil"],
     ["meetings.html", "▣", "Réunions"],
+    ["assemblies.html", "◇", "Assemblées"],
     ["reports.html", "✓", "Rapports"],
+    ["supervision.html", "⚖", "Supervision"],
     ["training.html", "↗", "Cursus"],
     ["tasks.html", "☷", "Mes tâches"],
   ];

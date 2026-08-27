@@ -323,3 +323,21 @@ body.portal-page:before{
 @media(max-width:980px){.portfolio-stats{grid-template-columns:repeat(2,1fr)}.card-span-7,.card-span-5{grid-column:span 12}}
 @media(max-width:620px){.portfolio-hero{padding:22px;align-items:flex-start}.portfolio-seal{width:96px;height:96px}.portfolio-seal span{font-size:1rem}.portfolio-stats{grid-template-columns:repeat(2,1fr)}.portfolio-hero h2{font-size:1.8rem}}
 @media(prefers-reduced-motion:reduce){.tab-btn{transition:none}}
+
+
+/* Phase 5 — assemblies, supervision and governance */
+.metric-strip { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin:18px 0 24px; }
+.metric-strip > div { padding:14px; border:1px solid rgba(24,43,83,.12); border-radius:14px; background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(238,244,252,.82)); }
+.metric-strip strong { display:block; color:var(--portal-navy,#182b53); font:1.55rem/1.1 'Fjalla One',sans-serif; }
+.metric-strip span { display:block; margin-top:5px; color:#667085; font-size:.78rem; }
+.governance-grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr); gap:24px; }
+.assembly-detail-card { margin-top:24px; scroll-margin-top:24px; }
+.governance-grid h3 { margin-top:0; }
+.audit-timeline { display:grid; gap:0; margin:20px 0; border-left:2px solid rgba(26,77,139,.18); padding-left:20px; }
+.audit-timeline article { position:relative; padding:0 0 18px; }
+.audit-timeline article::before { content:''; position:absolute; width:10px; height:10px; border-radius:50%; left:-26px; top:4px; background:var(--gold,#e4ad37); box-shadow:0 0 0 4px #fff; }
+.audit-timeline article div { display:flex; justify-content:space-between; gap:12px; color:#192b50; }
+.audit-timeline article span { color:#7a8497; font-size:.78rem; }
+.audit-timeline article p { margin:6px 0 0; color:#4d586b; white-space:pre-wrap; }
+@media (max-width: 900px) { .metric-strip { grid-template-columns:repeat(2,minmax(0,1fr)); } .governance-grid { grid-template-columns:1fr; } }
+@media (max-width: 560px) { .metric-strip { grid-template-columns:1fr 1fr; } .audit-timeline article div { display:block; } }
