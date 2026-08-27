@@ -175,6 +175,13 @@
         ).join("")}
       </div>
 
+      <div class="role-section-label">Validation Formateur</div>
+      <div class="form-grid" style="align-items:end; margin-bottom:12px;">
+        <div class="form-field"><label for="trainer-status">Statut d'homologation</label><select id="trainer-status"><option value="pending">En attente</option><option value="verified">Homologué</option><option value="suspended">Suspendu</option></select></div>
+        <div class="form-actions"><button class="btn btn-primary btn-sm" id="save-trainer-status" type="button">Enregistrer</button></div>
+      </div>
+      <div class="list-stack" style="margin-bottom:18px;">${(data.documents || []).length ? data.documents.map(d => `<div class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(d.title)}</span><span class="list-item-meta">${esc(d.document_type)} · ${esc(d.status)}</span></div></div>`).join("") : '<p class="field-hint">Aucun document dans le dossier.</p>'}</div>
+
       <div class="role-section-label">Rôles nationaux</div>
       <p class="field-hint" style="margin:-4px 0 10px;">Portée nationale, indépendante de ce club et du statut d'admin national.</p>
       <div class="role-chip-row" id="national-chips">
@@ -201,6 +208,13 @@
               .join("")
       }
     `;
+
+    const trainerStatus = document.getElementById("trainer-status");
+    if (data.trainerProfile) trainerStatus.value = data.trainerProfile.certification_status || "pending";
+    document.getElementById("save-trainer-status").addEventListener("click", async () => {
+      await callRoles({ action: "setTrainerStatus", memberId: currentMemberId, certificationStatus: trainerStatus.value });
+      await renderDetail();
+    });
 
     document.getElementById("save-membership-status").addEventListener("click", async () => {
       await callRoles({
