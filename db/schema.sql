@@ -26,18 +26,6 @@ create table if not exists portal_schools (
   created_at  timestamptz not null default now()
 );
 
--- "Statut" column on the paper AG presence sheet ("Club membre" / "Nouveau
--- Club") — a slow-changing property of the club itself (not per-assembly),
--- so it lives on portal_schools rather than portal_assembly_club_attendance.
-alter table portal_schools add column if not exists club_status text not null default 'club_membre';
-do $$
-begin
-  alter table portal_schools drop constraint if exists portal_schools_club_status_check;
-  alter table portal_schools add constraint portal_schools_club_status_check
-    check (club_status in ('club_membre', 'nouveau_club'));
-exception when duplicate_object then null;
-end $$;
-
 -- ---------------------------------------------------------------------
 -- Members
 -- ---------------------------------------------------------------------
@@ -503,76 +491,6 @@ alter table portal_training_entries add column if not exists validation_status t
 alter table portal_training_entries add column if not exists validated_by uuid references portal_members(id);
 alter table portal_training_entries add column if not exists validated_at timestamptz;
 alter table portal_training_entries add column if not exists updated_at timestamptz not null default now();
-
--- =======================================================================
--- FORMATION SESSIONS (VPI schedules -> formateurs accept -> members sign up)
--- =======================================================================
--- A club's VPI schedules a formation session for a given category (only
--- 'niveau_youthclubeur' is offered today; the category column + check
--- constraint keep this a real dropdown that's simply one-item for now, so
--- adding more official formations later is a constraint change, not a
--- redesign). The request is visible to every verified formateur; whichever
--- one accepts first claims it (status flips to 'open') and it becomes
--- visible to members of the requesting club for sign-up. A formateur can
--- also decline without blocking others from accepting afterwards, so
--- declines are recorded on a separate table rather than as terminal status.
-create table if not exists portal_formation_sessions (
-  id uuid primary key default gen_random_uuid(),
-  school_id integer not null references portal_schools(id) on delete cascade,
-  category text not null default 'niveau_youthclubeur' check (category in ('niveau_youthclubeur')),
-  requested_by uuid not null references portal_members(id),
-  proposed_date date not null,
-  location text,
-  notes text,
-  capacity integer not null default 20 check (capacity > 0),
-  status text not null default 'requested' check (status in ('requested', 'open', 'cancelled', 'completed')),
-  accepted_by uuid references portal_members(id),
-  accepted_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-create index if not exists idx_portal_formation_sessions_school on portal_formation_sessions(school_id, status);
-create index if not exists idx_portal_formation_sessions_status on portal_formation_sessions(status, category);
-
--- Formateurs who've explicitly declined a still-'requested' session, so the
--- UI can hide it from someone who already passed on it while leaving it
--- open to every other formateur.
-create table if not exists portal_formation_session_declines (
-  session_id uuid not null references portal_formation_sessions(id) on delete cascade,
-  member_id uuid not null references portal_members(id) on delete cascade,
-  declined_at timestamptz not null default now(),
-  primary key (session_id, member_id)
-);
-
--- Member sign-ups once a session is 'open' — capped at session.capacity,
--- enforced in the API (count + insert) since Postgres has no native
--- "max N rows per group" constraint without a trigger.
-create table if not exists portal_formation_signups (
-  id uuid primary key default gen_random_uuid(),
-  session_id uuid not null references portal_formation_sessions(id) on delete cascade,
-  member_id uuid not null references portal_members(id) on delete cascade,
-  signed_up_at timestamptz not null default now(),
-  attendance_status text not null default 'registered' check (attendance_status in ('registered', 'attended', 'no_show')),
-  unique (session_id, member_id)
-);
-create index if not exists idx_portal_formation_signups_session on portal_formation_signups(session_id);
-
--- The accepting formateur's own phase breakdown for that session — every
--- formateur presents the same official formation differently, so this is
--- freeform per-session content rather than a shared curriculum table.
-create table if not exists portal_formation_phases (
-  id uuid primary key default gen_random_uuid(),
-  session_id uuid not null references portal_formation_sessions(id) on delete cascade,
-  position integer not null default 0,
-  title text not null,
-  body text,
-  duration_text text,
-  created_by uuid references portal_members(id),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (session_id, position)
-);
-create index if not exists idx_portal_formation_phases_session on portal_formation_phases(session_id, position);
 
 create table if not exists portal_tasks (
   id uuid primary key default gen_random_uuid(),
@@ -1153,24 +1071,3 @@ create table if not exists portal_assembly_movements (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_portal_assembly_movements_assembly on portal_assembly_movements(assembly_id, created_at);
-
--- =======================================================================
--- PER-ASSEMBLY PRÉSENCE / VOTE FOR BEN·SUPCO, CNS, MEMBRES NATIONAUX (PHASE 7.1)
--- =======================================================================
--- The paper PV gives each of these three rosters its own real Présent/Absent
--- toggle (and, for CNS/membres nationaux, a Droit de vote toggle) scoped to
--- the assembly being minuted — not a static club-membership fact. One row
--- per (assembly, member); missing rows default to Absent/Non votant when
--- rendered, same convention as portal_assembly_club_attendance.
-create table if not exists portal_assembly_roster_presence (
-  id uuid primary key default gen_random_uuid(),
-  assembly_id uuid not null references portal_assemblies(id) on delete cascade,
-  member_id uuid not null references portal_members(id) on delete cascade,
-  roster text not null check (roster in ('ben', 'cns', 'formateurs', 'membres_nationaux')),
-  attendance_status text not null default 'absent' check (attendance_status in ('present','absent')),
-  voting_status text not null default 'non_votant' check (voting_status in ('votant','non_votant')),
-  assigned_by uuid references portal_members(id),
-  updated_at timestamptz not null default now(),
-  unique (assembly_id, member_id, roster)
-);
-create index if not exists idx_portal_assembly_roster_presence_assembly on portal_assembly_roster_presence(assembly_id, roster);

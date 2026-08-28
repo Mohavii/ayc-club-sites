@@ -17,7 +17,6 @@ const {
   requireCapability,
   getBenRoster,
   getMemberRoleLabel,
-  BEN_ROSTER_ROLES,
 } = require("./_lib/roles");
 
 function parseBody(req) {
@@ -994,230 +993,6 @@ async function training(req, res, member, body) {
   return json(res, 201, { entry: rows[0] });
 }
 
-const FORMATION_CATEGORIES = ["niveau_youthclubeur"];
-const FORMATION_CATEGORY_LABELS = { niveau_youthclubeur: "Niveau YOUTHCLUBeur" };
-
-// VPI schedules a formation session (category dropdown, currently just
-// "Niveau YOUTHCLUBeur" — FORMATION_CATEGORIES is the single source of
-// truth so adding more official formations later is a one-line change) ->
-// every verified formateur sees it as a pending request -> whichever one
-// accepts first claims it and the session opens up to club members for
-// sign-up, capped at session.capacity. The accepting formateur can also
-// save their own phase breakdown for how they'll run that session.
-async function formationSessions(req, res, member, body) {
-  const db = sql();
-  const access = await getMemberPortalAccess(member);
-  const trainerRows = await db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`;
-  const isVerifiedTrainer = member.is_national_admin || trainerRows[0]?.certification_status === "verified";
-
-  if (req.method === "GET") {
-    const schoolId = schoolScope(member, req.query?.schoolId);
-    const [mySchoolSessions, pendingForTrainers, myAcceptedSessions] = await Promise.all([
-      // Sessions for the member's own club, at whatever stage they're in —
-      // this is what a VPI or a regular member browsing sign-ups sees.
-      schoolId
-        ? db`
-            select s.*, sc.name as school_name, req.display_name as requested_by_name, acc.display_name as accepted_by_name,
-              (select count(*)::int from portal_formation_signups sg where sg.session_id = s.id) as signup_count,
-              exists(select 1 from portal_formation_signups sg where sg.session_id = s.id and sg.member_id = ${member.id}) as is_signed_up
-            from portal_formation_sessions s
-            join portal_schools sc on sc.id = s.school_id
-            join portal_members req on req.id = s.requested_by
-            left join portal_members acc on acc.id = s.accepted_by
-            where s.school_id = ${schoolId} and s.status != 'cancelled'
-            order by s.created_at desc
-          `
-        : [],
-      // Every still-'requested' session across all clubs, visible to any
-      // verified formateur who hasn't already declined it — this is the
-      // "request sent to all formateurs" inbox.
-      isVerifiedTrainer
-        ? db`
-            select s.*, sc.name as school_name, req.display_name as requested_by_name
-            from portal_formation_sessions s
-            join portal_schools sc on sc.id = s.school_id
-            join portal_members req on req.id = s.requested_by
-            where s.status = 'requested'
-              and not exists(select 1 from portal_formation_session_declines d where d.session_id = s.id and d.member_id = ${member.id})
-            order by s.created_at asc
-          `
-        : [],
-      // Sessions this formateur personally accepted, wherever the club —
-      // this is where they manage phases regardless of their own club_id.
-      isVerifiedTrainer
-        ? db`
-            select s.*, sc.name as school_name,
-              (select count(*)::int from portal_formation_signups sg where sg.session_id = s.id) as signup_count
-            from portal_formation_sessions s
-            join portal_schools sc on sc.id = s.school_id
-            where s.accepted_by = ${member.id} and s.status in ('open', 'completed')
-            order by s.proposed_date asc
-          `
-        : [],
-    ]);
-    let phasesBySession = {};
-    let signupsBySession = {};
-    const sessionIds = [...new Set([...mySchoolSessions, ...myAcceptedSessions].map(s => s.id))];
-    if (sessionIds.length) {
-      const phaseRows = await db`select * from portal_formation_phases where session_id = any(${sessionIds}) order by session_id, position`;
-      for (const row of phaseRows) (phasesBySession[row.session_id] ||= []).push(row);
-      // Signup rosters are only worth returning to whoever can act on them
-      // (the accepting formateur, or a club officer / national admin) —
-      // members browsing just need signup_count, already selected above.
-      const canSeeRosters = isVerifiedTrainer || member.is_national_admin || Boolean(await getCurrentDisplayRole(member.id, member.school_id));
-      if (canSeeRosters) {
-        const signupRows = await db`
-          select sg.*, m.display_name, m.username
-          from portal_formation_signups sg join portal_members m on m.id = sg.member_id
-          where sg.session_id = any(${sessionIds})
-          order by sg.signed_up_at asc
-        `;
-        for (const row of signupRows) (signupsBySession[row.session_id] ||= []).push(row);
-      }
-    }
-    return json(res, 200, {
-      categories: FORMATION_CATEGORIES.map(value => ({ value, label: FORMATION_CATEGORY_LABELS[value] })),
-      mySchoolSessions,
-      pendingForTrainers,
-      myAcceptedSessions,
-      phasesBySession,
-      signupsBySession,
-      access: { isVerifiedTrainer },
-    });
-  }
-
-  if (body.action === "schedule") {
-    // VPI (or national admin) picks a category + date; the request starts
-    // life visible to every verified formateur, not assigned to anyone yet.
-    const schoolId = schoolScope(member, body.schoolId);
-    if (!schoolId) return json(res, 400, { error: "Club invalide." });
-    const role = member.is_national_admin ? null : await getCurrentDisplayRole(member.id, schoolId);
-    if (!member.is_national_admin && role?.role !== "vpi") return json(res, 403, { error: "Réservé au VPI du club (ou à l'administration nationale)." });
-    const category = FORMATION_CATEGORIES.includes(body.category) ? body.category : null;
-    if (!category) return json(res, 400, { error: "Choisis une formation officielle dans la liste." });
-    const proposedDate = String(body.proposedDate || "").trim();
-    if (!proposedDate) return json(res, 400, { error: "Date proposée requise." });
-    const capacity = Number.isFinite(Number(body.capacity)) && Number(body.capacity) > 0 ? Math.min(500, Math.floor(Number(body.capacity))) : 20;
-    const rows = await db`
-      insert into portal_formation_sessions (school_id, category, requested_by, proposed_date, location, notes, capacity)
-      values (${schoolId}, ${category}, ${member.id}, ${proposedDate}, ${clip(body.location, 200)}, ${clip(body.notes, 2000)}, ${capacity})
-      returning *
-    `;
-    await recordAudit(db, { actorId: member.id, action: "formation.session.scheduled", entityType: "formation_session", entityId: rows[0].id, afterData: rows[0] });
-    return json(res, 201, { session: rows[0] });
-  }
-
-  if (body.action === "accept") {
-    // First formateur to accept claims it; a second acceptance attempt
-    // fails cleanly once status has moved off 'requested'.
-    if (!isVerifiedTrainer) return json(res, 403, { error: "Réservé aux formateurs homologués." });
-    const rows = await db`
-      update portal_formation_sessions
-      set status = 'open', accepted_by = ${member.id}, accepted_at = now(), updated_at = now()
-      where id = ${body.sessionId} and status = 'requested'
-      returning *
-    `;
-    if (!rows[0]) return json(res, 409, { error: "Cette session a déjà été acceptée, annulée ou n'existe plus." });
-    await recordAudit(db, { actorId: member.id, action: "formation.session.accepted", entityType: "formation_session", entityId: rows[0].id, afterData: rows[0] });
-    return json(res, 200, { session: rows[0] });
-  }
-
-  if (body.action === "decline") {
-    if (!isVerifiedTrainer) return json(res, 403, { error: "Réservé aux formateurs homologués." });
-    await db`insert into portal_formation_session_declines (session_id, member_id) values (${body.sessionId}, ${member.id}) on conflict do nothing`;
-    return json(res, 200, { ok: true });
-  }
-
-  if (body.action === "cancel") {
-    const rows = await db`select * from portal_formation_sessions where id = ${body.sessionId}`;
-    const session = rows[0];
-    if (!session) return json(res, 404, { error: "Session introuvable." });
-    const role = member.is_national_admin ? null : await getCurrentDisplayRole(member.id, session.school_id);
-    const allowed = member.is_national_admin || session.requested_by === member.id || session.accepted_by === member.id || role?.role === "vpi";
-    if (!allowed) return json(res, 403, { error: "Vous n'avez pas la permission d'annuler cette session." });
-    const updated = await db`update portal_formation_sessions set status = 'cancelled', updated_at = now() where id = ${body.sessionId} returning *`;
-    await recordAudit(db, { actorId: member.id, action: "formation.session.cancelled", entityType: "formation_session", entityId: body.sessionId, beforeData: session });
-    return json(res, 200, { session: updated[0] });
-  }
-
-  if (body.action === "signup") {
-    // Open to any active member for the session's own club; capacity is
-    // enforced here since Postgres has no built-in "max N rows" constraint.
-    const rows = await db`select * from portal_formation_sessions where id = ${body.sessionId}`;
-    const session = rows[0];
-    if (!session || session.status !== "open") return json(res, 400, { error: "Cette session n'est pas ouverte aux inscriptions." });
-    if (!member.is_national_admin && member.school_id !== session.school_id) return json(res, 403, { error: "Cette session est réservée aux membres du club organisateur." });
-    const countRows = await db`select count(*)::int as n from portal_formation_signups where session_id = ${body.sessionId}`;
-    if (countRows[0].n >= session.capacity) return json(res, 400, { error: "Cette session a atteint sa capacité maximale." });
-    const inserted = await db`
-      insert into portal_formation_signups (session_id, member_id) values (${body.sessionId}, ${member.id})
-      on conflict (session_id, member_id) do nothing
-      returning *
-    `;
-    if (!inserted[0]) return json(res, 200, { alreadySignedUp: true });
-    return json(res, 201, { signup: inserted[0] });
-  }
-
-  if (body.action === "cancel_signup") {
-    await db`delete from portal_formation_signups where session_id = ${body.sessionId} and member_id = ${member.id}`;
-    return json(res, 200, { ok: true });
-  }
-
-  if (body.action === "phases") {
-    // Only the formateur who actually accepted this session may save its
-    // phase breakdown — everyone presents the same official formation
-    // differently, so this is intentionally per-session, not shared.
-    const rows = await db`select * from portal_formation_sessions where id = ${body.sessionId}`;
-    const session = rows[0];
-    if (!session) return json(res, 404, { error: "Session introuvable." });
-    if (!member.is_national_admin && session.accepted_by !== member.id) return json(res, 403, { error: "Seul le formateur qui a accepté cette session peut en modifier les phases." });
-    const phases = Array.isArray(body.phases) ? body.phases : [];
-    await db`delete from portal_formation_phases where session_id = ${body.sessionId}`;
-    const saved = [];
-    for (const [index, phase] of phases.entries()) {
-      const title = String(phase?.title || "").trim().slice(0, 200);
-      if (!title) continue;
-      const inserted = await db`
-        insert into portal_formation_phases (session_id, position, title, body, duration_text, created_by)
-        values (${body.sessionId}, ${index}, ${title}, ${clip(phase?.body, 4000)}, ${clip(phase?.durationText, 60)}, ${member.id})
-        returning *
-      `;
-      saved.push(inserted[0]);
-    }
-    return json(res, 200, { phases: saved });
-  }
-
-  if (body.action === "complete") {
-    // Closing a session is also where "validating each member's formation"
-    // actually happens: every member who signed up gets a validated
-    // portal_training_entries row for this exact session (real category,
-    // date, host = accepting formateur), which is what the certificate
-    // generator on the Formation page reads from — instead of a formateur
-    // hand-typing a duplicate "training" entry disconnected from who
-    // actually attended.
-    const rows = await db`select * from portal_formation_sessions where id = ${body.sessionId}`;
-    const session = rows[0];
-    if (!session) return json(res, 404, { error: "Session introuvable." });
-    if (!member.is_national_admin && session.accepted_by !== member.id) return json(res, 403, { error: "Seul le formateur qui a accepté cette session peut la clôturer." });
-    const formateurRows = await db`select display_name from portal_members where id = ${session.accepted_by}`;
-    const signups = await db`select member_id, attendance_status from portal_formation_signups where session_id = ${body.sessionId}`;
-    const attendedMemberIds = new Set((Array.isArray(body.attendedMemberIds) ? body.attendedMemberIds : signups.map(s => s.member_id)).map(String));
-    for (const signup of signups) {
-      const attended = attendedMemberIds.has(String(signup.member_id));
-      await db`update portal_formation_signups set attendance_status = ${attended ? "attended" : "no_show"} where session_id = ${body.sessionId} and member_id = ${signup.member_id}`;
-      if (!attended) continue;
-      await db`
-        insert into portal_training_entries (member_id, category, title, host, held_on, location, hours, validation_status, validated_by, validated_at, notes)
-        values (${signup.member_id}, ${session.category}, ${FORMATION_CATEGORY_LABELS[session.category] || session.category}, ${formateurRows[0]?.display_name || null}, ${session.proposed_date}, ${session.location}, null, 'validated', ${session.accepted_by}, now(), ${'Session de formation #' + session.id})
-      `;
-    }
-    const updated = await db`update portal_formation_sessions set status = 'completed', updated_at = now() where id = ${body.sessionId} returning *`;
-    return json(res, 200, { session: updated[0] });
-  }
-
-  return json(res, 400, { error: "Action de formation inconnue." });
-}
-
 async function tasks(req, res, member, body) {
   const db = sql();
   if (req.method === 'GET') {
@@ -1427,39 +1202,8 @@ async function assemblyDetail(req, res, member, body) {
       where s.is_active = true
       on conflict (assembly_id, school_id) do nothing
     `;
-    // Same backfill idea for the BEN·SupCo / CNS / formateurs / membres
-    // nationaux rosters — each gets its own Présent/Absent (and, except
-    // formateurs, Votant/Non votant) row scoped to this assembly.
-    await db`
-      insert into portal_assembly_roster_presence (assembly_id, member_id, roster, attendance_status, voting_status, assigned_by)
-      select ${id}, r.member_id, 'ben', 'absent', 'non_votant', ${member.id}
-      from portal_national_roles r
-      where r.role = any(${BEN_ROSTER_ROLES}) and r.ended_at is null
-      on conflict (assembly_id, member_id, roster) do nothing
-    `;
-    await db`
-      insert into portal_assembly_roster_presence (assembly_id, member_id, roster, attendance_status, voting_status, assigned_by)
-      select ${id}, m.id, 'cns', 'absent', 'non_votant', ${member.id}
-      from portal_members m
-      where m.status = 'active' and m.membership_status = 'senior'
-      on conflict (assembly_id, member_id, roster) do nothing
-    `;
-    await db`
-      insert into portal_assembly_roster_presence (assembly_id, member_id, roster, attendance_status, voting_status, assigned_by)
-      select ${id}, m.id, 'formateurs', 'absent', 'non_votant', ${member.id}
-      from portal_members m join portal_trainer_profiles t on t.member_id = m.id
-      where m.status = 'active' and t.certification_status = 'verified'
-      on conflict (assembly_id, member_id, roster) do nothing
-    `;
-    await db`
-      insert into portal_assembly_roster_presence (assembly_id, member_id, roster, attendance_status, voting_status, assigned_by)
-      select ${id}, m.id, 'membres_nationaux', 'absent', 'non_votant', ${member.id}
-      from portal_members m
-      where m.status = 'active' and m.membership_status = 'membre_national'
-      on conflict (assembly_id, member_id, roster) do nothing
-    `;
   }
-  const [attendance, roles, motions, elections, minutes, clubAttendance, epnMembers, plenaries, piBoxes, groundRulesRows, movements, benRoster, cnsMembers, formateurs, membresNationaux, rosterPresenceRows] = await Promise.all([
+  const [attendance, roles, motions, elections, minutes, clubAttendance, epnMembers, plenaries, piBoxes, groundRulesRows, movements, benRoster, cnsMembers, formateurs, membresNationaux] = await Promise.all([
     db`select a.*, m.display_name, m.username, m.membership_status from portal_assembly_attendance a join portal_members m on m.id = a.member_id where a.assembly_id = ${id} order by m.display_name`,
     db`select ar.*, m.display_name, m.username from portal_assembly_roles ar join portal_members m on m.id = ar.member_id where ar.assembly_id = ${id} order by m.display_name`,
     db`select * from portal_assembly_motions where assembly_id = ${id} order by position`,
@@ -1468,7 +1212,7 @@ async function assemblyDetail(req, res, member, body) {
       ? db`select * from portal_minutes where meeting_id = ${assembly.meeting_id}`
       : db`select * from portal_minutes where meeting_id = ${assembly.meeting_id} and status in ('sent', 'validated')`,
     assembly.scope === "national"
-      ? db`select ca.*, s.name as school_name, s.slug as school_slug, s.club_status from portal_assembly_club_attendance ca join portal_schools s on s.id = ca.school_id where ca.assembly_id = ${id} order by s.name asc`
+      ? db`select ca.*, s.name as school_name, s.slug as school_slug from portal_assembly_club_attendance ca join portal_schools s on s.id = ca.school_id where ca.assembly_id = ${id} order by s.name asc`
       : Promise.resolve([]),
     assembly.scope === "national"
       ? db`
@@ -1494,25 +1238,7 @@ async function assemblyDetail(req, res, member, body) {
     assembly.scope === "national"
       ? db`select id, display_name, username from portal_members where status = 'active' and membership_status = 'membre_national' order by display_name asc`
       : Promise.resolve([]),
-    assembly.scope === "national"
-      ? db`select * from portal_assembly_roster_presence where assembly_id = ${id}`
-      : Promise.resolve([]),
   ]);
-  // Fold assembly-scoped presence/vote onto each roster's member rows so
-  // the frontend gets one flat object per person, same shape as clubAttendance.
-  const rosterPresenceByMember = new Map(rosterPresenceRows.map(row => [`${row.roster}:${row.member_id}`, row]));
-  const withRosterPresence = (members, rosterKey) => (members || []).map(m => {
-    const presence = rosterPresenceByMember.get(`${rosterKey}:${m.id}`);
-    return { ...m, attendance_status: presence?.attendance_status || "absent", voting_status: presence?.voting_status || "non_votant" };
-  });
-  const benRosterWithPresence = (benRoster || []).map(row => {
-    if (!row.holder) return row;
-    const presence = rosterPresenceByMember.get(`ben:${row.holder.id}`);
-    return { ...row, holder: { ...row.holder, attendance_status: presence?.attendance_status || "absent" } };
-  });
-  const cnsMembersWithPresence = withRosterPresence(cnsMembers, "cns");
-  const formateursWithPresence = withRosterPresence(formateurs, "formateurs");
-  const membresNationauxWithPresence = withRosterPresence(membresNationaux, "membres_nationaux");
   const groundRules = groundRulesRows[0] || { intro: "", rules: [] };
   let minutesStructured = { attendance: [], agendaBlocks: [], motions: [] };
   if (minutes[0]) {
@@ -1525,7 +1251,7 @@ async function assemblyDetail(req, res, member, body) {
   }
   const presentCount = attendance.filter(row => ["present", "late"].includes(row.attendance_status)).length;
   const quorumMet = assembly.scope === "local" ? presentCount >= assembly.quorum_required : null;
-  if (req.method === "GET" || body.action === "assembly") return json(res, 200, { assembly: { ...assembly, assembly_label: ASSEMBLY_LABELS[assembly.assembly_type] || assembly.assembly_type, present_count: presentCount, quorum_met_live: quorumMet }, attendance, roles, motions, elections, minutes: minutes[0] || null, minutesStructured, clubAttendance, epnMembers, plenaries, piBoxes, groundRules, movements, benRoster: benRosterWithPresence, cnsMembers: cnsMembersWithPresence, formateurs: formateursWithPresence, membresNationaux: membresNationauxWithPresence, canEditPV });
+  if (req.method === "GET" || body.action === "assembly") return json(res, 200, { assembly: { ...assembly, assembly_label: ASSEMBLY_LABELS[assembly.assembly_type] || assembly.assembly_type, present_count: presentCount, quorum_met_live: quorumMet }, attendance, roles, motions, elections, minutes: minutes[0] || null, minutesStructured, clubAttendance, epnMembers, plenaries, piBoxes, groundRules, movements, benRoster, cnsMembers, formateurs, membresNationaux, canEditPV });
   if (body.action === "attendance") {
     if (!(await requireClubCapability(req, res, member, "cscy_reviewer", assembly.school_id))) return;
     const target = attendance.find(row => row.member_id === body.memberId);
@@ -1554,29 +1280,6 @@ async function assemblyDetail(req, res, member, body) {
     const result = await db`update portal_assembly_club_attendance set attendance_status=${attendanceStatus}, voting_status=${votingStatus}, representative_name=${representativeName}, assigned_by=${member.id}, updated_at=now() where assembly_id=${id} and school_id=${body.schoolId} returning *`;
     await recordAudit(db, { actorId: member.id, action: "assembly.club_attendance.updated", entityType: "assembly", entityId: id, afterData: result[0] });
     return json(res, 200, { clubAttendance: result[0] });
-  }
-  if (body.action === "roster_presence") {
-    // Présent/Absent (+ Votant/Non votant, except formateurs) toggle for
-    // the BEN·SupCo, CNS, formateurs, and membres nationaux rosters —
-    // scoped to this assembly, same permission group as club_attendance.
-    if (assembly.scope !== "national") return json(res, 400, { error: "Cette liste n'existe que pour les AG nationales." });
-    const allowed = member.is_national_admin
-      || (await hasCapability(member.id, assembly.school_id, "cscy_reviewer"))
-      || (await hasNationalRole(member.id, "secretaire_national"));
-    if (!allowed) return json(res, 403, { error: "Vous n'avez pas la permission de modifier la présence de cette liste." });
-    const roster = ["ben", "cns", "formateurs", "membres_nationaux"].includes(body.roster) ? body.roster : null;
-    if (!roster) return json(res, 400, { error: "Liste invalide." });
-    if (!body.memberId) return json(res, 400, { error: "Membre requis." });
-    const attendanceStatus = ["present", "absent"].includes(body.attendanceStatus) ? body.attendanceStatus : "absent";
-    const votingStatus = ["votant", "non_votant"].includes(body.votingStatus) ? body.votingStatus : "non_votant";
-    const rows = await db`
-      insert into portal_assembly_roster_presence (assembly_id, member_id, roster, attendance_status, voting_status, assigned_by, updated_at)
-      values (${id}, ${body.memberId}, ${roster}, ${attendanceStatus}, ${votingStatus}, ${member.id}, now())
-      on conflict (assembly_id, member_id, roster) do update set attendance_status = excluded.attendance_status, voting_status = excluded.voting_status, assigned_by = excluded.assigned_by, updated_at = now()
-      returning *
-    `;
-    await recordAudit(db, { actorId: member.id, action: "assembly.roster_presence.updated", entityType: "assembly", entityId: id, afterData: rows[0] });
-    return json(res, 200, { rosterPresence: rows[0] });
   }
   if (body.action === "changement_representant") {
     // Swaps who represents a club at the AG without touching its
@@ -1911,7 +1614,6 @@ module.exports = async (req, res) => {
     if (action === "document_upload") return documentUpload(req, res, member);
     if (action === "document_download") return documentDownload(req, res, member);
     if (action === "training") return training(req, res, member, body);
-    if (action === "formation_sessions") return formationSessions(req, res, member, body);
     if (action === "tasks") return tasks(req, res, member, body);
     if (action === "responsibilities") return responsibilities(req, res, member, body);
     return json(res, 404, { error: "Action portail inconnue." });
