@@ -30,7 +30,23 @@ const CAPABILITIES = ["membership_approver", "report_validator", "pv_editor", "m
 // it lets whoever holds it write the national AG's PV (see
 // requirePvEditorForAssembly below) without needing the pv_editor
 // capability, since that capability is meant for local club PVs.
-const NATIONAL_ROLES = ["president_national", "epn_member", "secretaire_national"];
+// BEN posts (Trésorier National, VPA, VPR, VPCOM) and the Conseil de
+// Supervision's national seat (SUPCO) added alongside président_national so
+// the "Liste de présence du BEN et du Conseil de Supervision" on national AG
+// PVs can be driven from real member roles instead of free text — a vacant
+// post is simply "no current row for that role".
+const NATIONAL_ROLES = ["president_national", "epn_member", "secretaire_national", "secretaire_general_national", "tresorier_national", "vpa", "vpr", "vpcom", "supco_national"];
+const BEN_ROLE_LABELS = {
+  president_national: "Président National",
+  secretaire_general_national: "Secrétaire Générale Nationale",
+  tresorier_national: "Trésorier National",
+  vpa: "VPA",
+  vpr: "VPR",
+  vpcom: "VPCOM",
+  supco_national: "SUPCO",
+};
+// Order the BEN/SupCo roster is presented in, matching the paper PV.
+const BEN_ROSTER_ROLES = ["president_national", "secretaire_general_national", "tresorier_national", "vpa", "vpr", "vpcom", "supco_national"];
 const MEMBERSHIP_STATUSES = ["nouveau_adherent", "adherent", "responsable", "senior", "membre_national", "ancien"];
 
 function assertValidMembershipStatus(status) {
@@ -454,6 +470,43 @@ async function getEpnMembers() {
   `;
 }
 
+// Full "BEN et Conseil de Supervision" roster in paper-PV order, one row
+// per post — vacant posts come back as { role, holder: null } instead of
+// being silently dropped, matching the paper PV's red "Vacant" rows.
+async function getBenRoster() {
+  const db = sql();
+  const rows = await db`
+    select r.role, m.id as member_id, m.display_name, m.username
+    from portal_national_roles r
+    join portal_members m on m.id = r.member_id
+    where r.role = any(${BEN_ROSTER_ROLES}) and r.ended_at is null and m.status = 'active'
+  `;
+  const byRole = new Map(rows.map(row => [row.role, row]));
+  return BEN_ROSTER_ROLES.map(role => ({
+    role,
+    label: BEN_ROLE_LABELS[role],
+    holder: byRole.has(role) ? { id: byRole.get(role).member_id, displayName: byRole.get(role).display_name, username: byRole.get(role).username } : null,
+  }));
+}
+
+// Auto-fills a "PI" role label for a member: national title first (matches
+// the paper PV's "(Responsable LIAYC)" / "(Entité des membres nationaux)"
+// style), then club display role, else the membership status itself.
+async function getMemberRoleLabel(memberId) {
+  const db = sql();
+  const [nationalRows, clubRows, memberRows] = await Promise.all([
+    db`select role from portal_national_roles where member_id = ${memberId} and ended_at is null limit 1`,
+    db`select r.role, s.name as school_name from portal_club_display_roles r join portal_schools s on s.id = r.school_id where r.member_id = ${memberId} and r.ended_at is null limit 1`,
+    db`select display_name, membership_status from portal_members where id = ${memberId} limit 1`,
+  ]);
+  const clubRoleLabels = { president: "Président(e)", tresorier: "Trésorier(e)", secretaire: "Secrétaire", vpi: "VPI", vpe: "VPE", vpc: "VPC", supco_regional: "SupCo Régional" };
+  if (nationalRows[0]) return BEN_ROLE_LABELS[nationalRows[0].role] || nationalRows[0].role;
+  if (clubRows[0]) return `${clubRoleLabels[clubRows[0].role] || clubRows[0].role} · ${clubRows[0].school_name}`;
+  if (memberRows[0]?.membership_status === "senior") return "Conseil National des Seniors";
+  if (memberRows[0]?.membership_status === "membre_national") return "Entité des membres nationaux";
+  return memberRows[0] ? "Membre" : null;
+}
+
 // ---- HTTP route guards --------------------------------------------------
 // Same pattern as sessions.js's requireActiveMember/requireNationalAdmin:
 // writes the response and returns null on failure, so a route handler
@@ -531,4 +584,8 @@ module.exports = {
   setMembershipStatus,
   requireCapability,
   requireDisplayRole,
+  BEN_ROLE_LABELS,
+  BEN_ROSTER_ROLES,
+  getBenRoster,
+  getMemberRoleLabel,
 };

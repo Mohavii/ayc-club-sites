@@ -765,8 +765,14 @@ create table if not exists portal_assemblies (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-alter table portal_assemblies add column if not exists ag_workspace jsonb not null default '{}'::jsonb;
 create index if not exists idx_portal_assemblies_school on portal_assemblies(school_id, status, created_at desc);
+
+-- Extra Contextualisation fields from the paper PV's "I. Contextualisation"
+-- block: adoption state and the named rédacteurs (with their club), shown
+-- above the type/organisateur/lieu fields already covered by the assembly
+-- + meeting rows.
+alter table portal_assemblies add column if not exists adoption_state text not null default 'draft' check (adoption_state in ('draft', 'submitted_for_adoption', 'adopted'));
+alter table portal_assemblies add column if not exists editors jsonb not null default '[]'::jsonb; -- [{ name, club }]
 
 create table if not exists portal_assembly_roles (
   assembly_id uuid not null references portal_assemblies(id) on delete cascade,
@@ -956,3 +962,112 @@ create table if not exists portal_assembly_club_attendance (
   unique (assembly_id, school_id)
 );
 create index if not exists idx_portal_assembly_club_attendance_assembly on portal_assembly_club_attendance(assembly_id);
+
+-- Paper sheet has a "Représentant" column next to each club row (who showed
+-- up for that club) — free text since it's filled in on the day and the
+-- person may not have a portal account.
+alter table portal_assembly_club_attendance add column if not exists representative_name text;
+
+-- =======================================================================
+-- BEN / SUPCO NATIONAL POSTS (PHASE 7 — full PV parity with the paper AG)
+-- =======================================================================
+-- Named national offices beyond président_national/EPN/secrétaire, matching
+-- "La liste de présence du Bureau Exécutif National et les membres du
+-- Conseil de Supervision" on the paper PV. Same "one current row, history
+-- via ended_at" pattern as the rest of portal_national_roles — a post can
+-- be vacant (no current row) and the UI renders that as "Vacant".
+do $$
+begin
+  alter table portal_national_roles drop constraint if exists portal_national_roles_role_check;
+  alter table portal_national_roles add constraint portal_national_roles_role_check
+    check (role in (
+      'president_national', 'epn_member', 'secretaire_national',
+      'secretaire_general_national', 'tresorier_national', 'vpa', 'vpr', 'vpcom', 'supco_national'
+    ));
+exception when duplicate_object then null;
+end $$;
+
+-- =======================================================================
+-- PLÉNIÈRES (PHASE 7)
+-- =======================================================================
+-- A national AG runs across several "plénières" (sessions), each with its
+-- own start/end time and its own équipe plénière (président/vice-président/
+-- secrétaires/CSCY/CF) — see "La première plénière", "Plénière 2", etc. on
+-- the paper PV. Motions are grouped under a plenary via motions.plenary_id
+-- so the agenda/sommaire can list "Plénière N -> its motions" and the PV
+-- body can repeat the équipe + agenda mini-block per plénière.
+create table if not exists portal_assembly_plenaries (
+  id uuid primary key default gen_random_uuid(),
+  assembly_id uuid not null references portal_assemblies(id) on delete cascade,
+  position integer not null default 0,
+  label text not null default 'Plénière',
+  starts_at_text text,
+  closes_at_text text,
+  president_name text,
+  vice_president_name text,
+  secretaries text,
+  cscy_name text,
+  cf_name text,
+  created_at timestamptz not null default now(),
+  unique (assembly_id, position)
+);
+create index if not exists idx_portal_assembly_plenaries_assembly on portal_assembly_plenaries(assembly_id, position);
+
+alter table portal_assembly_motions add column if not exists plenary_id uuid references portal_assembly_plenaries(id) on delete set null;
+
+-- =======================================================================
+-- PI (POINT D'INTERVENTION) BOXES (PHASE 7)
+-- =======================================================================
+-- The boxed "PI: <name> (<role>)" callouts scattered through the paper PV,
+-- attached to a motion (or standalone / attached to a plenary). member_id
+-- is nullable — if the person has a portal account we look their role up
+-- automatically, otherwise role_label is free text.
+create table if not exists portal_assembly_pi (
+  id uuid primary key default gen_random_uuid(),
+  assembly_id uuid not null references portal_assemblies(id) on delete cascade,
+  motion_id uuid references portal_assembly_motions(id) on delete cascade,
+  plenary_id uuid references portal_assembly_plenaries(id) on delete set null,
+  member_id uuid references portal_members(id) on delete set null,
+  display_name text not null,
+  role_label text,
+  body text not null,
+  position integer not null default 0,
+  created_by uuid references portal_members(id),
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_portal_assembly_pi_assembly on portal_assembly_pi(assembly_id, motion_id);
+
+-- =======================================================================
+-- GROUND RULES (PHASE 7)
+-- =======================================================================
+-- One optional ground-rules block per assembly: a short intro plus an
+-- ordered list of rules, presented at the top of the plénière.
+create table if not exists portal_assembly_ground_rules (
+  assembly_id uuid primary key references portal_assemblies(id) on delete cascade,
+  intro text,
+  rules jsonb not null default '[]'::jsonb,
+  updated_by uuid references portal_members(id),
+  updated_at timestamptz not null default now()
+);
+
+-- =======================================================================
+-- MOUVEMENTS & CHANGEMENT DE REPRÉSENTANT (PHASE 7)
+-- =======================================================================
+-- Free-running log of "Nom et prénom / Statut-Club / Mouvement (Sortie ou
+-- Entrée) / Heure" rows exactly like the attached screenshot, plus
+-- "changement de représentant" — swapping which BEL member represents a
+-- club already marked présent, without touching attendance/vote rows.
+create table if not exists portal_assembly_movements (
+  id uuid primary key default gen_random_uuid(),
+  assembly_id uuid not null references portal_assemblies(id) on delete cascade,
+  movement_type text not null check (movement_type in ('sortie', 'entree', 'changement_representant')),
+  member_id uuid references portal_members(id) on delete set null,
+  display_name text not null,
+  status_club text,
+  school_id integer references portal_schools(id) on delete set null,
+  previous_representative_name text,
+  occurred_at_text text not null,
+  created_by uuid references portal_members(id),
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_portal_assembly_movements_assembly on portal_assembly_movements(assembly_id, created_at);
