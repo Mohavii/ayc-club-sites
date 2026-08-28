@@ -603,6 +603,14 @@ create table if not exists portal_minutes_motions (
   unique (minutes_id, position)
 );
 create index if not exists idx_portal_minutes_motions_minutes on portal_minutes_motions(minutes_id, position);
+-- Free-text proposer/seconder: in an AL/AG the proposer and seconder of a
+-- motion are usually entities (a club, the BEN, the CSCY…) rather than a
+-- single member, so we keep the member FK for standard club meetings and
+-- add plain text columns for the assembly case.
+alter table portal_minutes_motions add column if not exists proposer_name text;
+alter table portal_minutes_motions add column if not exists seconder_name text;
+alter table portal_minutes_motions add column if not exists closing_time text;
+alter table portal_minutes_motions add column if not exists duration_minutes integer;
 
 -- =======================================================================
 -- REPORT TEMPLATES, DEADLINES, AND STRATEGIC AXES (PHASE 3)

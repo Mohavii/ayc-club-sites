@@ -4,6 +4,29 @@
 // selects one allowlist in vercel.mjs before Vercel packages functions.
 
 const TARGETS = {
+  // Local development: serve every API route from one localhost origin so the
+  // whole portal can be tested without the production multi-project proxy split.
+  local: [
+    "api/chat.js",
+    "api/interactions.js",
+    "api/submit-form.js",
+    "api/session.js",
+    "api/portal.js",
+    "api/schools.js",
+    "api/auth/google/callback.js",
+    "api/auth/google/start.js",
+    "api/auth/logout.js",
+    "api/onboarding/check-username.js",
+    "api/onboarding/me.js",
+    "api/onboarding/submit.js",
+    "api/onboarding/upload-photo.js",
+    "api/admin/members.js",
+    "api/admin/members/decide.js",
+    "api/admin/members/pending.js",
+    "api/admin/members/set-admin.js",
+    "api/admin/roles.js",
+  ],
+
   bot: ["api/chat.js", "api/interactions.js", "api/submit-form.js", "api/session.js"],
 
   // Public-facing project: static public/portal/** plus proxy rewrites.

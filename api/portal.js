@@ -387,11 +387,13 @@ async function meetingDetail(req, res, member, body) {
         values (${minutesId}, ${position}, ${String(block.title || 'Point').slice(0, 300)}, ${block.discussion || null}, ${block.decision || null}, ${block.durationMinutes ? Number(block.durationMinutes) : null})
       `;
       for (const [position, motion] of motions.entries()) await tx`
-        insert into portal_minutes_motions (minutes_id, position, motion_type, title, proposer_id, seconder_id, amendment, direct_negative, majority_type, votes_for, votes_against, abstentions, result, consequence)
+        insert into portal_minutes_motions (minutes_id, position, motion_type, title, proposer_id, seconder_id, proposer_name, seconder_name, amendment, direct_negative, majority_type, votes_for, votes_against, abstentions, result, consequence, closing_time, duration_minutes)
         values (${minutesId}, ${position}, ${String(motion.motionType || 'decision').slice(0, 80)}, ${String(motion.title || 'Motion').slice(0, 300)},
           ${activeIds.has(motion.proposerId) ? motion.proposerId : null}, ${activeIds.has(motion.seconderId) ? motion.seconderId : null},
+          ${motion.proposerName ? String(motion.proposerName).slice(0, 200) : null}, ${motion.seconderName ? String(motion.seconderName).slice(0, 200) : null},
           ${motion.amendment || null}, ${motion.directNegative || null}, ${motion.majorityType || null},
-          ${Number(motion.votesFor || 0)}, ${Number(motion.votesAgainst || 0)}, ${Number(motion.abstentions || 0)}, ${motion.result || null}, ${motion.consequence || null})
+          ${Number(motion.votesFor || 0)}, ${Number(motion.votesAgainst || 0)}, ${Number(motion.abstentions || 0)}, ${motion.result || null}, ${motion.consequence || null},
+          ${motion.closingTime || null}, ${motion.durationMinutes ? Number(motion.durationMinutes) : null})
       `;
       return true;
     });
@@ -843,7 +845,7 @@ async function documentDownload(req, res, member) {
 async function training(req, res, member, body) {
   const db = sql();
   const access = await getMemberPortalAccess(member);
-  const isSimpleMember = !member.is_national_admin && (access.isOrdinaryMember || access.isNewAdherent);
+  const isSimpleMember = !member.is_national_admin && !access.isVerifiedTrainer && (access.isOrdinaryMember || access.isNewAdherent);
   if (req.method === "GET") {
     const [entries, trainerRows, awards, documents] = await Promise.all([
       isSimpleMember
@@ -858,6 +860,17 @@ async function training(req, res, member, body) {
     const totals = { hours: 0, declaredHours: 0, validatedHours: 0 };
     const isVerifiedTrainer = trainerRows[0]?.certification_status === "verified" || member.is_national_admin;
     const visibleEntries = isVerifiedTrainer ? entries : entries.filter(entry => MEMBER_TRAINING_CATEGORIES.includes(entry.category));
+    const trainingRequests = isVerifiedTrainer
+      ? await db`
+          select e.*, m.display_name as member_name, m.username as member_username, s.name as school_name
+          from portal_training_entries e
+          join portal_members m on m.id = e.member_id
+          left join portal_schools s on s.id = m.school_id
+          where e.validation_status = 'pending'
+            and (${member.is_national_admin} or m.school_id = ${member.school_id})
+          order by e.created_at asc
+        `
+      : [];
     for (const entry of visibleEntries) {
       const hours = Number(entry.hours || 0);
       totals.declaredHours += hours;
@@ -870,13 +883,40 @@ async function training(req, res, member, body) {
       awards,
       documents,
       totals,
+      trainingRequests,
       access: { isVerifiedTrainer, isSimpleMember },
       categoryLabels: isSimpleMember ? {} : MEMBER_TRAINING_LABELS,
     });
   }
-  if (isSimpleMember) return json(res, 403, { error: "Les formations d’un membre sont enregistrées et validées par les responsables compétents." });
+  const trainerRows = await db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`;
+  const canEditOfficialTraining = member.is_national_admin || trainerRows[0]?.certification_status === "verified";
+  if (body.action === "training_decision") {
+    if (!canEditOfficialTraining) return json(res, 403, { error: "Validation réservée aux formateurs homologués et à l’administration." });
+    const entryId = String(body.entryId || "");
+    const decision = body.decision === "reject" ? "rejected" : "validated";
+    const hours = body.hours === "" || body.hours == null ? null : Number(body.hours);
+    if (hours !== null && (!Number.isFinite(hours) || hours < 0 || hours > 10000)) return json(res, 400, { error: "Nombre d'heures invalide." });
+    const rows = await db`
+      select e.*, m.school_id
+      from portal_training_entries e
+      join portal_members m on m.id = e.member_id
+      where e.id = ${entryId}
+    `;
+    const entry = rows[0];
+    if (!entry || (!member.is_national_admin && entry.school_id !== member.school_id)) return json(res, 404, { error: "Formation introuvable." });
+    const updated = await db`
+      update portal_training_entries
+      set validation_status = ${decision},
+          hours = ${decision === "validated" ? hours : entry.hours},
+          validated_by = ${decision === "validated" ? member.id : null},
+          validated_at = ${decision === "validated" ? new Date() : null},
+          updated_at = now()
+      where id = ${entryId}
+      returning *
+    `;
+    return json(res, 200, { entry: updated[0] });
+  }
   if (body.action === "trainer_profile") {
-    const trainerRows = await db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`;
     const canEditTrainerProfile = member.is_national_admin || trainerRows[0]?.certification_status === "verified";
     if (!canEditTrainerProfile) return json(res, 403, { error: "La fiche Formateur est réservée aux formateurs homologués et aux responsables de formation." });
     const domains = jsonArrayInput(body.expertiseDomains);
@@ -892,7 +932,6 @@ async function training(req, res, member, body) {
     return json(res, 200, { trainerProfile: rows[0] });
   }
   if (body.action === "award") {
-    const trainerRows = await db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`;
     const canEditAwards = member.is_national_admin || trainerRows[0]?.certification_status === "verified";
     if (!canEditAwards) return json(res, 403, { error: "Les distinctions sont ajoutées par le parcours de validation prévu par l’association." });
     const title = String(body.title || "").trim().slice(0, 200);
@@ -910,8 +949,6 @@ async function training(req, res, member, body) {
     return json(res, 201, { award: rows[0] });
   }
   if (!body.title) return json(res, 400, { error: "Catégorie et titre requis." });
-  const trainerRows = await db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`;
-  const canEditOfficialTraining = member.is_national_admin || trainerRows[0]?.certification_status === "verified";
   const category = String(body.category || "").trim();
   if (!canEditOfficialTraining && !MEMBER_TRAINING_CATEGORIES.includes(category)) return json(res, 400, { error: "Choisis une des sept formations officielles du parcours YOUTHCLUBber." });
   if (!canEditOfficialTraining && body.hours !== "" && body.hours != null) return json(res, 403, { error: "Une participation membre est enregistrée sans heures officielles. Les heures sont saisies et validées par le responsable de formation." });
