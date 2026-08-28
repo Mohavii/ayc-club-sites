@@ -212,11 +212,13 @@
   function clubAttendanceRowMarkup(row, canEditClubs) {
     const presentSelected = row.attendance_status === 'present';
     const votantSelected = row.voting_status === 'votant';
+    const statusLabels = { club_membre: 'Club membre', nouveau_club: 'Nouveau Club' };
     return `<tr data-school="${row.school_id}">
       <td>${esc(row.school_name)}</td>
       <td>${canEditClubs
         ? `<input class="club-attendance-rep" data-school="${row.school_id}" value="${esc(row.representative_name || '')}" placeholder="N/A">`
         : esc(row.representative_name || 'N/A')}</td>
+      <td>${esc(statusLabels[row.club_status] || row.club_status || 'Club membre')}</td>
       <td>${canEditClubs
         ? `<select class="club-attendance-status" data-school="${row.school_id}"><option value="absent"${!presentSelected?' selected':''}>Absent</option><option value="present"${presentSelected?' selected':''}>Présent</option></select>`
         : `<span class="status-badge${presentSelected?' status-active':' status-invalidated'}">${presentSelected?'Présent':'Absent'}</span>`}</td>
@@ -231,22 +233,34 @@
     return `<div class="table-wrap"><table class="portal-table"><thead><tr><th>Prénom et nom</th><th>Rôle</th></tr></thead><tbody>${epnMembers.map(m => `<tr><td>${esc(m.display_name || m.username)}</td><td>${m.is_national_secretary ? 'Secrétaire National(e)' : 'Membre EPN'}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
-  function benRosterMarkup(benRoster) {
+  function rosterPresenceCell(member, roster, canEdit) {
+    const presentSelected = member.attendance_status === 'present';
+    if (!canEdit) return `<span class="status-badge${presentSelected?' status-active':' status-invalidated'}">${presentSelected?'Présent':'Absent'}</span>`;
+    return `<select class="roster-presence-status" data-roster="${roster}" data-member="${member.id}"><option value="absent"${!presentSelected?' selected':''}>Absent</option><option value="present"${presentSelected?' selected':''}>Présent</option></select>`;
+  }
+
+  function rosterVoteCell(member, roster, canEdit) {
+    const votantSelected = member.voting_status === 'votant';
+    if (!canEdit) return `<span class="status-badge${votantSelected?' status-active':' status-invalidated'}">${votantSelected?'Votant':'Non votant'}</span>`;
+    return `<select class="roster-presence-vote" data-roster="${roster}" data-member="${member.id}"><option value="non_votant"${!votantSelected?' selected':''}>Non votant</option><option value="votant"${votantSelected?' selected':''}>Votant</option></select>`;
+  }
+
+  function benRosterMarkup(benRoster, canEdit) {
     if (!benRoster || !benRoster.length) return '';
     return `<h3 style="margin-top:22px">Bureau Exécutif National (BEN) &amp; Conseil de Supervision</h3>
-      <div class="table-wrap"><table class="portal-table"><thead><tr><th>Poste</th><th>Prénom et nom</th><th>Présence</th></tr></thead><tbody>${benRoster.map(row => `<tr><td>${esc(row.label)}</td><td>${row.holder ? esc(row.holder.displayName || row.holder.username) : 'Vacant'}</td><td>${row.holder ? '<span class="status-badge status-active">À renseigner en présence individuelle</span>' : '<span class="status-badge status-invalidated">Poste vacant</span>'}</td></tr>`).join('')}</tbody></table></div>`;
+      <div class="table-wrap"><table class="portal-table"><thead><tr><th>Poste</th><th>Prénom et nom</th><th>Présence</th></tr></thead><tbody>${benRoster.map(row => `<tr><td>${esc(row.label)}</td><td>${row.holder ? esc(row.holder.displayName || row.holder.username) : 'Vacant'}</td><td>${row.holder ? rosterPresenceCell(row.holder, 'ben', canEdit) : '<span class="status-badge status-invalidated">Poste vacant</span>'}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
-  function simplePresenceListMarkup(title, members, withVote) {
+  function simplePresenceListMarkup(title, roster, members, withVote, canEdit) {
     if (!members || !members.length) return `<h3 style="margin-top:22px">${esc(title)}</h3>${AYCPortal.renderEmpty('Personne dans cette liste pour le moment.')}`;
-    return `<h3 style="margin-top:22px">${esc(title)}</h3><div class="table-wrap"><table class="portal-table"><thead><tr><th>Prénom et nom</th>${withVote ? '<th>Droit de vote</th>' : ''}</tr></thead><tbody>${members.map(m => `<tr><td>${esc(m.display_name || m.username)}</td>${withVote ? '<td><span class="status-badge status-active">Votant collectif</span></td>' : ''}</tr>`).join('')}</tbody></table></div>`;
+    return `<h3 style="margin-top:22px">${esc(title)}</h3><div class="table-wrap"><table class="portal-table"><thead><tr><th>Prénom et nom</th><th>Présence</th>${withVote ? '<th>Droit de vote</th>' : ''}</tr></thead><tbody>${members.map(m => `<tr><td>${esc(m.display_name || m.username)}</td><td>${rosterPresenceCell(m, roster, canEdit)}</td>${withVote ? `<td>${rosterVoteCell(m, roster, canEdit)}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
   }
 
-  function seniorsFormateursNationauxMarkup(data) {
-    return benRosterMarkup(data.benRoster)
-      + simplePresenceListMarkup('Conseil National des Seniors (CNS)', data.cnsMembers, true)
-      + simplePresenceListMarkup('Formateurs homologués', data.formateurs, false)
-      + simplePresenceListMarkup('Membres nationaux', data.membresNationaux, true);
+  function seniorsFormateursNationauxMarkup(data, canEdit) {
+    return benRosterMarkup(data.benRoster, canEdit)
+      + simplePresenceListMarkup('Conseil National des Seniors (CNS)', 'cns', data.cnsMembers, true, canEdit)
+      + simplePresenceListMarkup('Formateurs homologués', 'formateurs', data.formateurs, false, canEdit)
+      + simplePresenceListMarkup('Membres nationaux', 'membres_nationaux', data.membresNationaux, true, canEdit);
   }
 
   function piBoxMarkup(pi, canEdit) {
@@ -349,7 +363,7 @@
     const attendanceSectionMarkup = isNational
       ? `<h3>Clubs — présence et droit de vote</h3>
          <p class="list-item-meta" style="margin:-4px 0 10px">${clubsPresent} club(s) présent(s) sur ${(data.clubAttendance||[]).length}</p>
-         <div class="table-wrap"><table class="portal-table"><thead><tr><th>Club</th><th>Représentant</th><th>Présence</th><th>Vote</th></tr></thead><tbody>${(data.clubAttendance||[]).map(row=>clubAttendanceRowMarkup(row, canEditClubAttendance)).join('')}</tbody></table></div>
+         <div class="table-wrap"><table class="portal-table"><thead><tr><th>Club</th><th>Représentant</th><th>Statut</th><th>Présence</th><th>Vote</th></tr></thead><tbody>${(data.clubAttendance||[]).map(row=>clubAttendanceRowMarkup(row, canEditClubAttendance)).join('')}</tbody></table></div>
          <h3 style="margin-top:22px">Équipe Plénière Nationale (EPN)</h3>
          ${epnRosterMarkup(data.epnMembers||[])}`
       : `<h3>Présence et droits de vote</h3>
@@ -390,7 +404,7 @@
         </div>
         <div>
           ${attendanceSectionMarkup}
-          ${isNational ? seniorsFormateursNationauxMarkup(data) : ''}
+          ${isNational ? seniorsFormateursNationauxMarkup(data, canEditClubAttendance) : ''}
           <h3 style="margin-top:22px">Mouvements</h3>
           <p class="list-item-meta" style="margin:-4px 0 10px">Sorties, entrées et changements de représentant, comme sur la feuille de mouvement papier.</p>
           <div id="movements-list" class="list-stack">${movementsMarkup}</div>
@@ -413,6 +427,8 @@
     if (canEditClubAttendance) {
       detail.querySelectorAll('.club-attendance-status').forEach(select=>select.addEventListener('change',async()=>{const schoolId=select.dataset.school; const voteSelect=detail.querySelector(`.club-attendance-vote[data-school="${schoolId}"]`); try{await AYCPortal.api('assembly',{method:'POST',body:{action:'club_attendance',assemblyId:a.id,schoolId,attendanceStatus:select.value,votingStatus:voteSelect?voteSelect.value:'non_votant'}}); await openAssembly(a.id);}catch(e){apiError(e)}}));
       detail.querySelectorAll('.club-attendance-vote').forEach(select=>select.addEventListener('change',async()=>{const schoolId=select.dataset.school; const statusSelect=detail.querySelector(`.club-attendance-status[data-school="${schoolId}"]`); try{await AYCPortal.api('assembly',{method:'POST',body:{action:'club_attendance',assemblyId:a.id,schoolId,attendanceStatus:statusSelect?statusSelect.value:'absent',votingStatus:select.value}}); await openAssembly(a.id);}catch(e){apiError(e)}}));
+      detail.querySelectorAll('.roster-presence-status').forEach(select=>select.addEventListener('change',async()=>{const roster=select.dataset.roster; const memberId=select.dataset.member; const voteSelect=detail.querySelector(`.roster-presence-vote[data-roster="${roster}"][data-member="${memberId}"]`); try{await AYCPortal.api('assembly',{method:'POST',body:{action:'roster_presence',assemblyId:a.id,roster,memberId,attendanceStatus:select.value,votingStatus:voteSelect?voteSelect.value:'non_votant'}}); await openAssembly(a.id);}catch(e){apiError(e)}}));
+      detail.querySelectorAll('.roster-presence-vote').forEach(select=>select.addEventListener('change',async()=>{const roster=select.dataset.roster; const memberId=select.dataset.member; const statusSelect=detail.querySelector(`.roster-presence-status[data-roster="${roster}"][data-member="${memberId}"]`); try{await AYCPortal.api('assembly',{method:'POST',body:{action:'roster_presence',assemblyId:a.id,roster,memberId,attendanceStatus:statusSelect?statusSelect.value:'absent',votingStatus:select.value}}); await openAssembly(a.id);}catch(e){apiError(e)}}));
     }
     if (canClose) document.getElementById('close-assembly').onclick=async()=>{try{await AYCPortal.api('assembly',{method:'POST',body:{action:'close',assemblyId:a.id,outcomeSummary:'Clôture documentée dans le portail.'}}); await load(); await openAssembly(a.id);}catch(e){apiError(e)}};
 

@@ -29,6 +29,7 @@ module.exports = async (req, res) => {
         displayName: member.display_name,
         profilePictureUrl: member.profile_picture_url,
         status: member.status,
+        schoolId: member.school_id,
         isNationalAdmin: member.is_national_admin,
         canReviewMembership,
         access,
