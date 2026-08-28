@@ -69,7 +69,11 @@
     { value: "supervision_editor", label: "Responsable de supervision" },
     { value: "cscy_reviewer", label: "Référent CSCY" },
   ];
-  const NATIONAL_ROLES = [{ value: "president_national", label: "Président National" }];
+  const NATIONAL_ROLES = [
+    { value: "president_national", label: "Président National" },
+    { value: "epn_member", label: "Équipe Plénière Nationale (EPN)" },
+    { value: "secretaire_national", label: "Secrétaire National (rédaction des PV d’AG)" },
+  ];
   const NATIONAL_CAPABILITIES = [{ value: "national_projects", label: "Créer et piloter des projets nationaux" }];
   const MEMBERSHIP_STATUSES = [
     { value: "nouveau_adherent", label: "Nouveau adhérent" },
@@ -195,7 +199,7 @@
       </div>
 
       <div class="role-section-label">Rôles nationaux</div>
-      <p class="field-hint" style="margin:-4px 0 10px;">Portée nationale, indépendante de ce club et du statut d'admin national.</p>
+      <p class="field-hint" style="margin:-4px 0 10px;">Portée nationale, indépendante de ce club et du statut d'admin national. L'EPN est cumulable (plusieurs membres à la fois) et ses membres sont automatiquement listés comme participants sur chaque AG nationale.</p>
       <div class="role-chip-row" id="national-chips">
         ${NATIONAL_ROLES.map(
           (r) => `<button class="role-chip${activeNationalValues.has(r.value) ? " granted" : ""}"

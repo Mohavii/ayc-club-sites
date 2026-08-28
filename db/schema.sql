@@ -603,14 +603,6 @@ create table if not exists portal_minutes_motions (
   unique (minutes_id, position)
 );
 create index if not exists idx_portal_minutes_motions_minutes on portal_minutes_motions(minutes_id, position);
--- Free-text proposer/seconder: in an AL/AG the proposer and seconder of a
--- motion are usually entities (a club, the BEN, the CSCY…) rather than a
--- single member, so we keep the member FK for standard club meetings and
--- add plain text columns for the assembly case.
-alter table portal_minutes_motions add column if not exists proposer_name text;
-alter table portal_minutes_motions add column if not exists seconder_name text;
-alter table portal_minutes_motions add column if not exists closing_time text;
-alter table portal_minutes_motions add column if not exists duration_minutes integer;
 
 -- =======================================================================
 -- REPORT TEMPLATES, DEADLINES, AND STRATEGIC AXES (PHASE 3)
@@ -773,6 +765,7 @@ create table if not exists portal_assemblies (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table portal_assemblies add column if not exists ag_workspace jsonb not null default '{}'::jsonb;
 create index if not exists idx_portal_assemblies_school on portal_assemblies(school_id, status, created_at desc);
 
 create table if not exists portal_assembly_roles (
@@ -812,6 +805,18 @@ create table if not exists portal_assembly_motions (
   created_at timestamptz not null default now(),
   unique (assembly_id, position)
 );
+-- Free-text fields matching the paper PV format used in the field (proposer/seconder are often
+-- written by name rather than tied to a member account, incl. national bureau or observers).
+alter table portal_assembly_motions add column if not exists proposer_name text;
+alter table portal_assembly_motions add column if not exists seconder_name text;
+alter table portal_assembly_motions add column if not exists amendment text;
+alter table portal_assembly_motions add column if not exists direct_negative text;
+alter table portal_assembly_motions add column if not exists discussion text;
+alter table portal_assembly_motions add column if not exists starts_at_text text;
+alter table portal_assembly_motions add column if not exists closes_at_text text;
+alter table portal_assembly_motions add column if not exists duration_text text;
+alter table portal_assembly_motions add column if not exists vote_mode text not null default 'count' check (vote_mode in ('count','manual'));
+alter table portal_assembly_motions add column if not exists manual_result text check (manual_result in ('adopted','rejected','tie',null));
 
 create table if not exists portal_investigations (
   id uuid primary key default gen_random_uuid(),
@@ -914,3 +919,40 @@ create table if not exists portal_audit_events (
 );
 create index if not exists idx_portal_audit_events_entity on portal_audit_events(entity_type, entity_id, created_at desc);
 create index if not exists idx_portal_audit_events_actor on portal_audit_events(actor_id, created_at desc);
+
+-- =======================================================================
+-- ÉQUIPE PLÉNIÈRE NATIONALE (EPN) + NATIONAL AG CLUB ATTENDANCE (PHASE 6)
+-- =======================================================================
+-- EPN is a standing body (like BEN) rather than a single seat, so it is
+-- modeled as a stackable national role — many members can hold
+-- 'epn_member' at once, same "one current row, history via ended_at"
+-- pattern as the other national roles. A dedicated 'secretaire_national'
+-- role is added alongside it so the person(s) who write the national AG
+-- PV can be recognized without a club_id and without needing the
+-- pv_editor capability (see roles.js: national AGs accept either
+-- pv_editor OR the secretaire_national title).
+do $$
+begin
+  alter table portal_national_roles drop constraint if exists portal_national_roles_role_check;
+  alter table portal_national_roles add constraint portal_national_roles_role_check
+    check (role in ('president_national', 'epn_member', 'secretaire_national'));
+exception when duplicate_object then null;
+end $$;
+
+-- One row per (assembly, school) tracking whether that CLUB — not an
+-- individual member — showed up to a national AG and whether its seat
+-- is voting, matching the paper attendance sheet format ("Lycée Pilote
+-- X" rows with Présent/Absent + Votant/Non votant dropdowns). Distinct
+-- from portal_assembly_attendance, which tracks individual members and
+-- is still used for the EPN/BEN roster on the same assembly.
+create table if not exists portal_assembly_club_attendance (
+  id uuid primary key default gen_random_uuid(),
+  assembly_id uuid not null references portal_assemblies(id) on delete cascade,
+  school_id integer not null references portal_schools(id) on delete cascade,
+  attendance_status text not null default 'absent' check (attendance_status in ('present','absent')),
+  voting_status text not null default 'non_votant' check (voting_status in ('votant','non_votant')),
+  assigned_by uuid references portal_members(id),
+  updated_at timestamptz not null default now(),
+  unique (assembly_id, school_id)
+);
+create index if not exists idx_portal_assembly_club_attendance_assembly on portal_assembly_club_attendance(assembly_id);

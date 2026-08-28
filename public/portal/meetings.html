@@ -118,16 +118,7 @@
       const motions = structured.motions || [];
       const attendanceHtml = attendance.length ? `<div class="table-wrap"><table class="portal-table"><thead><tr><th>Membre</th><th>Présence</th></tr></thead><tbody>${attendance.map(row => `<tr><td>${esc(row.display_name || row.username)}</td><td>${esc({ present: 'Présent·e', absent: 'Absent·e', excused: 'Excusé·e', late: 'En retard' }[row.attendance_status] || row.attendance_status || '—')}</td></tr>`).join('')}</tbody></table></div>` : AYCPortal.renderEmpty('Aucune feuille de présence publiée');
       const blocksHtml = blocks.length ? blocks.map((block, index) => `<div class="list-item"><div class="meeting-date"><strong>${index + 1}</strong></div><div class="list-item-main"><span class="list-item-title">${esc(block.title || 'Point')}</span>${block.discussion ? `<p class="list-item-meta"><strong>Discussion :</strong> ${esc(block.discussion)}</p>` : ''}${block.decision ? `<p class="list-item-meta"><strong>Décision :</strong> ${esc(block.decision)}</p>` : ''}</div></div>`).join('') : AYCPortal.renderEmpty('Aucun point détaillé dans ce PV');
-      const majorityLabelsPub = { simple: 'Simple', absolute: 'Absolue', relative: 'Relative', two_thirds: 'Des deux tiers' };
-      const motionsHtml = motions.length ? motions.map((motion, index) => {
-        const passed = /passe$/.test((motion.result || '').trim()) && !/ne passe pas$/.test((motion.result || '').trim());
-        const hasVoteDetail = motion.votes_for || motion.votes_against || motion.abstentions;
-        return `<div class="pv-published-motion">
-          <div class="pv-published-motion-head"><span class="pv-motion-number">Motion ${index + 1}</span><span class="list-item-title">${esc(motion.title || 'Motion')}</span>${motion.result ? `<span class="pv-motion-result-badge ${passed ? 'is-pass' : 'is-fail'}">${esc(motion.result)}</span>` : ''}</div>
-          <div class="pv-published-motion-meta">${motion.proposer_name || motion.proposerName ? `<span><strong>Proposant :</strong> ${esc(motion.proposer_name || motion.proposerName)}</span>` : ''}${motion.seconder_name || motion.seconderName ? `<span><strong>Secondant :</strong> ${esc(motion.seconder_name || motion.seconderName)}</span>` : ''}${motion.majority_type ? `<span><strong>Majorité :</strong> ${esc(majorityLabelsPub[motion.majority_type] || motion.majority_type)}</span>` : ''}${hasVoteDetail ? `<span><strong>Vote :</strong> ${motion.votes_for || 0} pour · ${motion.votes_against || 0} contre · ${motion.abstentions || 0} abstention(s)</span>` : ''}</div>
-          ${motion.consequence ? `<p class="list-item-meta"><strong>Conséquence :</strong> ${esc(motion.consequence)}</p>` : ''}
-        </div>`;
-      }).join('') : AYCPortal.renderEmpty('Aucune motion publiée');
+      const motionsHtml = motions.length ? motions.map(motion => `<div class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(motion.title || 'Motion')}</span><span class="list-item-meta">${esc(motion.result || 'Résultat non renseigné')}${motion.consequence ? ` · ${esc(motion.consequence)}` : ''}</span></div></div>`).join('') : AYCPortal.renderEmpty('Aucune motion publiée');
       return `<section class="portal-card meeting-minutes-card" id="published-pv" style="margin-top:18px;scroll-margin-top:20px"><div class="toolbar"><div><p class="eyebrow">Document officiel</p><h2>Procès-verbal publié</h2><p class="list-item-meta">${esc(statusText)}${minutes.organizer ? ` · Rédaction : ${esc(minutes.organizer)}` : ''}${minutes.duration_minutes ? ` · ${minutes.duration_minutes} min` : ''}</p></div><span class="status-badge">${esc(statusText)}</span></div><div class="meeting-detail-grid"><div><h3>Points discutés et décisions</h3><div class="list-stack">${blocksHtml}</div><h3 style="margin-top:22px">Motions et résultats</h3><div class="list-stack">${motionsHtml}</div></div><div><h3>Présence publiée</h3>${attendanceHtml}</div></div></section>`;
     }
 
@@ -152,7 +143,6 @@
       const saved = data.minutes || {};
       const structured = data.structured || {};
       const isNationalMeeting = ['reunion_nationale', 'assemblee_generale'].includes(m.meeting_type);
-      const isAssembly = m.meeting_type === 'assemblee_generale';
       const attendanceById = new Map((structured.attendance || []).map(a => [a.member_id, a]));
       const blocks = structured.agendaBlocks || [];
       const motions = structured.motions || [];
@@ -161,26 +151,6 @@
       const attendanceOptions = value => ['present', 'absent', 'excused', 'late'].map(status => `<option value="${status}"${value === status ? ' selected' : ''}>${{ present: 'Présent·e', absent: 'Absent·e', excused: 'Excusé·e', late: 'En retard' }[status]}</option>`).join('');
       const nationalClubOptions = selected => nationalClubs.filter(club => club.representatives?.length).map(club => `<option value="${club.school_id}"${String(club.school_id) === String(selected) ? ' selected' : ''}>${esc(club.school_name)}</option>`).join('');
       const representativeOptions = (schoolId, selected) => (nationalClubs.find(club => String(club.school_id) === String(schoolId))?.representatives || []).map(rep => `<option value="${rep.id}"${String(rep.id) === String(selected) ? ' selected' : ''}>${esc(rep.displayName)} · ${esc(rep.role)}</option>`).join('');
-      // Entities that can propose/second a motion in an AL/AG: the clubs present plus
-      // the standing national bodies. For a standard club meeting we fall back to the
-      // roster of members instead, since there are no "entities" to speak of.
-      const motionEntityOptions = selected => {
-        const entities = isAssembly
-          ? [...clubPresence.map(c => c.schoolName || nationalClubs.find(n => String(n.school_id) === String(c.school_id))?.school_name).filter(Boolean), 'Bureau Exécutif National', 'CSCY National', 'SupCo National', 'Membres nationaux']
-          : roster.map(r => r.display_name || r.username);
-        const unique = [...new Set(entities)];
-        const options = unique.map(name => `<option value="${esc(name)}"${name === selected ? ' selected' : ''}>${esc(name)}</option>`).join('');
-        const customSelected = selected && !unique.includes(selected) ? ` selected` : '';
-        return `<option value="">Choisir…</option>${options}<option value="__custom__"${customSelected}>Autre (préciser)…</option>`;
-      };
-      const motionTypeLabels = { decision: 'Décision', procedural: 'Motion procédurale', point_ordre: "Point d'ordre", point_info: "Point d'information", election: 'Élection' };
-      const majorityLabels = { simple: 'Simple', absolute: 'Absolue', relative: 'Relative', two_thirds: 'Des deux tiers' };
-      const majorityPasses = (type, forVotes, against) => {
-        if (type === 'two_thirds') return forVotes >= against * 2 && forVotes > 0;
-        if (type === 'absolute') return forVotes > against; // abstentions already excluded from the pool by the caller
-        if (type === 'relative') return forVotes >= against;
-        return forVotes > against; // simple majority
-      };
       const localAttendanceRows = roster.map(row => {
         const a = attendanceById.get(row.id) || {};
         const status = row.membership_status || 'adherent';
@@ -190,67 +160,8 @@
       const localAttendanceMarkup = isNationalMeeting ? '' : `<section class="pv-section"><div class="pv-section-heading"><div><h3>Présence locale</h3><p>Les membres actifs disposent automatiquement du droit de vote local. Les nouveaux adhérents peuvent être présents, mais leur vote n’est pas comptabilisé.</p></div><span class="pv-section-count">${roster.length} membre(s)</span></div><div class="table-wrap"><table class="portal-table pv-attendance-table"><thead><tr><th>Membre</th><th>Statut</th><th>Présence</th></tr></thead><tbody id="attendance-rows">${localAttendanceRows || '<tr><td colspan="3">Aucun membre actif dans ce club.</td></tr>'}</tbody></table></div></section>`;
       const nationalPresenceMarkup = isNationalMeeting ? `<section class="pv-section"><div class="pv-section-heading"><div><h3>Clubs présents</h3><p>Le vote national est porté par les clubs. Chaque club présent doit être représenté par un membre BEL actif.</p></div><span class="pv-section-count" id="club-count">${clubPresence.length} club(s)</span></div><div id="pv-clubs" class="pv-club-list">${clubPresenceRows || '<div class="pv-empty-clubs">Aucun club ajouté pour le moment.</div>'}</div><button type="button" class="btn btn-secondary btn-sm" id="add-club">Ajouter un club présent</button></section>` : '';
       const blocksMarkup = blocks.map((block, index) => `<article class="pv-block pv-editor-row"><div class="pv-block-number">${index + 1}</div><div class="pv-block-fields"><label>Point discuté<input class="block-title" value="${esc(block.title || '')}" placeholder="Titre du point"></label><label>Discussion<textarea class="block-discussion" placeholder="Résumé des échanges">${esc(block.discussion || '')}</textarea></label><label>Conclusion<textarea class="block-decision" placeholder="Décision ou suite à donner">${esc(block.decision || '')}</textarea></label></div></article>`).join('');
-      const knownEntityNames = new Set([...roster.map(r => r.display_name || r.username), ...clubPresence.map(c => c.schoolName), 'Bureau Exécutif National', 'CSCY National', 'SupCo National', 'Membres nationaux']);
-      const entityFieldMarkup = (fieldClass, value) => {
-        const isCustom = Boolean(value) && !knownEntityNames.has(value);
-        return `<select class="${fieldClass}">${motionEntityOptions(isCustom ? '__custom__' : (value || ''))}</select><input class="${fieldClass}-custom" placeholder="Préciser le nom" value="${esc(isCustom ? value : '')}" style="display:${isCustom ? 'block' : 'none'}">`;
-      };
-      const motionCardMarkup = (motion, index) => `<article class="pv-motion-card" data-index="${index}">
-        <div class="pv-motion-card-head">
-          <span class="pv-motion-number">Motion ${index + 1}</span>
-          <select class="motion-type" aria-label="Type de motion">${Object.entries(motionTypeLabels).map(([value, text]) => `<option value="${value}"${(motion.motionType || motion.motion_type) === value ? ' selected' : ''}>${text}</option>`).join('')}</select>
-          <button type="button" class="btn btn-quiet btn-sm remove-motion">Retirer</button>
-        </div>
-        <label class="pv-motion-title-field">Objet de la motion<input class="motion-title" value="${esc(motion.title || '')}" placeholder="Ex. Vote sur les postes vacants du BEL"></label>
-        <div class="pv-motion-grid">
-          <label>Proposant${entityFieldMarkup('motion-proposer', motion.proposerName || motion.proposer_name || '')}</label>
-          <label>Secondant${entityFieldMarkup('motion-seconder', motion.seconderName || motion.seconder_name || '')}</label>
-          <label>Amendement<select class="motion-amendment"><option value="non"${motion.amendment !== 'oui' ? ' selected' : ''}>Non</option><option value="oui"${motion.amendment === 'oui' ? ' selected' : ''}>Oui</option></select></label>
-          <label>Direct négatif<select class="motion-direct-negative"><option value="non"${(motion.directNegative || motion.direct_negative) !== 'oui' ? ' selected' : ''}>Non</option><option value="oui"${(motion.directNegative || motion.direct_negative) === 'oui' ? ' selected' : ''}>Oui</option></select></label>
-          <label>Majorité utilisée<select class="motion-majority">${Object.entries(majorityLabels).map(([value, text]) => `<option value="${value}"${(motion.majorityType || motion.majority_type || 'simple') === value ? ' selected' : ''}>${text}</option>`).join('')}</select></label>
-          <label>Heure de clôture<input class="motion-closing-time" type="time" value="${esc(motion.closingTime || motion.closing_time || '')}"></label>
-        </div>
-        <div class="pv-motion-votes">
-          <label>Votes pour<input class="motion-votes-for" type="number" min="0" value="${motion.votesFor ?? motion.votes_for ?? 0}"></label>
-          <label>Votes contre<input class="motion-votes-against" type="number" min="0" value="${motion.votesAgainst ?? motion.votes_against ?? 0}"></label>
-          <label>Abstentions<input class="motion-abstentions" type="number" min="0" value="${motion.abstentions ?? 0}"></label>
-          <label>Durée (min)<input class="motion-duration" type="number" min="0" value="${motion.durationMinutes ?? motion.duration_minutes ?? ''}"></label>
-          <div class="pv-motion-result-badge" data-result-badge>—</div>
-        </div>
-        <label class="pv-motion-consequence-field">Conséquence <span class="field-hint-inline">(ce que ce résultat entraîne concrètement)</span><textarea class="motion-consequence" placeholder="Ex. L'équipe plénière est donc validée par l'ensemble des entités.">${esc(motion.consequence || '')}</textarea></label>
-      </article>`;
-      const motionsMarkup = motions.map((motion, index) => motionCardMarkup(motion, index)).join('');
-      const pvTypeHint = isAssembly
-        ? "Assemblée (AL/AG) : le vote se fait par entité (clubs, BEN, CSCY…). Chaque motion garde son proposant, son secondant et le détail du vote."
-        : (m.meeting_type === 'reunion_nationale'
-          ? "Réunion nationale : la présence se suit par club représenté par un membre du BEL."
-          : "Réunion de club : la présence et le vote se suivent membre par membre.");
-      detailRoot.innerHTML = `<section class="portal-card meeting-detail-card pv-editor-shell">
-        <div class="pv-editor-header">
-          <div><span class="pv-kicker">${esc(label[m.meeting_type] || m.meeting_type)}</span><h2>Procès-verbal de ${esc(m.title)}</h2><p>${AYCPortal.formatDate(m.starts_at, true)} · ${esc(m.location || 'Format en ligne')} · ${esc(label[m.status] || m.status || 'Planifiée')}</p></div>
-          <button class="btn btn-secondary btn-sm" id="close-detail">Fermer</button>
-        </div>
-        <p class="pv-type-hint">${pvTypeHint}</p>
-        <div class="pv-summary-grid">
-          <label>Mandat / session<input id="pv-mandate" value="${esc(saved.mandate || '')}" placeholder="Ex. 2026–2027"></label>
-          <label>Organisateur·rice<input id="pv-organizer" value="${esc(saved.organizer || '')}" placeholder="Nom de la personne responsable"></label>
-          <label>Date de rédaction<input id="pv-drafted" type="date" value="${esc(saved.drafted_at ? saved.drafted_at.slice(0, 10) : '')}"></label>
-          <label>Date d’envoi<input id="pv-sent" type="date" value="${esc(saved.sent_at ? saved.sent_at.slice(0, 10) : '')}"></label>
-          <label>Statut du PV<select id="pv-status"><option value="draft"${saved.status === 'draft' || !saved.status ? ' selected' : ''}>Brouillon</option><option value="sent"${saved.status === 'sent' ? ' selected' : ''}>Publié</option><option value="validated"${saved.status === 'validated' ? ' selected' : ''}>Validé</option></select></label>
-          <label>Durée (minutes)<input id="pv-duration" type="number" min="0" value="${saved.duration_minutes || ''}" placeholder="—"></label>
-        </div>
-        <div class="pv-editor-toolbar"><div><h3>Procès-verbal</h3><p>Structure les échanges et les décisions sans surcharger la page.</p></div><span class="pv-save-hint">Les résultats de vote sont calculés automatiquement.</span></div>
-        ${localAttendanceMarkup}${nationalPresenceMarkup}
-        <section class="pv-section">
-          <div class="pv-section-heading"><div><h3>Points discutés</h3><p>Un bloc par point de l’ordre du jour, avec sa conclusion.</p></div><button type="button" class="btn btn-secondary btn-sm" id="add-block">Ajouter un point</button></div>
-          <div id="pv-blocks" class="pv-block-list">${blocksMarkup || '<div class="pv-empty-blocks">Aucun point détaillé pour le moment. Ajoute le premier point de l’ordre du jour.</div>'}</div>
-        </section>
-        <section class="pv-section">
-          <div class="pv-section-heading"><div><h3>Motions et votes</h3><p>Indique la majorité utilisée et les voix : le résultat (passe / ne passe pas) s’affiche tout seul.</p></div><button type="button" class="btn btn-secondary btn-sm" id="add-motion">Ajouter une motion</button></div>
-          <div id="pv-motions" class="pv-motion-list">${motionsMarkup || '<div class="pv-empty-blocks">Aucune motion pour le moment. Ajoute la première décision ou élection soumise au vote.</div>'}</div>
-        </section>
-        <div class="pv-footer-actions"><button class="btn btn-secondary" id="save-pv-draft">Enregistrer le brouillon</button><button class="btn btn-primary" id="save-pv">Enregistrer le PV</button></div>
-      </section>`;
+      const motionsMarkup = motions.map(motion => `<article class="pv-motion pv-editor-row"><div class="pv-block-fields"><label>Décision ou motion<input class="motion-title" value="${esc(motion.title || '')}" placeholder="Objet de la décision"></label><label>Résultat<textarea class="motion-result" placeholder="Résultat et conséquence">${esc(motion.result || '')}</textarea></label></div></article>`).join('');
+      detailRoot.innerHTML = `<section class="portal-card meeting-detail-card pv-editor-shell"><div class="pv-editor-header"><div><span class="pv-kicker">${esc(label[m.meeting_type] || m.meeting_type)}</span><h2>Procès-verbal de ${esc(m.title)}</h2><p>${AYCPortal.formatDate(m.starts_at, true)} · ${esc(m.location || 'Format en ligne')} · ${esc(label[m.status] || m.status || 'Planifiée')}</p></div><button class="btn btn-secondary btn-sm" id="close-detail">Fermer</button></div><div class="pv-summary-grid"><label>Mandat / session<input id="pv-mandate" value="${esc(saved.mandate || '')}" placeholder="Ex. 2026–2027"></label><label>Organisateur·rice<input id="pv-organizer" value="${esc(saved.organizer || '')}" placeholder="Nom de la personne responsable"></label><label>Date de rédaction<input id="pv-drafted" type="date" value="${esc(saved.drafted_at ? saved.drafted_at.slice(0, 10) : '')}"></label><label>Date d’envoi<input id="pv-sent" type="date" value="${esc(saved.sent_at ? saved.sent_at.slice(0, 10) : '')}"></label><label>Statut du PV<select id="pv-status"><option value="draft"${saved.status === 'draft' || !saved.status ? ' selected' : ''}>Brouillon</option><option value="sent"${saved.status === 'sent' ? ' selected' : ''}>Publié</option><option value="validated"${saved.status === 'validated' ? ' selected' : ''}>Validé</option></select></label><label>Durée (minutes)<input id="pv-duration" type="number" min="0" value="${saved.duration_minutes || ''}" placeholder="—"></label></div><div class="pv-editor-toolbar"><div><h3>Procès-verbal</h3><p>Structure les échanges et les décisions sans surcharger la page.</p></div><span class="pv-save-hint">Les règles de vote sont appliquées automatiquement.</span></div>${localAttendanceMarkup}${nationalPresenceMarkup}<section class="pv-section"><div class="pv-section-heading"><div><h3>Points discutés</h3><p>Un bloc par point de l’ordre du jour, avec sa conclusion.</p></div><button type="button" class="btn btn-secondary btn-sm" id="add-block">Ajouter un point</button></div><div id="pv-blocks" class="pv-block-list">${blocksMarkup || '<div class="pv-empty-blocks">Aucun point détaillé pour le moment.</div>'}</div></section><section class="pv-section"><div class="pv-section-heading"><div><h3>Décisions et motions</h3><p>Conserve uniquement le résultat utile à la lecture du PV.</p></div><button type="button" class="btn btn-secondary btn-sm" id="add-motion">Ajouter une décision</button></div><div id="pv-motions" class="pv-motion-list">${motionsMarkup || '<div class="pv-empty-blocks">Aucune décision détaillée pour le moment.</div>'}</div></section><div class="pv-footer-actions"><button class="btn btn-secondary" id="save-pv-draft">Enregistrer le brouillon</button><button class="btn btn-primary" id="save-pv">Enregistrer le PV</button></div></section>`;
 
       const blocksRoot = document.getElementById('pv-blocks');
       const motionsRoot = document.getElementById('pv-motions');
@@ -264,76 +175,14 @@
       clubsRoot?.querySelectorAll('.pv-club-row').forEach(bindClubRow);
       document.getElementById('add-club')?.addEventListener('click', () => { const row = document.createElement('div'); row.className = 'pv-club-row'; row.innerHTML = `<div class="form-field"><label>Club présent</label><select class="club-school"><option value="">Choisir un club</option>${nationalClubOptions('')}</select></div><div class="form-field"><label>Représentant BEL</label><select class="club-representative"><option value="">Choisir un représentant</option></select></div><button type="button" class="btn btn-quiet btn-sm remove-club">Retirer</button>`; clubsRoot.querySelector('.pv-empty-clubs')?.remove(); clubsRoot.appendChild(row); bindClubRow(row); document.getElementById('club-count').textContent = `${clubsRoot.querySelectorAll('.pv-club-row').length} club(s)`; });
       document.getElementById('add-block').onclick = () => { const div = document.createElement('article'); div.className = 'pv-block pv-editor-row'; div.innerHTML = `<div class="pv-block-number">${blocksRoot.querySelectorAll('.pv-block').length + 1}</div><div class="pv-block-fields"><label>Point discuté<input class="block-title" placeholder="Titre du point"></label><label>Discussion<textarea class="block-discussion" placeholder="Résumé des échanges"></textarea></label><label>Conclusion<textarea class="block-decision" placeholder="Décision ou suite à donner"></textarea></label></div>`; blocksRoot.querySelector('.pv-empty-blocks')?.remove(); blocksRoot.appendChild(div); };
-
-      // --- Motion cards: entity pickers with a "custom name" fallback, plus a
-      // live-computed pass/fail badge so the person never has to work the
-      // majority rule out by hand while typing up the PV. ---
-      function updateMotionResult(card) {
-        const forVotes = Number(card.querySelector('.motion-votes-for').value) || 0;
-        const against = Number(card.querySelector('.motion-votes-against').value) || 0;
-        const abstentions = Number(card.querySelector('.motion-abstentions').value) || 0;
-        const majorityType = card.querySelector('.motion-majority').value;
-        const directNegative = card.querySelector('.motion-direct-negative').value === 'oui';
-        const badge = card.querySelector('[data-result-badge]');
-        if (!forVotes && !against && !abstentions) { badge.textContent = 'En attente du vote'; badge.className = 'pv-motion-result-badge is-pending'; return; }
-        const effectiveMajority = directNegative && majorityType !== 'two_thirds' ? 'two_thirds' : majorityType;
-        const passes = majorityPasses(effectiveMajority, forVotes, against);
-        badge.textContent = passes ? 'La motion passe' : 'La motion ne passe pas';
-        badge.className = `pv-motion-result-badge ${passes ? 'is-pass' : 'is-fail'}`;
-      }
-      function bindEntityField(card, fieldClass) {
-        const select = card.querySelector(`.${fieldClass}`);
-        const custom = card.querySelector(`.${fieldClass}-custom`);
-        select?.addEventListener('change', () => { custom.style.display = select.value === '__custom__' ? 'block' : 'none'; if (select.value === '__custom__') custom.focus(); });
-      }
-      function bindMotionCard(card) {
-        bindEntityField(card, 'motion-proposer');
-        bindEntityField(card, 'motion-seconder');
-        ['.motion-votes-for', '.motion-votes-against', '.motion-abstentions', '.motion-majority', '.motion-direct-negative'].forEach(sel => card.querySelector(sel).addEventListener('input', () => updateMotionResult(card)));
-        card.querySelector('.remove-motion').addEventListener('click', () => { card.remove(); motionsRoot.querySelectorAll('.pv-motion-card').forEach((c, i) => { c.dataset.index = i; c.querySelector('.pv-motion-number').textContent = `Motion ${i + 1}`; }); if (!motionsRoot.querySelector('.pv-motion-card')) motionsRoot.innerHTML = '<div class="pv-empty-blocks">Aucune motion pour le moment. Ajoute la première décision ou élection soumise au vote.</div>'; });
-        updateMotionResult(card);
-      }
-      motionsRoot.querySelectorAll('.pv-motion-card').forEach(bindMotionCard);
-      document.getElementById('add-motion').onclick = () => {
-        const index = motionsRoot.querySelectorAll('.pv-motion-card').length;
-        const wrap = document.createElement('div');
-        wrap.innerHTML = motionCardMarkup({}, index);
-        const card = wrap.firstElementChild;
-        motionsRoot.querySelector('.pv-empty-blocks')?.remove();
-        motionsRoot.appendChild(card);
-        bindMotionCard(card);
-        card.querySelector('.motion-title').focus();
-      };
+      document.getElementById('add-motion').onclick = () => { const div = document.createElement('article'); div.className = 'pv-motion pv-editor-row'; div.innerHTML = `<div class="pv-block-fields"><label>Décision ou motion<input class="motion-title" placeholder="Objet de la décision"></label><label>Résultat<textarea class="motion-result" placeholder="Résultat et conséquence"></textarea></label></div>`; motionsRoot.querySelector('.pv-empty-blocks')?.remove(); motionsRoot.appendChild(div); };
       const savePV = async statusOverride => {
         const status = statusOverride || document.getElementById('pv-status').value;
         const attendance = isNationalMeeting ? [] : [...document.querySelectorAll('#attendance-rows tr[data-member-id]')].map(row => ({ memberId: row.dataset.memberId, attendanceStatus: row.querySelector('.attendance-status').value }));
         const nationalClubPresence = isNationalMeeting ? [...clubsRoot.querySelectorAll('.pv-club-row')].map(row => ({ schoolId: row.querySelector('.club-school').value, representativeId: row.querySelector('.club-representative').value })).filter(row => row.schoolId && row.representativeId) : [];
         if (isNationalMeeting && status !== 'draft' && !nationalClubPresence.length) { notice.innerHTML = '<div class="alert alert-error">Ajoute au moins un club présent et son représentant BEL avant de publier le PV national.</div>'; return; }
         const agendaBlocks = [...blocksRoot.querySelectorAll('.pv-block')].map(row => ({ title: row.querySelector('.block-title').value.trim(), discussion: row.querySelector('.block-discussion').value.trim(), decision: row.querySelector('.block-decision').value.trim() })).filter(x => x.title);
-        const entityValue = (card, fieldClass) => { const select = card.querySelector(`.${fieldClass}`); return select.value === '__custom__' ? card.querySelector(`.${fieldClass}-custom`).value.trim() : select.value; };
-        const motions = [...motionsRoot.querySelectorAll('.pv-motion-card')].map(card => {
-          const forVotes = Number(card.querySelector('.motion-votes-for').value) || 0;
-          const against = Number(card.querySelector('.motion-votes-against').value) || 0;
-          const abstentions = Number(card.querySelector('.motion-abstentions').value) || 0;
-          const majorityType = card.querySelector('.motion-majority').value;
-          const directNegative = card.querySelector('.motion-direct-negative').value;
-          const effectiveMajority = directNegative === 'oui' && majorityType !== 'two_thirds' ? 'two_thirds' : majorityType;
-          const hasVotes = Boolean(forVotes || against || abstentions);
-          return {
-            motionType: card.querySelector('.motion-type').value,
-            title: card.querySelector('.motion-title').value.trim(),
-            proposerName: entityValue(card, 'motion-proposer'),
-            seconderName: entityValue(card, 'motion-seconder'),
-            amendment: card.querySelector('.motion-amendment').value,
-            directNegative,
-            majorityType,
-            closingTime: card.querySelector('.motion-closing-time').value,
-            durationMinutes: card.querySelector('.motion-duration').value ? Number(card.querySelector('.motion-duration').value) : null,
-            votesFor: forVotes, votesAgainst: against, abstentions,
-            result: hasVotes ? (majorityPasses(effectiveMajority, forVotes, against) ? 'La motion passe' : 'La motion ne passe pas') : '',
-            consequence: card.querySelector('.motion-consequence').value.trim(),
-          };
-        }).filter(x => x.title);
+        const motions = [...motionsRoot.querySelectorAll('.pv-motion')].map(row => ({ title: row.querySelector('.motion-title').value.trim(), result: row.querySelector('.motion-result').value.trim() })).filter(x => x.title);
         try { await AYCPortal.api('meeting', { method: 'POST', body: { action: 'save_minutes', meetingId: m.id, mode: isNationalMeeting ? 'assemblee_generale' : 'standard', status, mandate: document.getElementById('pv-mandate').value, organizer: document.getElementById('pv-organizer').value, draftedAt: document.getElementById('pv-drafted').value || null, sentAt: document.getElementById('pv-sent').value || null, durationMinutes: document.getElementById('pv-duration').value, attendance, clubPresence: nationalClubPresence, agendaBlocks, motions } }); document.getElementById('pv-status').value = status; notice.innerHTML = `<div class="alert alert-success">${status === 'draft' ? 'Le brouillon du PV est enregistré.' : 'Le PV est enregistré et prêt pour sa publication.'}</div>`; } catch (error) { apiError(error); }
       };
       document.getElementById('save-pv-draft').onclick = () => savePV('draft');

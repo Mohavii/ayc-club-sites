@@ -23,7 +23,14 @@ const { sql } = require("./db");
 const DISPLAY_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc", "supco_regional"];
 const BEL_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc"];
 const CAPABILITIES = ["membership_approver", "report_validator", "pv_editor", "meeting_organizer", "project_manager", "supervision_editor", "cscy_reviewer"];
-const NATIONAL_ROLES = ["president_national"];
+// 'epn_member' seats someone on the Équipe Plénière Nationale (EPN), the
+// standing body listed as attendees on every national AG — many members
+// hold this at once, unlike a single-seat title. 'secretaire_national' is
+// the national-scope counterpart of the club 'secretaire' display role:
+// it lets whoever holds it write the national AG's PV (see
+// requirePvEditorForAssembly below) without needing the pv_editor
+// capability, since that capability is meant for local club PVs.
+const NATIONAL_ROLES = ["president_national", "epn_member", "secretaire_national"];
 const MEMBERSHIP_STATUSES = ["nouveau_adherent", "adherent", "responsable", "senior", "membre_national", "ancien"];
 
 function assertValidMembershipStatus(status) {
@@ -260,19 +267,27 @@ async function canReviewMembership(memberId, schoolId) {
 async function getMemberPortalAccess(member) {
   const db = sql();
   const schoolId = member.school_id || null;
-  const [roleRows, capabilityRows, nationalCapabilityRows, trainerRows] = await Promise.all([
+  const [roleRows, capabilityRows, nationalCapabilityRows, trainerRows, nationalRoleRows] = await Promise.all([
     schoolId ? db`select role from portal_club_display_roles where member_id = ${member.id} and school_id = ${schoolId} and ended_at is null limit 1` : Promise.resolve([]),
     schoolId ? db`select capability from portal_capability_grants where member_id = ${member.id} and school_id = ${schoolId} and revoked_at is null` : Promise.resolve([]),
     db`select capability from portal_national_capability_grants where member_id = ${member.id} and revoked_at is null`,
     db`select certification_status from portal_trainer_profiles where member_id = ${member.id} limit 1`,
+    db`select role from portal_national_roles where member_id = ${member.id} and ended_at is null`,
   ]);
   const displayRole = roleRows[0]?.role || null;
   const capabilities = capabilityRows.map(row => row.capability);
   const isNationalAdmin = Boolean(member.is_national_admin);
   const isVerifiedTrainer = trainerRows[0]?.certification_status === "verified";
   const nationalCapabilities = nationalCapabilityRows.map(row => row.capability);
+  const nationalRoles = nationalRoleRows.map(row => row.role);
   const has = capability => isNationalAdmin || capabilities.includes(capability);
   const hasNational = capability => isNationalAdmin || nationalCapabilities.includes(capability);
+  // 'secretaire_national' writes national AG PVs on its own merit — it
+  // is NOT folded into canEditPV, which several other screens (reports,
+  // local meetings) treat as "holds the local pv_editor capability".
+  // Assemblies.html checks this flag specifically for national scope.
+  const isNationalSecretary = isNationalAdmin || nationalRoles.includes("secretaire_national");
+  const isEpnMember = isNationalAdmin || nationalRoles.includes("epn_member");
   const isNewAdherent = member.membership_status === "nouveau_adherent";
   const isOrdinaryMember = !isNationalAdmin && !BEL_ROLES.includes(displayRole) && capabilities.length === 0;
   const canManageClubWork = isNationalAdmin || capabilities.some(capability => ["meeting_organizer", "pv_editor", "project_manager", "report_validator"].includes(capability));
@@ -289,6 +304,9 @@ async function getMemberPortalAccess(member) {
     canCreateProject: has("project_manager"),
     canCreateNationalProject: hasNational("national_projects"),
     nationalCapabilities,
+    nationalRoles,
+    isNationalSecretary,
+    isEpnMember,
     canReviewReports: has("report_validator"),
     canManageSupervision: has("supervision_editor"),
     canReviewSupervision: has("supervision_editor") || has("cscy_reviewer"),
@@ -406,6 +424,36 @@ async function getMemberNationalRoles(memberId) {
   `;
 }
 
+// Whether a member currently holds a given national-scope title —
+// national admins are NOT auto-granted these (unlike capabilities):
+// EPN membership and the national secretary title are seats, not admin
+// overrides, so who counts as "on the EPN" stays exactly who's been
+// seated there.
+async function hasNationalRole(memberId, role) {
+  assertValidNationalRole(role);
+  const db = sql();
+  const rows = await db`
+    select 1 from portal_national_roles
+    where member_id = ${memberId} and role = ${role} and ended_at is null
+    limit 1
+  `;
+  return rows.length > 0;
+}
+
+// Everyone currently seated on the Équipe Plénière Nationale — the
+// standing roster auto-listed as attendees whenever a national AG is
+// opened, the same way BEL/BEN office holders anchor a local assembly.
+async function getEpnMembers() {
+  const db = sql();
+  return db`
+    select m.*, r.started_at as role_started_at
+    from portal_national_roles r
+    join portal_members m on m.id = r.member_id
+    where r.role = 'epn_member' and r.ended_at is null and m.status = 'active'
+    order by m.display_name asc
+  `;
+}
+
 // ---- HTTP route guards --------------------------------------------------
 // Same pattern as sessions.js's requireActiveMember/requireNationalAdmin:
 // writes the response and returns null on failure, so a route handler
@@ -477,6 +525,8 @@ module.exports = {
   setNationalRole,
   clearNationalRole,
   getMemberNationalRoles,
+  hasNationalRole,
+  getEpnMembers,
   getMemberStatusHistory,
   setMembershipStatus,
   requireCapability,

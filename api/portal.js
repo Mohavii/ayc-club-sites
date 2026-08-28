@@ -3,6 +3,7 @@
 const { sql } = require("./_lib/db");
 const { put, get } = require("@vercel/blob");
 const { requireActiveMember } = require("./_lib/sessions");
+const { buildAgWorkspace } = require("./_lib/ag-template");
 const {
   getMemberRoleHistory,
   getMemberCapabilities,
@@ -12,6 +13,8 @@ const {
   BEL_ROLES,
   hasCapability,
   hasNationalCapability,
+  hasNationalRole,
+  getEpnMembers,
   requireCapability,
 } = require("./_lib/roles");
 
@@ -78,6 +81,22 @@ function schoolScope(member, requested) {
 async function requireClubCapability(req, res, member, capability, schoolId) {
   const guard = requireCapability(capability);
   return guard(req, res, member, schoolId);
+}
+
+// PV editing for a NATIONAL assembly is opened up to whoever holds the
+// 'secretaire_national' title — les secrétaires write the AG's PV as
+// part of that role, without needing the pv_editor capability, which
+// stays a local-club-only permission. Local assemblies are unaffected
+// and keep going through requireClubCapability("pv_editor", schoolId).
+async function requirePvEditorForAssembly(req, res, member, assembly) {
+  if (member.is_national_admin) return true;
+  if (assembly.scope === "national") {
+    if (await hasNationalRole(member.id, "secretaire_national")) return true;
+    if (await hasCapability(member.id, assembly.school_id, "pv_editor")) return true;
+    res.status(403).json({ error: "Réservé au/à la Secrétaire National(e) ou aux personnes disposant de la permission Éditeur de PV." });
+    return false;
+  }
+  return requireClubCapability(req, res, member, "pv_editor", assembly.school_id);
 }
 
 async function profile(member) {
@@ -387,13 +406,11 @@ async function meetingDetail(req, res, member, body) {
         values (${minutesId}, ${position}, ${String(block.title || 'Point').slice(0, 300)}, ${block.discussion || null}, ${block.decision || null}, ${block.durationMinutes ? Number(block.durationMinutes) : null})
       `;
       for (const [position, motion] of motions.entries()) await tx`
-        insert into portal_minutes_motions (minutes_id, position, motion_type, title, proposer_id, seconder_id, proposer_name, seconder_name, amendment, direct_negative, majority_type, votes_for, votes_against, abstentions, result, consequence, closing_time, duration_minutes)
+        insert into portal_minutes_motions (minutes_id, position, motion_type, title, proposer_id, seconder_id, amendment, direct_negative, majority_type, votes_for, votes_against, abstentions, result, consequence)
         values (${minutesId}, ${position}, ${String(motion.motionType || 'decision').slice(0, 80)}, ${String(motion.title || 'Motion').slice(0, 300)},
           ${activeIds.has(motion.proposerId) ? motion.proposerId : null}, ${activeIds.has(motion.seconderId) ? motion.seconderId : null},
-          ${motion.proposerName ? String(motion.proposerName).slice(0, 200) : null}, ${motion.seconderName ? String(motion.seconderName).slice(0, 200) : null},
           ${motion.amendment || null}, ${motion.directNegative || null}, ${motion.majorityType || null},
-          ${Number(motion.votesFor || 0)}, ${Number(motion.votesAgainst || 0)}, ${Number(motion.abstentions || 0)}, ${motion.result || null}, ${motion.consequence || null},
-          ${motion.closingTime || null}, ${motion.durationMinutes ? Number(motion.durationMinutes) : null})
+          ${Number(motion.votesFor || 0)}, ${Number(motion.votesAgainst || 0)}, ${Number(motion.abstentions || 0)}, ${motion.result || null}, ${motion.consequence || null})
       `;
       return true;
     });
@@ -1047,6 +1064,58 @@ async function responsibilities(req, res, member, body) {
 
 const ASSEMBLY_TYPES = ["alofm", "adhesion", "validation", "aloe", "dissolution", "ag_ordinaire", "ag_extraordinaire"];
 const ASSEMBLY_LABELS = { alofm: "ALOFM", adhesion: "AL d’adhésion", validation: "AL de validation", aloe: "ALOE", dissolution: "AL de dissolution", ag_ordinaire: "AG ordinaire", ag_extraordinaire: "AG extraordinaire" };
+
+function isNationalAgAssembly(assembly) { return assembly?.scope === "national" && String(assembly?.assembly_type || "").startsWith("ag_"); }
+
+function clampAgText(value, max = 2000) {
+  return value == null ? "" : String(value).slice(0, max);
+}
+
+function normalizeAgWorkspace(input, fallback) {
+  const source = input && typeof input === "object" ? input : {};
+  const base = fallback && typeof fallback === "object" ? JSON.parse(JSON.stringify(fallback)) : buildAgWorkspace();
+  const merge = (key, value) => { if (value !== undefined) base[key] = value; };
+  merge("contextualization", source.contextualization);
+  merge("summary", source.summary);
+  merge("plenaries", Array.isArray(source.plenaries) ? source.plenaries.slice(0, 12) : undefined);
+  merge("clubs", Array.isArray(source.clubs) ? source.clubs.slice(0, 100) : undefined);
+  merge("benSupco", Array.isArray(source.benSupco) ? source.benSupco.slice(0, 50) : undefined);
+  merge("seniors", Array.isArray(source.seniors) ? source.seniors.slice(0, 100) : undefined);
+  merge("trainers", Array.isArray(source.trainers) ? source.trainers.slice(0, 100) : undefined);
+  merge("nationalMembers", Array.isArray(source.nationalMembers) ? source.nationalMembers.slice(0, 100) : undefined);
+  merge("pis", Array.isArray(source.pis) ? source.pis.slice(0, 100) : undefined);
+  merge("groundRules", source.groundRules);
+  merge("movements", Array.isArray(source.movements) ? source.movements.slice(0, 500) : undefined);
+  merge("representativeChanges", Array.isArray(source.representativeChanges) ? source.representativeChanges.slice(0, 200) : undefined);
+  merge("motionCatalog", Array.isArray(source.motionCatalog) ? source.motionCatalog.slice(0, 100) : undefined);
+  return base;
+}
+
+async function enrichAgWorkspace(db, assembly, workspace) {
+  if (!isNationalAgAssembly(assembly)) return workspace;
+  const clubs = await db`
+    select s.id as school_id, s.name as school_name,
+      coalesce((select json_agg(json_build_object('id', m.id, 'name', m.display_name, 'username', m.username, 'role', r.role) order by r.role, m.display_name)
+        from portal_club_display_roles r
+        join portal_members m on m.id = r.member_id
+        where r.school_id = s.id and r.role in ('president','tresorier','secretaire','vpi','vpe','vpc')
+          and r.ended_at is null and m.status = 'active'), '[]'::json) as bel_members
+    from portal_schools s where s.is_active = true order by s.name`;
+  const piCandidates = await db`
+    select m.id, m.display_name, m.username,
+      coalesce((select case nr.role when 'president_national' then 'Président National' when 'secretaire_national' then 'Secrétaire Général(e) National(e)' when 'epn_member' then 'Membre EPN' else nr.role end
+        from portal_national_roles nr where nr.member_id=m.id and nr.ended_at is null order by nr.started_at desc limit 1),
+        (select case r.role when 'president' then 'Président BEL' when 'tresorier' then 'Trésorier BEL' when 'secretaire' then 'Secrétaire BEL' when 'vpi' then 'VPI BEL' when 'vpe' then 'VPE BEL' when 'vpc' then 'VPC BEL' else r.role end
+        from portal_club_display_roles r where r.member_id=m.id and r.ended_at is null order by r.started_at desc limit 1),
+        case m.membership_status when 'membre_national' then 'Membre national' when 'senior' then 'Senior' when 'responsable' then 'Responsable' when 'adherent' then 'Adhérent' else m.membership_status end) as role_label
+    from portal_members m where m.status='active' order by m.display_name`;
+  const clubByName = new Map(clubs.map(c => [c.school_name, c]));
+  const mergedClubs = (workspace.clubs || []).map(row => {
+    const live = clubByName.get(row.name);
+    return { ...row, schoolId: row.schoolId || live?.school_id || null, belMembers: live?.bel_members || [] };
+  });
+  return { ...workspace, clubs: mergedClubs, piCandidates };
+}
 const ELIGIBLE_MEMBER_STATUSES = new Set(["adherent", "responsable"]);
 
 function majorityOutcome(forVotes, againstVotes, abstentions, majorityType) {
@@ -1101,7 +1170,7 @@ async function assemblies(req, res, member, body) {
             coalesce((select json_agg(json_build_object('memberId', ar.member_id, 'role', ar.role)) from portal_assembly_roles ar where ar.assembly_id = a.id), '[]'::json) as roles,
             (select count(*)::int from portal_assembly_attendance aa where aa.assembly_id = a.id and aa.attendance_status in ('present','late')) as present_count
           from portal_assemblies a join portal_meetings m on m.id = a.meeting_id left join portal_schools s on s.id = a.school_id
-          where a.school_id = ${schoolId}
+          where (a.school_id = ${schoolId} or (a.scope = 'national' and a.assembly_type like 'ag_%'))
           order by m.starts_at desc
         `;
     return json(res, 200, { assemblies: rows.map(row => ({ ...row, assembly_label: ASSEMBLY_LABELS[row.assembly_type] || row.assembly_type })) });
@@ -1123,22 +1192,55 @@ async function assemblies(req, res, member, body) {
   const eligible = memberRows.filter(row => ELIGIBLE_MEMBER_STATUSES.has(row.membership_status));
   const memberSnapshot = memberRows.map(row => ({ memberId: row.id, displayName: row.display_name, username: row.username, membershipStatus: row.membership_status, votingRights: ELIGIBLE_MEMBER_STATUSES.has(row.membership_status) }));
   const quorumRequired = scope === "local" ? Math.max(1, Math.ceil(memberRows.length / 3)) : 0;
+  const isAgExtraordinaire = assemblyType === "ag_extraordinaire";
+  const agWorkspace = isAgExtraordinaire ? buildAgWorkspace() : (scope === "national" ? { contextualization: {}, summary: {}, plenaries: [], clubs: [], benSupco: [], seniors: [], trainers: [], nationalMembers: [], pis: [], groundRules: { introduction: "", rules: [] }, movements: [], representativeChanges: [], motionCatalog: [] } : null);
+  const meetingAgendaSeed = isAgExtraordinaire
+    ? agWorkspace.plenaries.flatMap(p => p.agenda.map((item) => ({ position: item.motionPosition, title: `${item.label}: ${item.title}` })))
+    : assemblyMotionSeed(assemblyType).map((item, position) => ({ position, title: item }));
   const meetingRows = await db`
     insert into portal_meetings (school_id, created_by, title, meeting_type, starts_at, ends_at, format, location, maps_url, comments, agenda, status)
-    values (${schoolId}, ${member.id}, ${title}, ${meetingType}, ${startsAt}, ${body.endsAt || null}, ${["presentiel", "en_ligne", "hybride"].includes(body.format) ? body.format : "presentiel"}, ${body.location || null}, ${body.mapsUrl || null}, ${body.comments || null}, ${JSON.stringify(assemblyMotionSeed(assemblyType).map((item, position) => ({ position, title: item })))}::jsonb, 'planned')
+    values (${schoolId}, ${member.id}, ${title}, ${meetingType}, ${startsAt}, ${body.endsAt || null}, ${["presentiel", "en_ligne", "hybride"].includes(body.format) ? body.format : "presentiel"}, ${body.location || null}, ${body.mapsUrl || null}, ${body.comments || null}, ${JSON.stringify(meetingAgendaSeed)}::jsonb, 'planned')
     returning *
   `;
   const meeting = meetingRows[0];
   const assemblyRows = await db`
-    insert into portal_assemblies (meeting_id, school_id, assembly_type, scope, status, member_snapshot_count, quorum_required, eligible_voter_count, voter_snapshot, project_url, database_url, created_by)
-    values (${meeting.id}, ${schoolId}, ${assemblyType}, ${scope}, 'planned', ${memberRows.length}, ${quorumRequired}, ${eligible.length}, ${JSON.stringify(memberSnapshot)}::jsonb, ${body.projectUrl || null}, ${body.databaseUrl || null}, ${member.id})
+    insert into portal_assemblies (meeting_id, school_id, assembly_type, scope, status, member_snapshot_count, quorum_required, eligible_voter_count, voter_snapshot, project_url, database_url, ag_workspace, created_by)
+    values (${meeting.id}, ${schoolId}, ${assemblyType}, ${scope}, 'planned', ${memberRows.length}, ${quorumRequired}, ${eligible.length}, ${JSON.stringify(memberSnapshot)}::jsonb, ${body.projectUrl || null}, ${body.databaseUrl || null}, ${agWorkspace ? JSON.stringify(agWorkspace) : null}::jsonb, ${member.id})
     returning *
   `;
   const assembly = assemblyRows[0];
+  if (isAgExtraordinaire) {
+    for (const plenary of agWorkspace.plenaries) {
+      for (const item of plenary.agenda) {
+        const plenaryNote = `Plénière ${plenary.number}`;
+        await db`insert into portal_meeting_agenda_items (meeting_id, position, title, duration_minutes, notes, created_by) values (${meeting.id}, ${item.motionPosition}, ${item.title}, null, ${plenaryNote}, ${member.id}) on conflict (meeting_id, position) do nothing`;
+      }
+    }
+  }
   for (const row of memberRows) await db`insert into portal_assembly_attendance (assembly_id, member_id, attendance_status, voting_rights, eligibility_basis, assigned_by) values (${assembly.id}, ${row.id}, 'invited', ${ELIGIBLE_MEMBER_STATUSES.has(row.membership_status)}, ${row.membership_status}, ${member.id}) on conflict (assembly_id, member_id) do nothing`;
-  for (const [position, motionTitle] of assemblyMotionSeed(assemblyType).entries()) await db`insert into portal_assembly_motions (assembly_id, position, motion_type, title, majority_type, required_motion) values (${assembly.id}, ${position}, ${position < 5 || position >= assemblyMotionSeed(assemblyType).length - 3 ? "procedural" : "decision"}, ${motionTitle}, 'simple', ${position < 5 || position >= assemblyMotionSeed(assemblyType).length - 3})`;
+  if (isAgExtraordinaire) {
+    for (const motion of agWorkspace.motionCatalog) {
+      const motionPosition = Number(motion.position);
+      const isProcedural = String(motion.label || '').toLowerCase().includes('procédure');
+      await db`
+        insert into portal_assembly_motions (assembly_id, position, motion_type, title, majority_type, required_motion, consequence, proposer_name, seconder_name, amendment, direct_negative, discussion, starts_at_text, closes_at_text, duration_text, vote_mode, manual_result)
+        values (${assembly.id}, ${motionPosition}, ${isProcedural ? 'procedural' : 'decision'}, ${motion.title}, 'simple', false, ${motion.consequence || null}, ${motion.proposer || null}, ${motion.seconder || null}, ${motion.amendment || null}, ${motion.directNegative || null}, ${motion.discussion || null}, ${motion.startsAt || null}, ${motion.closesAt || null}, ${motion.duration || null}, ${motion.result ? 'manual' : 'count'}, ${motion.result === 'La motion passe' ? 'adopted' : motion.result === 'La motion ne passe pas' ? 'rejected' : null})`;
+    }
+  } else {
+    for (const [position, motionTitle] of assemblyMotionSeed(assemblyType).entries()) {
+      await db`insert into portal_assembly_motions (assembly_id, position, motion_type, title, majority_type, required_motion) values (${assembly.id}, ${position}, ${position < 5 || position >= assemblyMotionSeed(assemblyType).length - 3 ? "procedural" : "decision"}, ${motionTitle}, 'simple', ${position < 5 || position >= assemblyMotionSeed(assemblyType).length - 3})`;
+    }
+  }
+  // National AGs list every active CLUB as an attendee row (Présent/Absent
+  // + Votant/Non votant, defaulting to Absent/Non votant), matching the
+  // paper attendance sheet — separate from the per-member roster above,
+  // which still covers the EPN/BEN individuals.
+  if (scope === "national") {
+    const allSchools = await db`select id from portal_schools where is_active = true`;
+    for (const school of allSchools) await db`insert into portal_assembly_club_attendance (assembly_id, school_id, attendance_status, voting_status, assigned_by) values (${assembly.id}, ${school.id}, 'absent', 'non_votant', ${member.id}) on conflict (assembly_id, school_id) do nothing`;
+  }
   await recordAudit(db, { actorId: member.id, action: "assembly.created", entityType: "assembly", entityId: assembly.id, afterData: { assemblyType, scope, memberSnapshotCount: memberRows.length, quorumRequired } });
-  return json(res, 201, { assembly, meeting });
+  return json(res, 201, { assembly, meeting, agWorkspace });
 }
 
 async function assemblyDetail(req, res, member, body) {
@@ -1147,10 +1249,26 @@ async function assemblyDetail(req, res, member, body) {
   const db = sql();
   const assemblyRows = await db`select a.*, m.title, m.starts_at, m.ends_at, m.format, m.location, m.comments, s.name as school_name from portal_assemblies a join portal_meetings m on m.id = a.meeting_id left join portal_schools s on s.id = a.school_id where a.id = ${id}`;
   const assembly = assemblyRows[0];
-  if (!assembly || (!member.is_national_admin && assembly.school_id !== member.school_id)) return json(res, 404, { error: "Assemblée introuvable." });
+  if (!assembly || (!member.is_national_admin && !isNationalAgAssembly(assembly) && assembly.school_id !== member.school_id)) return json(res, 404, { error: "Assemblée introuvable." });
   const access = await getMemberPortalAccess(member);
-  const canEditPV = Boolean(member.is_national_admin || access.canEditPV);
-  const [attendance, roles, motions, elections, minutes] = await Promise.all([
+  const canEditPV = Boolean(member.is_national_admin || access.canEditPV || (assembly.scope === "national" && access.isNationalSecretary));
+  let agWorkspace = isNationalAgAssembly(assembly) ? normalizeAgWorkspace(assembly.ag_workspace, assembly.assembly_type === "ag_extraordinaire" ? buildAgWorkspace() : null) : null;
+  if (isNationalAgAssembly(assembly) && assembly.assembly_type === "ag_extraordinaire" && (!assembly.ag_workspace || !Object.keys(assembly.ag_workspace || {}).length)) {
+    await db`update portal_assemblies set ag_workspace=${JSON.stringify(agWorkspace)}::jsonb, updated_at=now() where id=${id}`;
+  }
+  // Backfill club-attendance rows for national AGs created before this
+  // feature existed, or for clubs added after the AG was created — keeps
+  // "always show all active clubs" true without a one-off migration.
+  if (assembly.scope === "national") {
+    await db`
+      insert into portal_assembly_club_attendance (assembly_id, school_id, attendance_status, voting_status, assigned_by)
+      select ${id}, s.id, 'absent', 'non_votant', ${member.id}
+      from portal_schools s
+      where s.is_active = true
+      on conflict (assembly_id, school_id) do nothing
+    `;
+  }
+  const [attendance, roles, motions, elections, minutes, clubAttendance, epnMembers] = await Promise.all([
     db`select a.*, m.display_name, m.username, m.membership_status from portal_assembly_attendance a join portal_members m on m.id = a.member_id where a.assembly_id = ${id} order by m.display_name`,
     db`select ar.*, m.display_name, m.username from portal_assembly_roles ar join portal_members m on m.id = ar.member_id where ar.assembly_id = ${id} order by m.display_name`,
     db`select * from portal_assembly_motions where assembly_id = ${id} order by position`,
@@ -1158,6 +1276,19 @@ async function assemblyDetail(req, res, member, body) {
     canEditPV
       ? db`select * from portal_minutes where meeting_id = ${assembly.meeting_id}`
       : db`select * from portal_minutes where meeting_id = ${assembly.meeting_id} and status in ('sent', 'validated')`,
+    assembly.scope === "national"
+      ? db`select ca.*, s.name as school_name, s.slug as school_slug from portal_assembly_club_attendance ca join portal_schools s on s.id = ca.school_id where ca.assembly_id = ${id} order by s.name asc`
+      : Promise.resolve([]),
+    assembly.scope === "national"
+      ? db`
+          select m.id, m.display_name, m.username, m.profile_picture_url,
+            coalesce((select r2.role from portal_national_roles r2 where r2.member_id = m.id and r2.role = 'secretaire_national' and r2.ended_at is null limit 1) is not null, false) as is_national_secretary
+          from portal_national_roles r
+          join portal_members m on m.id = r.member_id
+          where r.role = 'epn_member' and r.ended_at is null and m.status = 'active'
+          order by m.display_name asc
+        `
+      : Promise.resolve([]),
   ]);
   let minutesStructured = { attendance: [], agendaBlocks: [], motions: [] };
   if (minutes[0]) {
@@ -1170,7 +1301,53 @@ async function assemblyDetail(req, res, member, body) {
   }
   const presentCount = attendance.filter(row => ["present", "late"].includes(row.attendance_status)).length;
   const quorumMet = assembly.scope === "local" ? presentCount >= assembly.quorum_required : null;
-  if (req.method === "GET" || body.action === "assembly") return json(res, 200, { assembly: { ...assembly, assembly_label: ASSEMBLY_LABELS[assembly.assembly_type] || assembly.assembly_type, present_count: presentCount, quorum_met_live: quorumMet }, attendance, roles, motions, elections, minutes: minutes[0] || null, minutesStructured });
+  if (agWorkspace) agWorkspace = await enrichAgWorkspace(db, assembly, agWorkspace);
+  if (req.method === "GET" || body.action === "assembly") return json(res, 200, { assembly: { ...assembly, assembly_label: ASSEMBLY_LABELS[assembly.assembly_type] || assembly.assembly_type, present_count: presentCount, quorum_met_live: quorumMet }, attendance, roles, motions, elections, minutes: minutes[0] || null, minutesStructured, clubAttendance, epnMembers, agWorkspace });
+
+  if (body.action === "ag_workspace") {
+    if (!isNationalAgAssembly(assembly)) return json(res, 400, { error: "Cette fonctionnalité est réservée aux AG nationales. Les AL/PV ne sont pas modifiées." });
+    if (!(await requirePvEditorForAssembly(req, res, member, assembly))) return;
+    const incoming = normalizeAgWorkspace(body.workspace, agWorkspace || buildAgWorkspace());
+    const belRows = await db`
+      select r.school_id, r.member_id, r.role, m.display_name
+      from portal_club_display_roles r
+      join portal_members m on m.id=r.member_id
+      where r.role in ('president','tresorier','secretaire','vpi','vpe','vpc')
+        and r.ended_at is null and m.status='active'`;
+    const allowedRepresentatives = new Set(belRows.map(row => `${row.school_id}:${row.member_id}`));
+    for (const club of incoming.clubs || []) {
+      if (club.representativeId && club.schoolId && !allowedRepresentatives.has(`${club.schoolId}:${club.representativeId}`)) {
+        return json(res, 400, { error: `Le représentant de ${club.name || 'ce club'} doit être un membre BEL actif du même club.` });
+      }
+    }
+    incoming.contextualization = incoming.contextualization || {};
+    incoming.summary = incoming.summary || {};
+    incoming.groundRules = incoming.groundRules || { introduction: "", rules: [] };
+    incoming.groundRules.introduction = clampAgText(incoming.groundRules.introduction, 4000);
+    incoming.groundRules.rules = Array.isArray(incoming.groundRules.rules) ? incoming.groundRules.rules.slice(0, 100).map(rule => clampAgText(rule, 1000)).filter(Boolean) : [];
+    incoming.movements = (incoming.movements || []).map(row => ({
+      name: clampAgText(row.name, 180),
+      statusClub: clampAgText(row.statusClub, 240),
+      movement: row.movement === 'sortie' ? 'sortie' : 'entree',
+      hour: clampAgText(row.hour, 20),
+    })).filter(row => row.name);
+    const piCandidateMap = new Map((agWorkspace?.piCandidates || []).map(candidate => [String(candidate.id), candidate]));
+    incoming.pis = (incoming.pis || []).map(row => {
+      const memberId = row.memberId || null;
+      const candidate = memberId ? piCandidateMap.get(String(memberId)) : null;
+      return {
+        id: row.id || `pi-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        memberId,
+        name: clampAgText(candidate?.display_name || row.name, 200),
+        role: clampAgText(candidate?.role_label || row.role, 200),
+        note: clampAgText(row.note, 4000),
+        source: clampAgText(row.source, 300),
+      };
+    }).filter(row => row.name);
+    const saved = await db`update portal_assemblies set ag_workspace=${JSON.stringify(incoming)}::jsonb, updated_at=now() where id=${id} returning ag_workspace`;
+    await recordAudit(db, { actorId: member.id, action: "ag.workspace.updated", entityType: "assembly", entityId: id, afterData: saved[0]?.ag_workspace || incoming });
+    return json(res, 200, { ok: true, agWorkspace: await enrichAgWorkspace(db, assembly, saved[0]?.ag_workspace || incoming) });
+  }
   if (body.action === "attendance") {
     if (!(await requireClubCapability(req, res, member, "cscy_reviewer", assembly.school_id))) return;
     const target = attendance.find(row => row.member_id === body.memberId);
@@ -1182,23 +1359,73 @@ async function assemblyDetail(req, res, member, body) {
     await recordAudit(db, { actorId: member.id, action: "assembly.attendance.updated", entityType: "assembly", entityId: id, afterData: result[0] });
     return json(res, 200, { attendance: result[0] });
   }
+  if (body.action === "club_attendance") {
+    if (assembly.scope !== "national") return json(res, 400, { error: "La présence par club n’existe que pour les AG nationales." });
+    // Same instance that checks members in at the door (cscy_reviewer)
+    // can toggle club rows, plus the national secretary since they're
+    // typically the one filling in the sheet from the room.
+    const allowed = member.is_national_admin
+      || (await hasCapability(member.id, assembly.school_id, "cscy_reviewer"))
+      || (await hasNationalRole(member.id, "secretaire_national"));
+    if (!allowed) return json(res, 403, { error: "Vous n'avez pas la permission de modifier la présence des clubs." });
+    const target = clubAttendance.find(row => row.school_id === Number(body.schoolId));
+    if (!target) return json(res, 404, { error: "Club absent du relevé de cette assemblée." });
+    const attendanceStatus = ["present", "absent"].includes(body.attendanceStatus) ? body.attendanceStatus : "absent";
+    const votingStatus = ["votant", "non_votant"].includes(body.votingStatus) ? body.votingStatus : "non_votant";
+    const result = await db`update portal_assembly_club_attendance set attendance_status=${attendanceStatus}, voting_status=${votingStatus}, assigned_by=${member.id}, updated_at=now() where assembly_id=${id} and school_id=${body.schoolId} returning *`;
+    await recordAudit(db, { actorId: member.id, action: "assembly.club_attendance.updated", entityType: "assembly", entityId: id, afterData: result[0] });
+    return json(res, 200, { clubAttendance: result[0] });
+  }
   if (body.action === "motion") {
-    if (!(await requireClubCapability(req, res, member, "pv_editor", assembly.school_id))) return;
+    if (!(await requirePvEditorForAssembly(req, res, member, assembly))) return;
     const position = Number(body.position);
     const existing = motions.find(row => row.position === position);
     const majorityType = ["simple", "absolute", "relative", "two_thirds"].includes(body.majorityType) ? body.majorityType : (existing?.majority_type || "simple");
+    const voteMode = body.voteMode === "manual" ? "manual" : "count";
     const votesFor = Math.max(0, Number(body.votesFor) || 0);
     const votesAgainst = Math.max(0, Number(body.votesAgainst) || 0);
     const abstentions = Math.max(0, Number(body.abstentions) || 0);
-    const resultLabel = majorityOutcome(votesFor, votesAgainst, abstentions, majorityType);
+    const manualResult = ["adopted", "rejected", "tie"].includes(body.manualResult) ? body.manualResult : null;
+    const resultLabel = voteMode === "manual" ? (manualResult || existing?.manual_result || null) : majorityOutcome(votesFor, votesAgainst, abstentions, majorityType);
+    const clip = (value, max) => (value == null ? null : String(value).slice(0, max));
+    const motionType = String(body.motionType || existing?.motion_type || "decision");
+    const requiredMotion = body.requiredMotion == null ? Boolean(existing?.required_motion) : Boolean(body.requiredMotion);
     const rows = await db`
-      insert into portal_assembly_motions (assembly_id, position, motion_type, title, majority_type, required_motion, votes_for, votes_against, abstentions, result, consequence)
-      values (${id}, ${Number.isInteger(position) && position >= 0 ? position : motions.length}, ${String(body.motionType || "decision")}, ${String(body.title || "Motion").slice(0, 300)}, ${majorityType}, ${Boolean(body.requiredMotion)}, ${votesFor}, ${votesAgainst}, ${abstentions}, ${resultLabel}, ${body.consequence || null})
-      on conflict (assembly_id, position) do update set title=excluded.title, majority_type=excluded.majority_type, votes_for=excluded.votes_for, votes_against=excluded.votes_against, abstentions=excluded.abstentions, result=excluded.result, consequence=excluded.consequence
+      insert into portal_assembly_motions (
+        assembly_id, position, motion_type, title, majority_type, required_motion,
+        votes_for, votes_against, abstentions, result, consequence,
+        proposer_name, seconder_name, amendment, direct_negative, discussion,
+        starts_at_text, closes_at_text, duration_text, vote_mode, manual_result
+      )
+      values (
+        ${id}, ${Number.isInteger(position) && position >= 0 ? position : motions.length}, ${motionType}, ${String(body.title || "Motion").slice(0, 300)}, ${majorityType}, ${requiredMotion},
+        ${votesFor}, ${votesAgainst}, ${abstentions}, ${resultLabel}, ${clip(body.consequence, 2000)},
+        ${clip(body.proposerName, 200)}, ${clip(body.seconderName, 200)}, ${clip(body.amendment, 2000)}, ${clip(body.directNegative, 2000)}, ${clip(body.discussion, 4000)},
+        ${clip(body.startsAtText, 40)}, ${clip(body.closesAtText, 40)}, ${clip(body.durationText, 60)}, ${voteMode}, ${manualResult}
+      )
+      on conflict (assembly_id, position) do update set
+        motion_type=excluded.motion_type, title=excluded.title, majority_type=excluded.majority_type, required_motion=excluded.required_motion,
+        votes_for=excluded.votes_for, votes_against=excluded.votes_against, abstentions=excluded.abstentions,
+        result=excluded.result, consequence=excluded.consequence, proposer_name=excluded.proposer_name, seconder_name=excluded.seconder_name,
+        amendment=excluded.amendment, direct_negative=excluded.direct_negative, discussion=excluded.discussion,
+        starts_at_text=excluded.starts_at_text, closes_at_text=excluded.closes_at_text, duration_text=excluded.duration_text,
+        vote_mode=excluded.vote_mode, manual_result=excluded.manual_result
       returning *
     `;
     await recordAudit(db, { actorId: member.id, action: "assembly.motion.recorded", entityType: "assembly", entityId: id, afterData: rows[0] });
     return json(res, 200, { motion: rows[0] });
+  }
+  if (body.action === "delete_motion") {
+    if (!(await requirePvEditorForAssembly(req, res, member, assembly))) return;
+    const position = Number(body.position);
+    const target = motions.find(row => row.position === position);
+    if (!target) return json(res, 404, { error: "Motion introuvable." });
+    if (target.required_motion) return json(res, 400, { error: "Cette motion fait partie du déroulé obligatoire de l’assemblée et ne peut pas être supprimée." });
+    await db`delete from portal_assembly_motions where assembly_id = ${id} and position = ${position}`;
+    const remaining = await db`select * from portal_assembly_motions where assembly_id = ${id} order by position`;
+    for (const [index, row] of remaining.entries()) if (row.position !== index) await db`update portal_assembly_motions set position = ${index} where id = ${row.id}`;
+    await recordAudit(db, { actorId: member.id, action: "assembly.motion.deleted", entityType: "assembly", entityId: id, beforeData: target });
+    return json(res, 200, { ok: true });
   }
   if (body.action === "close") {
     if (!(await requireClubCapability(req, res, member, "supervision_editor", assembly.school_id))) return;
