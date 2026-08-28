@@ -101,7 +101,7 @@ module.exports = async (req, res) => {
       case "list": {
         const target = await requireActiveTarget(res, memberId);
         if (!target) return;
-        const [roleHistory, capabilities, nationalRoles, trainerRows, documents] = await Promise.all([
+        const [roleHistory, capabilities, nationalRoles, nationalCapabilities, trainerRows, documents] = await Promise.all([
           getMemberRoleHistory(memberId),
           getMemberCapabilities(memberId),
           getMemberNationalRoles(memberId),
