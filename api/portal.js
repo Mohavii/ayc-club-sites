@@ -1367,7 +1367,7 @@ async function assemblies(req, res, member, body) {
             coalesce((select json_agg(json_build_object('memberId', ar.member_id, 'role', ar.role)) from portal_assembly_roles ar where ar.assembly_id = a.id), '[]'::json) as roles,
             (select count(*)::int from portal_assembly_attendance aa where aa.assembly_id = a.id and aa.attendance_status in ('present','late')) as present_count
           from portal_assemblies a join portal_meetings m on m.id = a.meeting_id left join portal_schools s on s.id = a.school_id
-          where a.school_id = ${schoolId}
+          where a.school_id = ${schoolId} or a.scope = 'national'
           order by m.starts_at desc
         `;
     return json(res, 200, { assemblies: rows.map(row => ({ ...row, assembly_label: ASSEMBLY_LABELS[row.assembly_type] || row.assembly_type })) });
@@ -1444,7 +1444,7 @@ async function assemblyDetail(req, res, member, body) {
   const db = sql();
   const assemblyRows = await db`select a.*, m.title, m.starts_at, m.ends_at, m.format, m.location, m.comments, s.name as school_name from portal_assemblies a join portal_meetings m on m.id = a.meeting_id left join portal_schools s on s.id = a.school_id where a.id = ${id}`;
   const assembly = assemblyRows[0];
-  if (!assembly || (!member.is_national_admin && assembly.school_id !== member.school_id)) return json(res, 404, { error: "Assemblée introuvable." });
+  if (!assembly || (!member.is_national_admin && assembly.scope !== "national" && assembly.school_id !== member.school_id)) return json(res, 404, { error: "Assemblée introuvable." });
   const access = await getMemberPortalAccess(member);
   const isEplSecretaryLive = assembly.scope === "local" && (member.is_national_admin || await hasEplRole(member.id, assembly.school_id, "epl_secretaire"));
   const canEditPV = Boolean(member.is_national_admin || access.canEditPV || (assembly.scope === "national" && access.isNationalSecretary) || isEplSecretaryLive);
