@@ -71,7 +71,7 @@
       <section class="portal-tab-panel active" id="tab-panel-meetings">
         <div id="notice"></div>
         <div class="portal-grid">
-          <section class="portal-card card-span-8"><div class="toolbar"><div><p class="eyebrow">Calendrier</p><h2>Réunions</h2></div><button class="btn btn-secondary btn-sm" id="refresh">Actualiser</button></div><div id="meeting-list" class="list-stack"></div></section>
+          <section class="portal-card card-span-8" id="meeting-list-card"><div class="toolbar"><div><p class="eyebrow">Calendrier</p><h2>Réunions</h2></div><button class="btn btn-secondary btn-sm" id="refresh">Actualiser</button></div><div id="meeting-list" class="list-stack"></div></section>
           <section class="portal-card card-span-4" id="meeting-prep-card"><p class="eyebrow">Préparation</p><h2>Nouvelle réunion</h2><form id="meeting-form">
             <div class="form-field"><label for="meetingType">Type</label><select id="meetingType"><option value="reunion_locale">Réunion locale</option><option value="reunion_nationale">Réunion nationale</option></select></div>
             <div class="form-field"><label for="meetingTitle">Titre</label><input id="meetingTitle" required placeholder="Réunion hebdomadaire du bureau"></div>
@@ -386,6 +386,11 @@
     try {
       if (!member.isNationalAdmin) {
         document.querySelectorAll('#meetingType option[value="reunion_nationale"]').forEach(o => o.remove());
+      }
+      if (!member.access?.canCreateMeeting && !member.isNationalAdmin) {
+        document.getElementById('meeting-prep-card').hidden = true;
+        document.getElementById('meeting-list-card').classList.remove('card-span-8');
+        document.getElementById('meeting-list-card').classList.add('card-span-12');
       }
       await load();
     } catch (e) { apiError(e); }

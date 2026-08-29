@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Mon parcours de formation · Portail YOUTHCLUBber</title>
   <link rel="icon" href="../assets/favicon-32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../theme.css">
   <link rel="stylesheet" href="portal.css">
 </head>
@@ -24,12 +27,12 @@
       <section class="stats-grid portfolio-stats" id="training-stats"></section>
       <section class="portal-card"><div class="toolbar"><div><p class="eyebrow">Progression</p><h2>Parcours YOUTHCLUBber</h2></div><span class="status-badge status-active">Suivi personnel</span></div><div class="list-stack" id="path"></div></section>
       <div class="portal-grid" style="margin-top:18px">
-        <section class="portal-card card-span-8">
+        <section class="portal-card card-span-12">
           <div class="toolbar"><div><p class="eyebrow">Historique</p><h2>Mes participations</h2></div><button class="btn btn-secondary btn-sm" id="reload">Actualiser</button></div>
           <div class="tab-row" id="portfolio-tabs" hidden><button class="tab-btn active" data-filter="all">Toutes</button></div>
           <div class="table-wrap"><table class="portal-table"><thead><tr><th>Formation</th><th>Intitulé / lieu</th><th>Hôte / date</th><th>Heures officielles</th><th>État</th></tr></thead><tbody id="entries"></tbody></table></div>
         </section>
-        <section class="portal-card red-theme" id="member-participation-card" hidden>
+        <section class="portal-card red-theme card-span-12" id="member-participation-card" hidden>
           <h2>Demander une participation</h2>
           <p class="field-hint" id="training-form-help">Choisis une formation officielle. Ta demande sera traitée par le responsable compétent, sans ajout d’heures par toi.</p>
           <form id="training-form">

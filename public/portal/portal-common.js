@@ -8,7 +8,6 @@
           ["home", "⌂", "Accueil"],
           ["profile", "◉", "Mon profil"],
           ["meetings", "▣", "Réunions"],
-          ["meetings#assemblies", "🏛", "Assemblées"],
           ["projects", "◆", "Projets"],
           ["training", "↗", "Cursus"],
           ["tasks", "☷", "Mes tâches"],
@@ -68,7 +67,7 @@
     if (sidebar) {
       sidebar.innerHTML = `
         <aside class="icon-sidebar" aria-label="Espace membre">
-          <div class="sidebar-mark">Y</div>
+          <div class="sidebar-mark"><img src="../assets/logo-secondary-white.png" alt="Association YOUTH CLUBs" class="sidebar-mark-logo"></div>
           <nav class="sidebar-nav">
             ${groups.map(group => `<section class="sidebar-group"><h2 class="sidebar-group-label">${escapeHtml(group.label)}</h2><div class="sidebar-links">${group.items.map(([href, icon, label]) => `<a class="sidebar-link ${(current === href || currentWithHash === href) ? "active" : ""}" href="${href}" title="${escapeHtml(label)}"><span class="sidebar-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></a>`).join("")}</div></section>`).join("")}
           </nav>
@@ -151,7 +150,7 @@
     overlay.className = "portal-loading-screen";
     overlay.innerHTML = `
       <div class="portal-loading-inner">
-        <div class="portal-loading-mark">Y</div>
+        <img src="../assets/logo-primary-blue.png" alt="Association YOUTH CLUBs" class="portal-loading-mark">
         <div class="portal-loading-ring"></div>
         <span class="portal-loading-text">Chargement…</span>
       </div>`;

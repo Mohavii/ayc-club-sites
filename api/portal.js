@@ -237,6 +237,10 @@ async function createMeeting(req, res, member, body) {
   const schoolId = schoolScope(member, body.schoolId);
   if (!schoolId) return json(res, 400, { error: "Club invalide." });
   if (!(await requireClubCapability(req, res, member, "meeting_organizer", schoolId))) return;
+  const nationalTypes = ["reunion_nationale", "assemblee_generale"];
+  if (nationalTypes.includes(body.meetingType) && !member.is_national_admin) {
+    return json(res, 403, { error: "Seul un administrateur national peut créer ce type de réunion." });
+  }
   const title = String(body.title || "").trim();
   const startsAt = String(body.startsAt || "").trim();
   const allowedTypes = MEETING_TYPES;
