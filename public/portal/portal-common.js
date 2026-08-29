@@ -8,7 +8,7 @@
           ["home", "⌂", "Accueil"],
           ["profile", "◉", "Mon profil"],
           ["meetings", "▣", "Réunions"],
-          ["assemblies", "🏛", "Assemblées"],
+          ["meetings#assemblies", "🏛", "Assemblées"],
           ["projects", "◆", "Projets"],
           ["training", "↗", "Cursus"],
           ["tasks", "☷", "Mes tâches"],
@@ -35,6 +35,7 @@
 
   function renderShell(member) {
     const current = location.pathname.split("/").pop() || "home";
+    const currentWithHash = current + (location.hash || "");
     const initials = member?.displayName
       ? member.displayName.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase()
       : "";
@@ -69,7 +70,7 @@
         <aside class="icon-sidebar" aria-label="Espace membre">
           <div class="sidebar-mark">Y</div>
           <nav class="sidebar-nav">
-            ${groups.map(group => `<section class="sidebar-group"><h2 class="sidebar-group-label">${escapeHtml(group.label)}</h2><div class="sidebar-links">${group.items.map(([href, icon, label]) => `<a class="sidebar-link ${current === href ? "active" : ""}" href="${href}" title="${escapeHtml(label)}"><span class="sidebar-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></a>`).join("")}</div></section>`).join("")}
+            ${groups.map(group => `<section class="sidebar-group"><h2 class="sidebar-group-label">${escapeHtml(group.label)}</h2><div class="sidebar-links">${group.items.map(([href, icon, label]) => `<a class="sidebar-link ${(current === href || currentWithHash === href) ? "active" : ""}" href="${href}" title="${escapeHtml(label)}"><span class="sidebar-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></a>`).join("")}</div></section>`).join("")}
           </nav>
           <a class="sidebar-link sidebar-settings" href="profile#settings" title="Paramètres"><span class="sidebar-icon" aria-hidden="true">⚙</span><span>Paramètres</span></a>
         </aside>`;
