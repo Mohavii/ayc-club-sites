@@ -19,8 +19,11 @@
       <div class="portal-heading"><div><p class="eyebrow">Pouvoir législatif</p><h1>Réunions & Assemblées</h1><p>Prépare les réunions et assemblées, conserve le rôle de chaque participant et suis le quorum avec une photographie datée des membres.</p></div></div>
       <div id="notice"></div>
       <div class="portal-grid">
-        <section class="portal-card card-span-8"><div class="toolbar"><div><p class="eyebrow">Calendrier institutionnel</p><h2>Réunions & assemblées</h2></div><button class="btn btn-secondary btn-sm" id="refresh">Actualiser</button></div><div id="assembly-list" class="list-stack"></div></section>
-        <section class="portal-card card-span-4"><p class="eyebrow">Préparation</p><h2>Nouvelle réunion / assemblée</h2><form id="assembly-form">
+        <section class="portal-card card-span-12"><div class="toolbar"><div><p class="eyebrow">Calendrier institutionnel</p><h2>Réunions & assemblées</h2></div><button class="btn btn-secondary btn-sm" id="refresh">Actualiser</button></div><div id="assembly-list" class="list-stack"></div></section>
+      </div>
+      <div id="assembly-detail"></div>
+      <div class="portal-grid" style="margin-top:18px">
+        <section class="portal-card card-span-12" id="assembly-prep-card"><p class="eyebrow">Préparation</p><h2>Nouvelle réunion / assemblée</h2><form id="assembly-form" class="form-grid">
           <div class="form-field"><label for="assemblyType">Type</label><select id="assemblyType"><option value="alofm">ALOFM</option><option value="ale">ALE</option><option value="aloe">ALOE</option><option value="agomm">AGOMM</option><option value="agofm">AGOFM</option><option value="age">AGE</option></select></div>
           <div class="form-field"><label for="assemblyTitle">Titre</label><input id="assemblyTitle" required></div>
           <div class="form-field"><label for="startsAt">Date et heure</label><input id="startsAt" type="datetime-local" required></div>
@@ -28,10 +31,9 @@
           <div class="form-field"><label for="location">Lieu / lien</label><input id="location"></div>
           <div class="form-field"><label for="projectUrl">Lien projet</label><input id="projectUrl" type="url"></div>
           <div class="form-field"><label for="databaseUrl">Lien base de données</label><input id="databaseUrl" type="url"></div>
-          <div class="form-actions"><button class="btn btn-primary" type="submit">Préparer</button></div>
+          <div class="form-actions full"><button class="btn btn-primary" type="submit">Préparer</button></div>
         </form></section>
       </div>
-      <div id="assembly-detail"></div>
     </main>
   </div>
 <script src="portal-common.js"></script>
@@ -639,7 +641,7 @@
   list.addEventListener('click',e=>{const b=e.target.closest('[data-open]');if(b)openAssembly(b.dataset.open)});
   document.getElementById('refresh').onclick=()=>load().catch(apiError);
   document.getElementById('assembly-form').addEventListener('submit',async e=>{e.preventDefault();try{await AYCPortal.api('assemblies',{method:'POST',body:{action:'create',assemblyType:document.getElementById('assemblyType').value,title:document.getElementById('assemblyTitle').value,startsAt:document.getElementById('startsAt').value,format:document.getElementById('format').value,location:document.getElementById('location').value,projectUrl:document.getElementById('projectUrl').value,databaseUrl:document.getElementById('databaseUrl').value}});e.target.reset();notice.innerHTML='<div class="alert alert-success">L’assemblée a été préparée sans modifier les membres.</div>';await load()}catch(err){apiError(err)}});
-  try{member=await AYCPortal.initPortalShell({requireActive:true});if(!member)return;const canCreate=Boolean(member.access?.canCreateAssembly||member.isNationalAdmin);if(!canCreate){const form=document.getElementById('assembly-form');form.hidden=true;form.insertAdjacentHTML('beforebegin','<p class="restricted-note">La préparation des assemblées est gérée par les responsables désignés et les instances compétentes.</p>');document.querySelector('#assembly-form').closest('.portal-card').querySelector('h2').textContent='Préparation réservée';}await load()}catch(e){apiError(e)}
+  try{member=await AYCPortal.initPortalShell({requireActive:true});if(!member)return;const canCreate=Boolean(member.access?.canCreateAssembly||member.isNationalAdmin);if(!canCreate){document.getElementById('assembly-prep-card').hidden=true;}await load()}catch(e){apiError(e)}
 })();
 </script>
 </body>

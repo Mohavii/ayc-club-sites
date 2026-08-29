@@ -330,6 +330,13 @@ body.portal-page:before{
 .meeting-date span { font-size: .68rem; text-transform: uppercase; opacity: .8; margin-top: 4px; }
 .meeting-detail-card { margin-top: 20px; scroll-margin-top: 20px; border-top: 4px solid #e5b942; }
 .meeting-detail-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 28px; margin-top: 18px; }
+.project-list-item { align-items: center; gap: 10px; }
+.scope-pill { flex: none; padding: 4px 10px; border-radius: 999px; font-size: .68rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; line-height: 1.4; }
+.scope-pill-national { background: #0b346f; color: #fff; }
+.scope-pill-local { background: #e7edf7; color: #24406f; }
+.project-summary { margin: 14px 0 18px; padding: 16px 18px; border-radius: 14px; background: #f4f7fc; }
+.project-summary p { margin: 0; color: #45516b; line-height: 1.6; }
+.project-summary-stats { display: flex; gap: 16px; margin-top: 10px; font-size: .78rem; font-weight: 700; color: #0b346f; }
 .meeting-detail-grid h3, .meeting-detail-grid h4 { color: var(--portal-navy); margin: 20px 0 10px; }
 .agenda-row, .pv-block, .pv-motion { background: rgba(245,248,252,.8); }
 .agenda-row .form-grid, .pv-block .form-grid, .pv-motion .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

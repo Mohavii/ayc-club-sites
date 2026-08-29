@@ -247,14 +247,29 @@
       }
     `;
 
+    // Wraps a chip/button click handler so a failed request (invalid
+    // role, member no longer active, session expired, server error…)
+    // surfaces to the admin via alert() instead of failing silently —
+    // without this, a thrown error inside an async click handler just
+    // rejects unnoticed and the UI looks like the click did nothing.
+    function guarded(handler) {
+      return async (e) => {
+        try {
+          await handler(e);
+        } catch (err) {
+          alert(err.message || "Échec de la requête.");
+        }
+      };
+    }
+
     const trainerStatus = document.getElementById("trainer-status");
     if (data.trainerProfile) trainerStatus.value = data.trainerProfile.certification_status || "pending";
-    document.getElementById("save-trainer-status").addEventListener("click", async () => {
+    document.getElementById("save-trainer-status").addEventListener("click", guarded(async () => {
       await callRoles({ action: "setTrainerStatus", memberId: currentMemberId, certificationStatus: trainerStatus.value });
       await renderDetail();
-    });
+    }));
 
-    document.getElementById("save-membership-status").addEventListener("click", async () => {
+    document.getElementById("save-membership-status").addEventListener("click", guarded(async () => {
       await callRoles({
         action: "setMembershipStatus",
         memberId: currentMemberId,
@@ -262,9 +277,9 @@
         reason: document.getElementById("membership-reason").value,
       });
       await renderDetail();
-    });
+    }));
 
-    document.getElementById("display-chips").addEventListener("click", async (e) => {
+    document.getElementById("display-chips").addEventListener("click", guarded(async (e) => {
       const clear = e.target.closest("#clear-display-role");
       if (clear) {
         await callRoles({ action: "clearDisplayRole", memberId: currentMemberId, schoolId: currentSchoolId });
@@ -280,43 +295,43 @@
         role: chip.dataset.role,
       });
       await renderDetail();
-    });
+    }));
 
-    document.getElementById("capability-chips").addEventListener("click", async (e) => {
+    document.getElementById("capability-chips").addEventListener("click", guarded(async (e) => {
       const chip = e.target.closest(".role-chip[data-capability]");
       if (!chip) return;
       const capability = chip.dataset.capability;
       const action = activeCapValues.has(capability) ? "revokeCapability" : "grantCapability";
       await callRoles({ action, memberId: currentMemberId, schoolId: currentSchoolId, capability });
       await renderDetail();
-    });
+    }));
 
-    document.getElementById("national-capability-chips").addEventListener("click", async (e) => {
+    document.getElementById("national-capability-chips").addEventListener("click", guarded(async (e) => {
       const chip = e.target.closest(".role-chip[data-national-capability]");
       if (!chip) return;
       const capability = chip.dataset.nationalCapability;
       const action = activeNationalCapabilityValues.has(capability) ? "revokeNationalCapability" : "grantNationalCapability";
       await callRoles({ action, memberId: currentMemberId, capability });
       await renderDetail();
-    });
+    }));
 
-    document.getElementById("national-chips").addEventListener("click", async (e) => {
+    document.getElementById("national-chips").addEventListener("click", guarded(async (e) => {
       const chip = e.target.closest(".role-chip[data-national]");
       if (!chip) return;
       const role = chip.dataset.national;
       const action = activeNationalValues.has(role) ? "clearNationalRole" : "setNationalRole";
       await callRoles({ action, memberId: currentMemberId, role });
       await renderDetail();
-    });
+    }));
 
-    document.getElementById("epn-chips").addEventListener("click", async (e) => {
+    document.getElementById("epn-chips").addEventListener("click", guarded(async (e) => {
       const chip = e.target.closest(".role-chip[data-national]");
       if (!chip) return;
       const role = chip.dataset.national;
       const action = activeNationalValues.has(role) ? "clearNationalRole" : "setNationalRole";
       await callRoles({ action, memberId: currentMemberId, role });
       await renderDetail();
-    });
+    }));
   }
 
   schoolSelect.addEventListener("change", async () => {

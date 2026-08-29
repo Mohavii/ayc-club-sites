@@ -59,7 +59,22 @@
         ? `<img class="profile-large-avatar" src="${esc(m.profile_picture_url)}" alt="Photo de profil">`
         : `<span class="profile-large-avatar">${esc(initials)}</span>`;
       const currentRoles = (data.roles || []).filter(r => !r.ended_at);
-      const history = (data.roles || []).map(r => `
+      // Repeated clicks on a role chip (e.g. re-saving the same role) can
+      // insert several rows that are functionally identical — same role,
+      // same club, same start/end. Those are display noise, not real
+      // history, so we collapse exact duplicates. A club role held twice
+      // over genuinely different periods (e.g. re-elected the next year)
+      // still shows both rows, since only the started_at differs.
+      const dedupeRoleRows = rows => {
+        const seen = new Set();
+        return rows.filter(r => {
+          const key = [r.role, r.school_id ?? '', r.started_at, r.ended_at ?? ''].join('|');
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      };
+      const history = dedupeRoleRows(data.roles || []).map(r => `
         <div class="list-item">
           <div class="list-item-main">
             <span class="list-item-title">${esc(roleNames[r.role] || r.role)}</span>
@@ -68,7 +83,12 @@
           <span class="status-badge ${!r.ended_at ? 'status-active' : ''}">${r.ended_at ? 'Terminé' : 'Actuel'}</span>
         </div>`).join('');
       const capabilities = (data.capabilities || []).map(c => `<span class="role-badge">${esc(c.capability.replaceAll('_', ' '))} · ${esc(c.school_name || 'club')}</span>`).join('');
-      const statusHistory = (data.statusHistory || []).map(h => `
+      // Same idea for the membership-status timeline: collapse consecutive
+      // entries that carry the same status, since re-clicking "save" on an
+      // unchanged status shouldn't read as a new event in the history.
+      const rawStatusHistory = (data.statusHistory || []).slice().sort((a, b) => new Date(b.changed_at) - new Date(a.changed_at));
+      const dedupedStatusHistory = rawStatusHistory.filter((h, i) => i === 0 || h.status !== rawStatusHistory[i - 1].status);
+      const statusHistory = dedupedStatusHistory.map(h => `
         <div class="list-item">
           <div class="list-item-main">
             <span class="list-item-title">${esc(statusNames[h.status] || h.status)}</span>
@@ -134,10 +154,10 @@
             <div class="list-stack">${statusHistory || '<div class="empty-state">Aucun changement de statut enregistré.</div>'}</div>
           </section>
 
-          <section class="portal-card card-span-8">
+          ${isSimpleMember ? '' : `<section class="portal-card card-span-8">
             <h2>Historique des postes occupés</h2>
             <div class="list-stack">${history || AYCPortal.renderEmpty('Aucun poste officiel enregistré')}</div>
-          </section>
+          </section>`}
 
           <section class="portal-card card-span-4">
             <h2>Dossier de candidature</h2>
