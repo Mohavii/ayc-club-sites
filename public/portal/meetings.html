@@ -410,7 +410,7 @@
   const apiError = error => AYCPortal.renderError(notice, error);
   function renderList(rows) {
     if (!rows.length) { list.innerHTML = AYCPortal.renderEmpty('Aucune assemblée planifiée'); return; }
-    list.innerHTML = rows.map(a => `<article class="list-item assembly-row"><div class="meeting-date"><strong>${new Date(a.starts_at).toLocaleDateString('fr-FR',{day:'2-digit'})}</strong><span>${new Date(a.starts_at).toLocaleDateString('fr-FR',{month:'short'})}</span></div><div class="list-item-main"><span class="list-item-title">${esc(a.title)}</span><span class="list-item-meta">${esc(labels[a.assembly_type] || a.assembly_type)} · ${esc(a.scope === 'national' ? 'Bureau Exécutif National' : (a.school_name || 'Mon club'))} · ${AYCPortal.formatDate(a.starts_at,true)}</span></div><div class="heading-actions"><span class="status-badge">${esc(labels[a.status] || a.status)}</span><button class="btn btn-secondary btn-sm" data-open="${a.id}">Voir la base</button></div></article>`).join('');
+    list.innerHTML = rows.map(a => `<article class="list-item assembly-row"><div class="meeting-date"><strong>${new Date(a.starts_at).toLocaleDateString('fr-FR',{day:'2-digit'})}</strong><span>${new Date(a.starts_at).toLocaleDateString('fr-FR',{month:'short'})}</span></div><div class="list-item-main"><span class="list-item-title">${esc(a.title)}</span></div><div class="heading-actions"><span class="status-badge">${esc(labels[a.status] || a.status)}</span><button class="btn btn-secondary btn-sm" data-open="${a.id}">Voir la base</button></div></article>`).join('');
   }
   async function load() { const data = await AYCPortal.api('assemblies'); renderList(data.assemblies || []); }
   function renderPublishedPV(data) {
