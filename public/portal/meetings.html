@@ -410,7 +410,7 @@
   const apiError = error => AYCPortal.renderError(notice, error);
   function renderList(rows) {
     if (!rows.length) { list.innerHTML = AYCPortal.renderEmpty('Aucune assemblée planifiée'); return; }
-    list.innerHTML = rows.map(a => `<article class="list-item assembly-row"><div class="meeting-date"><strong>${new Date(a.starts_at).toLocaleDateString('fr-FR',{day:'2-digit'})}</strong><span>${new Date(a.starts_at).toLocaleDateString('fr-FR',{month:'short'})}</span></div><div class="list-item-main"><span class="list-item-title">${esc(a.title)}</span><span class="list-item-meta">${esc(labels[a.assembly_type] || a.assembly_type)} · ${esc(a.scope === 'national' ? 'Bureau Exécutif National' : (a.school_name || 'Mon club'))} · ${AYCPortal.formatDate(a.starts_at,true)}</span><span class="list-item-meta">${a.member_snapshot_count || 0} membres au snapshot · quorum ${a.quorum_required || '—'} · ${a.present_count || 0} présent·es</span></div><div class="heading-actions"><span class="status-badge">${esc(labels[a.status] || a.status)}</span><button class="btn btn-secondary btn-sm" data-open="${a.id}">Voir la base</button></div></article>`).join('');
+    list.innerHTML = rows.map(a => `<article class="list-item assembly-row"><div class="meeting-date"><strong>${new Date(a.starts_at).toLocaleDateString('fr-FR',{day:'2-digit'})}</strong><span>${new Date(a.starts_at).toLocaleDateString('fr-FR',{month:'short'})}</span></div><div class="list-item-main"><span class="list-item-title">${esc(a.title)}</span><span class="list-item-meta">${esc(labels[a.assembly_type] || a.assembly_type)} · ${esc(a.scope === 'national' ? 'Bureau Exécutif National' : (a.school_name || 'Mon club'))} · ${AYCPortal.formatDate(a.starts_at,true)}</span></div><div class="heading-actions"><span class="status-badge">${esc(labels[a.status] || a.status)}</span><button class="btn btn-secondary btn-sm" data-open="${a.id}">Voir la base</button></div></article>`).join('');
   }
   async function load() { const data = await AYCPortal.api('assemblies'); renderList(data.assemblies || []); }
   function renderPublishedPV(data) {
@@ -717,19 +717,34 @@
     return `Motion ${m.position + 1} :`;
   }
 
-  function plenariesMarkup(assemblyId, plenaries, motions, canEdit) {
+  function plenariesMarkup(assemblyId, plenaries, motions, canEdit, epnMembers) {
     if (!plenaries.length) return AYCPortal.renderEmpty('Aucune plénière planifiée. Ajoutez-en une pour organiser l’agenda.');
+    // AG plenary teams (Président·e, Vice-président·e, CSCY, Secrétaires, CF)
+    // are seated by the EPN, not typed by hand each time. If a plenary has
+    // no manually-saved name for a post, fall back to whoever currently
+    // holds that EPN role — still overridable via "Modifier l'équipe".
+    const byRole = role => (epnMembers || []).filter(m => (m.epn_roles || []).includes(role)).map(m => m.display_name || m.username);
+    const epnPresident = byRole('epn_president').join(', ');
+    const epnVicePresident = byRole('epn_vice_president').join(', ');
+    const epnCscy = byRole('epn_cscy').join(', ');
+    const epnCf = byRole('epn_comite_financier').join(', ');
+    const epnSecretaries = byRole('epn_secretaire').join(', ');
     return plenaries.map((p, idx) => {
       const plenaryMotions = motions.filter(m => m.plenary_id === p.id);
+      const presidentName = p.president_name || epnPresident;
+      const vicePresidentName = p.vice_president_name || epnVicePresident;
+      const cscyName = p.cscy_name || epnCscy;
+      const cfName = p.cf_name || epnCf;
+      const secretaries = p.secretaries || epnSecretaries;
       return `<div class="plenary-block" data-plenary="${p.id}">
         <div class="plenary-block-head"><div><h4>${esc(p.label || `Plénière ${idx + 1}`)}</h4><p class="list-item-meta">${p.starts_at_text ? `Début ${esc(p.starts_at_text)}` : ''}${p.closes_at_text ? ` · Clôture ${esc(p.closes_at_text)}` : ''}</p></div>${canEdit ? `<div class="heading-actions"><button type="button" class="btn btn-quiet btn-sm" data-edit-plenary="${p.id}">Modifier l’équipe</button>${!plenaryMotions.length ? `<button type="button" class="btn btn-quiet btn-sm" data-delete-plenary="${p.id}">Supprimer</button>` : ''}</div>` : ''}</div>
         <div class="plenary-team-grid">
-          <div class="form-field"><label>Président(e)</label><input value="${esc(p.president_name||'')}" disabled></div>
-          <div class="form-field"><label>Vice-président(e)</label><input value="${esc(p.vice_president_name||'')}" disabled></div>
-          <div class="form-field"><label>CSCY</label><input value="${esc(p.cscy_name||'')}" disabled></div>
+          <div class="form-field"><label>Président(e)</label><input value="${esc(presidentName)}" disabled></div>
+          <div class="form-field"><label>Vice-président(e)</label><input value="${esc(vicePresidentName)}" disabled></div>
+          <div class="form-field"><label>CSCY</label><input value="${esc(cscyName)}" disabled></div>
         </div>
-        ${p.secretaries ? `<p class="list-item-meta" style="margin:-4px 0 10px"><strong>Secrétaires :</strong> ${esc(p.secretaries)}</p>` : ''}
-        ${p.cf_name ? `<p class="list-item-meta" style="margin:-4px 0 10px"><strong>Comité Financier :</strong> ${esc(p.cf_name)}</p>` : '<p class="list-item-meta" style="margin:-4px 0 10px">Comité Financier : pas de CF</p>'}
+        ${secretaries ? `<p class="list-item-meta" style="margin:-4px 0 10px"><strong>Secrétaires :</strong> ${esc(secretaries)}</p>` : ''}
+        ${cfName ? `<p class="list-item-meta" style="margin:-4px 0 10px"><strong>Comité Financier :</strong> ${esc(cfName)}</p>` : '<p class="list-item-meta" style="margin:-4px 0 10px">Comité Financier : pas de CF</p>'}
         <div class="plenary-agenda-list">${plenaryMotions.length ? plenaryMotions.map(m => `<a href="#motion-${m.position}" class="plenary-agenda-item" data-agenda-link="${m.position}"><span class="agenda-index">${agendaLabelFor(m)}</span><span>${esc(m.title || 'Motion sans titre')}</span>${m.required_motion ? '<span class="agenda-required">Obligatoire</span>' : ''}</a>`).join('') : AYCPortal.renderEmpty('Aucune motion rattachée à cette plénière')}</div>
       </div>`;
     }).join('');
@@ -817,7 +832,7 @@
          <div class="table-wrap"><table class="portal-table"><thead><tr><th>Membre</th><th>Statut</th><th>Présence</th><th>Voix</th></tr></thead><tbody>${data.attendance.map(row => `<tr><td>${esc(row.display_name || row.username)}</td><td>${esc(row.membership_status || '—')}</td><td>${canEditAttendance ? `<select class="assembly-attendance" data-asmMember="${row.member_id}">${['invited','present','absent','excused','late'].map(s=>`<option value="${s}"${row.attendance_status===s?' selected':''}>${labels[s]}</option>`).join('')}</select>` : esc(labels[row.attendance_status] || row.attendance_status)}</td><td>${canEditAttendance ? `<input class="assembly-vote" data-asmMember="${row.member_id}" type="checkbox"${row.voting_rights?' checked':''}>` : (row.voting_rights ? 'Oui' : 'Non')}</td></tr>`).join('')}</tbody></table></div>`;
     const plenaries = data.plenaries || [];
     currentPlenaries = plenaries;
-    const plenariesMarkupStr = plenariesMarkup(a.id, plenaries, data.motions, canEditMotions);
+    const plenariesMarkupStr = plenariesMarkup(a.id, plenaries, data.motions, canEditMotions, data.epnMembers);
     const groundRulesMarkup = groundRulesSectionMarkup(data.groundRules || { intro: '', rules: [] }, canEditMotions);
     const movementsMarkup = (data.movements || []).length
       ? (data.movements || []).map(mv => movementRowMarkup(mv, canEditClubAttendance)).join('')
@@ -835,8 +850,10 @@
         <div style="margin-top:14px"><p class="eyebrow" style="margin-bottom:8px">Noms et clubs des rédacteurs</p>
           <div id="editors-list" class="list-stack" style="margin-bottom:10px">${(() => {
             const savedEditors = a.editors || [];
-            const eplEditors = (data.eplMembers || []).map(m => ({ name: m.display_name || m.username, club: m.home_school_name || '—' }));
-            const displayEditors = savedEditors.length ? savedEditors : eplEditors;
+            const autoEditors = a.scope === 'national'
+              ? (data.epnMembers || []).filter(m => (m.epn_roles || []).includes('epn_secretaire')).map(m => ({ name: m.display_name || m.username, club: 'Secrétaire de la Plénière Nationale' }))
+              : (data.eplMembers || []).map(m => ({ name: m.display_name || m.username, club: m.home_school_name || '—' }));
+            const displayEditors = savedEditors.length ? savedEditors : autoEditors;
             if (!displayEditors.length) return AYCPortal.renderEmpty('Aucun rédacteur renseigné');
             return displayEditors.map((e,i) => `<div class="list-item" data-editor-index="${i}"><div class="list-item-main"><span class="list-item-title">${esc(e.name)}</span><span class="list-item-meta">${esc(e.club||'—')}</span></div>${canEditMotions && savedEditors.length ? `<button type="button" class="btn btn-quiet btn-sm" data-remove-editor="${i}">Retirer</button>` : ''}</div>`).join('');
           })()}</div>
