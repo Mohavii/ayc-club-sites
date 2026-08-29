@@ -33,7 +33,7 @@ comments for why):
 | Vercel project | `DEPLOY_TARGET` | What it serves |
 |---|---|---|
 | (existing bot project) | `bot` | Discord bot's own API routes |
-| `ayc-portal-edge` | `portal-edge` | **Owns the real domain.** Static `public/portal/**` files + proxies `/api/*` to the service projects below via `vercel.cjs` rewrites. Zero API routes of its own. |
+| `ayc-portal-edge` | `portal-edge` | **Owns the real domain.** Static `public/portal/**` files + proxies `/api/*` to the service projects below via `vercel.cjs` rewrites. Zero API routes of its own. `middleware.js` at the repo root locks this project to `/portal`, `/api`, `/assets`, and `/favicon.ico` only — everything else 302s to `/portal/login`, since the static build actually publishes all of `public/` (including the externe marketing pages) and nothing else stops them being reachable on this domain. |
 | `ayc-portal-auth` | `portal-auth` | Google OAuth, sessions, onboarding, schools list |
 | `ayc-portal-admin` | `portal-admin` | National-admin-only: membership decide/pending, role/capability assignment |
 | *(future)* `ayc-portal-member` | `portal-member` | Active-member self-service routes, once built |
@@ -65,7 +65,10 @@ backward compatibility, but new projects should use the uppercase spelling.
    including `portal-edge` picking up the corrected rewrite targets.
 5. Add the `internes.associationyouthclubs.org` domain to the
    `ayc-portal-edge` project ONLY (Settings → Domains), with the
-   matching CNAME at your DNS registrar.
+   matching CNAME at your DNS registrar. `middleware.js` checks
+   `DEPLOY_TARGET === "portal-edge"` at request time, so as long as this
+   project's env var is set correctly (step 2), the lockdown to
+   `/portal` applies automatically — no per-domain config needed.
 6. As new service projects are added later (`portal-member`,
    `portal-officer`), repeat steps 1–2 for them, add their routes to
    `scripts/deployment-targets.js`, add a rewrite line to the

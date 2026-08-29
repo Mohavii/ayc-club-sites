@@ -23,6 +23,7 @@ const {
   EPL_ROLES,
   EPL_ROLE_LABELS,
   hasEplRole,
+  getEplMembers,
 } = require("./_lib/roles");
 
 function parseBody(req) {
@@ -292,9 +293,9 @@ async function meetingDetail(req, res, member, body) {
       ]);
       structured = { attendance, agendaBlocks, motions };
     }
-    return json(res, 200, { meeting: { ...meeting, is_archived: true }, agendaItems: [], attendees: [], roster: [], nationalClubs: [], minutes: archivedMinutes[0] || null, structured, archived: true, readOnly: true });
+    return json(res, 200, { meeting: { ...meeting, is_archived: true }, agendaItems: [], attendees: [], roster: [], nationalClubs: [], eplMembers: [], minutes: archivedMinutes[0] || null, structured, archived: true, readOnly: true });
   }
-  const [agendaItems, attendees, minutes, roster, nationalClubs] = await Promise.all([
+  const [agendaItems, attendees, minutes, roster, nationalClubs, eplMembers] = await Promise.all([
     db`select * from portal_meeting_agenda_items where meeting_id = ${id} order by position`,
     db`
       select a.*, m.display_name, m.username, m.profile_picture_url, m.membership_status
@@ -329,6 +330,10 @@ async function meetingDetail(req, res, member, body) {
           order by s.name
         `
       : Promise.resolve([]),
+    // The Équipe Plénière Locale is used to auto-fill "Rédigé par" on a
+    // local meeting's PV — nobody has to pick a preparer by hand anymore,
+    // it defaults to whoever is currently seated on the club's EPL.
+    !isNationalMeeting ? getEplMembers(meeting.school_id) : Promise.resolve([]),
   ]);
   let structured = { attendance: [], agendaBlocks: [], motions: [] };
   if (minutes[0]) {
@@ -339,7 +344,7 @@ async function meetingDetail(req, res, member, body) {
     ]);
     structured = { attendance, agendaBlocks, motions };
   }
-  if (req.method === "GET" || body.action === "meeting") return json(res, 200, { meeting, agendaItems, attendees, roster, nationalClubs, minutes: minutes[0] || null, structured, canEditPV });
+  if (req.method === "GET" || body.action === "meeting") return json(res, 200, { meeting, agendaItems, attendees, roster, nationalClubs, eplMembers, minutes: minutes[0] || null, structured, canEditPV });
   if (body.action === "rsvp") {
     const rsvp = ["pending", "present", "absent"].includes(body.rsvp) ? body.rsvp : "pending";
     const result = await db`
@@ -357,9 +362,9 @@ async function meetingDetail(req, res, member, body) {
     const attendance = Array.isArray(body.attendance) ? body.attendance.slice(0, 300) : [];
     const agendaBlocks = Array.isArray(body.agendaBlocks) ? body.agendaBlocks.slice(0, 50) : [];
     const motions = Array.isArray(body.motions) ? body.motions.slice(0, 100) : [];
-    const activeIds = new Set(roster.map(row => row.id));
-    const normalizedAttendance = isNationalMeeting ? [] : attendance.filter(row => activeIds.has(row.memberId)).map((row, index) => {
-      const member = roster.find(candidate => candidate.id === row.memberId);
+    const activeIds = new Set(roster.map(row => String(row.id)));
+    const normalizedAttendance = isNationalMeeting ? [] : attendance.filter(row => activeIds.has(String(row.memberId))).map((row, index) => {
+      const member = roster.find(candidate => String(candidate.id) === String(row.memberId));
       const canVoteLocally = member?.membership_status !== 'nouveau_adherent';
       return {
         memberId: row.memberId,
@@ -385,7 +390,7 @@ async function meetingDetail(req, res, member, body) {
         }
         seenClubs.add(schoolId);
         clubPresence.push({ schoolId: Number(schoolId), schoolName: club.school_name, representativeId: representative.id, representativeName: representative.displayName, representativeRole: representative.role });
-        activeIds.add(representative.id);
+        activeIds.add(String(representative.id));
       }
     }
     const savedMinutes = await db`

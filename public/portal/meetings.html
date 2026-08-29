@@ -11,17 +11,26 @@
   <link rel="stylesheet" href="../theme.css">
   <link rel="stylesheet" href="portal.css">
   <style>
-    .pv-table{width:100%;border-collapse:collapse}
-    .pv-table th,.pv-table td{border:1px solid var(--border,#dfe3ee);padding:10px;vertical-align:top;font-size:.92rem}
-    .pv-table thead th{background:#2f4bd0;color:#fff;font-weight:600}
-    .pv-table textarea{width:100%;min-height:64px;resize:vertical;font:inherit}
-    .pv-table input[type="text"],.pv-table input[type="number"],.pv-table input[type="url"]{width:100%;font:inherit}
-    .pv-attachments{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-    .pv-attachment-pill{display:inline-flex;align-items:center;gap:6px;background:#eef0fa;border-radius:999px;padding:4px 10px;font-size:.82rem}
+    /* ---- PV editor : mise en page en cartes numérotées, plus de table serrée --- */
+    .pv-points{display:grid;gap:14px;margin-top:4px}
+    .pv-point-card{border:1px solid #e2e8f1;border-radius:14px;background:#fff;overflow:hidden}
+    .pv-point-head{display:flex;align-items:center;gap:12px;padding:14px 16px;background:linear-gradient(180deg,#fbfdff,#f5f8fc);border-bottom:1px solid #edf0f6}
+    .pv-point-number{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#e9f0ff;color:#2f4bd0;font-weight:900;font-size:.8rem}
+    .pv-point-head-fields{flex:1;min-width:0;display:grid;grid-template-columns:1fr 140px;gap:10px}
+    .pv-point-body{padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .pv-point-body .pv-field{display:grid;gap:6px}
+    .pv-point-body .pv-field.full{grid-column:1/-1}
+    .pv-field label{font-size:.7rem;font-weight:900;letter-spacing:.03em;color:#7a869a;text-transform:uppercase}
+    .pv-point-card input,.pv-point-card textarea{width:100%;box-sizing:border-box;border:1px solid #d9dfeb;border-radius:10px;background:#fff;padding:10px 11px;color:#263653;font:inherit;font-size:.83rem;outline:none;transition:border-color .18s ease,box-shadow .18s ease}
+    .pv-point-card input:focus,.pv-point-card textarea:focus{border-color:#5b82d0;box-shadow:0 0 0 3px rgba(91,130,208,.12)}
+    .pv-point-card textarea{min-height:78px;resize:vertical;line-height:1.45}
+    .pv-attachments{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+    .pv-attachment-pill{display:inline-flex;align-items:center;gap:6px;background:#eef0fa;border-radius:999px;padding:4px 10px;font-size:.78rem;color:#3d4861}
     .pv-attachment-pill button{border:none;background:none;cursor:pointer;color:#8a8fa6;font-size:.9rem;line-height:1}
-    .pv-add-file{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+    .pv-add-file{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
     .pv-add-file input{flex:1;min-width:110px}
-    .pv-point-remove{margin-top:6px}
+    .pv-point-foot{display:flex;justify-content:flex-end;padding:0 16px 14px}
+    .pv-point-remove{color:#a34450}
     .agenda-builder-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
     .agenda-builder-row input[type="text"]{flex:3}
     .agenda-builder-row input[type="number"]{flex:1}
@@ -30,6 +39,21 @@
     .portal-tab.active{background:var(--portal-navy,#1f2a5a);border-color:var(--portal-navy,#1f2a5a);color:#fff}
     .portal-tab-panel{display:none}
     .portal-tab-panel.active{display:block}
+    /* Published (read-only) PV keeps a compact table — fine once it's static */
+    .pv-table{width:100%;border-collapse:collapse}
+    .pv-table th,.pv-table td{border:1px solid var(--border,#dfe3ee);padding:10px;vertical-align:top;font-size:.86rem}
+    .pv-table thead th{background:#2f4bd0;color:#fff;font-weight:600}
+    /* ---- Rédacteur / EPL auto-fill + présence -------------------------- */
+    .pv-organizer-row{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+    .pv-organizer-row .form-field{flex:1;min-width:220px}
+    .pv-organizer-hint{font-size:.72rem;color:#7a869a;margin-top:4px}
+    .pv-attendance-grid{display:grid;gap:8px;margin-top:6px}
+    .pv-attendance-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid #edf0f6;border-radius:10px;background:#fff}
+    .pv-attendance-row .name{font-weight:700;color:var(--portal-navy);font-size:.84rem}
+    .pv-attendance-row .name small{display:block;font-weight:500;color:#8792a6;font-size:.7rem;margin-top:1px}
+    .pv-attendance-row select{border:1px solid #dce3ef;border-radius:8px;padding:7px 9px;color:#3d4861;background:#fff;font:inherit;font-size:.76rem}
+    .pv-attendance-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:2px}
+    .pv-attendance-toolbar .btn{flex:none}
   </style>
 </head>
 <body>
@@ -160,35 +184,70 @@
     if (!pvBlocks.length) pvBlocks = [{ title: '', durationMinutes: null, actualDurationMinutes: null, discussion: '', decision: '', nextSteps: '', attachments: [] }];
   }
 
-  function pvEditorRow(block, index) {
+  function pvPointCard(block, index) {
     const attachmentsHtml = (block.attachments || []).map((f, fi) => `<span class="pv-attachment-pill">${esc(f.name || f.url)}<button type="button" data-remove-file="${index}:${fi}">✕</button></span>`).join('');
-    return `<tr data-block="${index}">
-      <td>
-        <input type="text" class="pv-title" placeholder="Point de l'ordre du jour" value="${esc(block.title)}">
-        <input type="number" class="pv-duration" min="0" placeholder="Durée estimée (min)" value="${block.durationMinutes ?? ''}" style="margin-top:6px">
-      </td>
-      <td><input type="number" class="pv-actual-duration" min="0" placeholder="min" value="${block.actualDurationMinutes ?? ''}"></td>
-      <td><textarea class="pv-discussion" placeholder="Discussions">${esc(block.discussion)}</textarea></td>
-      <td><textarea class="pv-decision" placeholder="Conclusions">${esc(block.decision)}</textarea></td>
-      <td><textarea class="pv-next-steps" placeholder="Conduites à tenir et échéances">${esc(block.nextSteps)}</textarea></td>
-      <td>
-        <div class="pv-attachments">${attachmentsHtml}</div>
-        <div class="pv-add-file"><input type="text" class="pv-file-name" placeholder="Nom du fichier"><input type="url" class="pv-file-url" placeholder="Lien"><button type="button" class="btn btn-quiet btn-sm" data-add-file="${index}">+</button></div>
-        <button type="button" class="btn btn-quiet btn-sm pv-point-remove" data-remove-point="${index}">Supprimer ce point</button>
-      </td>
-    </tr>`;
+    return `<div class="pv-point-card" data-block="${index}">
+      <div class="pv-point-head">
+        <span class="pv-point-number">${index + 1}</span>
+        <div class="pv-point-head-fields">
+          <input type="text" class="pv-title" placeholder="Point de l'ordre du jour" value="${esc(block.title)}">
+          <input type="number" class="pv-duration" min="0" placeholder="Durée est. (min)" value="${block.durationMinutes ?? ''}">
+        </div>
+      </div>
+      <div class="pv-point-body">
+        <div class="pv-field"><label>Durée réelle</label><input type="number" class="pv-actual-duration" min="0" placeholder="min" value="${block.actualDurationMinutes ?? ''}"></div>
+        <div class="pv-field"><label>Fichiers joints</label>
+          <div class="pv-attachments">${attachmentsHtml}</div>
+          <div class="pv-add-file"><input type="text" class="pv-file-name" placeholder="Nom du fichier"><input type="url" class="pv-file-url" placeholder="Lien"><button type="button" class="btn btn-quiet btn-sm" data-add-file="${index}">+</button></div>
+        </div>
+        <div class="pv-field full"><label>Discussions</label><textarea class="pv-discussion" placeholder="Ce qui a été discuté">${esc(block.discussion)}</textarea></div>
+        <div class="pv-field"><label>Conclusions</label><textarea class="pv-decision" placeholder="Ce qui a été décidé">${esc(block.decision)}</textarea></div>
+        <div class="pv-field"><label>Conduites à tenir et échéances</label><textarea class="pv-next-steps" placeholder="Qui fait quoi, pour quand">${esc(block.nextSteps)}</textarea></div>
+      </div>
+      <div class="pv-point-foot"><button type="button" class="btn btn-quiet btn-sm pv-point-remove" data-remove-point="${index}">Supprimer ce point</button></div>
+    </div>`;
   }
 
-  function renderPvEditor(meetingId, canEditPV, minutes) {
+  function pvOrganizerFieldMarkup(minutes, eplMembers) {
+    const current = minutes?.organizer || '';
+    const eplNames = (eplMembers || []).map(m => m.display_name || m.username).filter(Boolean);
+    // Auto-suggest the EPL as the default preparer/rédacteur — the person
+    // preparing a local meeting's PV no longer has to pick someone by
+    // hand; if nothing was saved yet, we seed the field with the EPL
+    // roster and they can still overwrite it with a different name.
+    const autoValue = current || eplNames.join(', ');
+    const datalist = eplNames.length ? `<datalist id="pv-organizer-options">${eplNames.map(n => `<option value="${esc(n)}">`).join('')}${eplNames.length > 1 ? `<option value="${esc(eplNames.join(', '))}">` : ''}</datalist>` : '';
+    const hint = eplNames.length
+      ? `Pré-rempli avec l'Équipe Plénière Locale (${esc(eplNames.join(', '))}) — modifiable si quelqu'un d'autre a rédigé.`
+      : `Aucune Équipe Plénière Locale n'est enregistrée pour ce club ; indique qui a rédigé le PV.`;
+    return `<div class="form-field"><label for="pv-organizer">Rédigé par</label><input id="pv-organizer"${eplNames.length ? ' list="pv-organizer-options"' : ''} value="${esc(autoValue)}">${datalist}<p class="pv-organizer-hint">${hint}</p></div>`;
+  }
+
+  function pvAttendanceFieldMarkup(roster, savedAttendance) {
+    if (!roster || !roster.length) return '';
+    const savedByMember = new Map((savedAttendance || []).map(row => [String(row.memberId ?? row.member_id), row]));
+    const rows = roster.map(m => {
+      const saved = savedByMember.get(String(m.id));
+      const status = saved?.attendanceStatus || saved?.attendance_status || 'present';
+      const options = [['present', 'Présent·e'], ['absent', 'Absent·e'], ['excused', 'Excusé·e'], ['late', 'En retard']]
+        .map(([v, l]) => `<option value="${v}"${status === v ? ' selected' : ''}>${l}</option>`).join('');
+      return `<div class="pv-attendance-row" data-member="${m.id}"><span class="name">${esc(m.display_name || m.username)}${m.membership_status ? `<small>${esc(m.membership_status)}</small>` : ''}</span><select class="pv-attendance-status">${options}</select></div>`;
+    }).join('');
+    return `<div class="pv-attendance-toolbar"><div><p class="eyebrow" style="margin:0 0 2px">Présence</p><p class="pv-organizer-hint" style="margin:0">Tous les membres actifs du club sont listés ci-dessous ; ajuste qui était présent·e ou absent·e.</p></div><button type="button" class="btn btn-quiet btn-sm" id="pv-mark-all-present">Tout marquer présent</button></div>
+      <div class="pv-attendance-grid" id="pv-attendance-grid">${rows}</div>`;
+  }
+
+  function renderPvEditor(meetingId, canEditPV, minutes, roster, eplMembers, savedAttendance, isNationalMeeting) {
     if (!canEditPV) return '';
-    const rowsHtml = pvBlocks.map((b, i) => pvEditorRow(b, i)).join('');
+    const cardsHtml = pvBlocks.map((b, i) => pvPointCard(b, i)).join('');
     return `<section class="portal-card" style="margin-top:18px"><div class="toolbar"><div><p class="eyebrow">Procès-verbal</p><h2>Rédiger le PV</h2></div></div>
-      <div class="table-wrap"><table class="pv-table" id="pv-editor-table"><thead><tr><th>Point de l'ordre du jour et sa durée estimée</th><th>Durée réelle du point</th><th>Discussions</th><th>Conclusions</th><th>Conduites à tenir et échéances</th><th>Fichiers joints</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+      <div class="pv-points" id="pv-editor-table">${cardsHtml}</div>
       <button type="button" class="btn btn-quiet btn-sm" id="pv-add-point" style="margin-top:10px">+ Ajouter un point</button>
       <div class="form-grid" style="margin-top:14px">
-        <div class="form-field"><label for="pv-organizer">Rédigé par</label><input id="pv-organizer" value="${esc(minutes?.organizer || '')}"></div>
+        ${pvOrganizerFieldMarkup(minutes, eplMembers)}
         <div class="form-field"><label for="pv-status">Statut</label><select id="pv-status"><option value="draft"${(!minutes || minutes.status==='draft') ? ' selected' : ''}>Brouillon</option><option value="sent"${minutes?.status==='sent' ? ' selected' : ''}>Publié</option><option value="validated"${minutes?.status==='validated' ? ' selected' : ''}>Validé</option></select></div>
       </div>
+      ${isNationalMeeting ? '' : `<div style="margin-top:16px">${pvAttendanceFieldMarkup(roster, savedAttendance)}</div>`}
       <div class="form-actions"><button type="button" class="btn btn-primary" id="pv-save" data-meeting="${meetingId}">Enregistrer le PV</button></div>
     </section>`;
   }
@@ -197,7 +256,7 @@
     const table = document.getElementById('pv-editor-table');
     if (!table) return;
     function readRowsIntoState() {
-      table.querySelectorAll('tr[data-block]').forEach(row => {
+      table.querySelectorAll('.pv-point-card[data-block]').forEach(row => {
         const i = Number(row.dataset.block);
         if (!pvBlocks[i]) return;
         pvBlocks[i].title = row.querySelector('.pv-title').value.trim();
@@ -211,26 +270,26 @@
     document.getElementById('pv-add-point').addEventListener('click', () => {
       readRowsIntoState();
       pvBlocks.push({ title: '', durationMinutes: null, actualDurationMinutes: null, discussion: '', decision: '', nextSteps: '', attachments: [] });
-      table.querySelector('tbody').innerHTML = pvBlocks.map((b, i) => pvEditorRow(b, i)).join('');
+      table.innerHTML = pvBlocks.map((b, i) => pvPointCard(b, i)).join('');
       bindRowFileButtons();
     });
     function bindRowFileButtons() {
       table.querySelectorAll('[data-add-file]').forEach(btn => btn.addEventListener('click', () => {
         readRowsIntoState();
         const i = Number(btn.dataset.addFile);
-        const row = table.querySelector(`tr[data-block="${i}"]`);
+        const row = table.querySelector(`.pv-point-card[data-block="${i}"]`);
         const name = row.querySelector('.pv-file-name').value.trim();
         const url = row.querySelector('.pv-file-url').value.trim();
         if (!url) return;
         pvBlocks[i].attachments = [...(pvBlocks[i].attachments || []), { name: name || url, url }];
-        table.querySelector('tbody').innerHTML = pvBlocks.map((b, ii) => pvEditorRow(b, ii)).join('');
+        table.innerHTML = pvBlocks.map((b, ii) => pvPointCard(b, ii)).join('');
         bindRowFileButtons();
       }));
       table.querySelectorAll('[data-remove-file]').forEach(btn => btn.addEventListener('click', () => {
         readRowsIntoState();
         const [i, fi] = btn.dataset.removeFile.split(':').map(Number);
         pvBlocks[i].attachments.splice(fi, 1);
-        table.querySelector('tbody').innerHTML = pvBlocks.map((b, ii) => pvEditorRow(b, ii)).join('');
+        table.innerHTML = pvBlocks.map((b, ii) => pvPointCard(b, ii)).join('');
         bindRowFileButtons();
       }));
       table.querySelectorAll('[data-remove-point]').forEach(btn => btn.addEventListener('click', () => {
@@ -238,19 +297,27 @@
         const i = Number(btn.dataset.removePoint);
         if (pvBlocks.length <= 1) return;
         pvBlocks.splice(i, 1);
-        table.querySelector('tbody').innerHTML = pvBlocks.map((b, ii) => pvEditorRow(b, ii)).join('');
+        table.innerHTML = pvBlocks.map((b, ii) => pvPointCard(b, ii)).join('');
         bindRowFileButtons();
       }));
     }
     bindRowFileButtons();
+    document.getElementById('pv-mark-all-present')?.addEventListener('click', () => {
+      document.querySelectorAll('#pv-attendance-grid .pv-attendance-status').forEach(select => { select.value = 'present'; });
+    });
     document.getElementById('pv-save').addEventListener('click', async () => {
       readRowsIntoState();
+      const attendance = Array.from(document.querySelectorAll('#pv-attendance-grid .pv-attendance-row')).map(row => ({
+        memberId: row.dataset.member,
+        attendanceStatus: row.querySelector('.pv-attendance-status').value,
+      }));
       try {
         await AYCPortal.api('meeting', { method: 'POST', body: {
           action: 'save_minutes', meetingId,
           organizer: document.getElementById('pv-organizer').value.trim(),
           status: document.getElementById('pv-status').value,
           agendaBlocks: pvBlocks.filter(b => b.title),
+          attendance,
         } });
         notice.innerHTML = '<div class="alert alert-success">Le procès-verbal a été enregistré.</div>';
         await openMeeting(meetingId);
@@ -280,7 +347,7 @@
           <h3 style="margin-top:18px">Réponses</h3>${attendeesHtml}
         </section>
       </div>
-      ${renderPvEditor(m.id, canEditPV, data.minutes)}
+      ${renderPvEditor(m.id, canEditPV, data.minutes, data.roster, data.eplMembers, data.structured?.attendance, m.meeting_type === 'reunion_nationale')}
       ${!canEditPV ? renderPublishedPV(data) : ''}
     `;
     detail.querySelectorAll('[data-rsvp]').forEach(btn => btn.addEventListener('click', async () => {
@@ -590,6 +657,18 @@
     }).join('')}</tbody></table></div>`;
   }
 
+  // EPL (Équipe Plénière Locale) : l'équipe — venue d'autres clubs — qui
+  // préside l'assemblée locale. Auto-listée dès que des personnes sont
+  // affectées depuis la Gestion des rôles ; rien à choisir ici.
+  function eplRosterMarkup(eplMembers) {
+    if (!eplMembers.length) return AYCPortal.renderEmpty('Aucune Équipe Plénière Locale affectée pour le moment. Affectez-en depuis la Gestion des rôles.');
+    return `<div class="table-wrap"><table class="portal-table"><thead><tr><th>Prénom et nom</th><th>Rôle</th><th>Club d’origine</th></tr></thead><tbody>${eplMembers.map(m => {
+      const roleLabels = (m.epl_role_labels && m.epl_role_labels.length ? m.epl_role_labels.join(', ') : 'Membre EPL');
+      const roleText = m.is_epl_secretaire ? `${roleLabels} · Rédige le PV` : roleLabels;
+      return `<tr><td>${esc(m.display_name || m.username)}</td><td>${esc(roleText)}</td><td>${esc(m.home_school_name || '—')}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  }
+
   function rosterPresenceCell(asmMember, roster, canEdit) {
     const presentSelected = asmMember.attendance_status === 'present';
     if (!canEdit) return `<span class="status-badge${presentSelected?' status-active':' status-invalidated'}">${presentSelected?'Présent':'Absent'}</span>`;
@@ -727,7 +806,11 @@
          <div class="table-wrap"><table class="portal-table"><thead><tr><th>Club</th><th>Représentant</th><th>Statut</th><th>Présence</th><th>Vote</th></tr></thead><tbody>${(data.clubAttendance||[]).map(row=>clubAttendanceRowMarkup(row, canEditClubAttendance)).join('')}</tbody></table></div>
          <h3 style="margin-top:22px">Équipe Plénière Nationale (EPN)</h3>
          ${epnRosterMarkup(data.epnMembers||[])}`
-      : `<h3>Présence et droits de vote</h3>
+      : `<h3>Équipe Plénière Locale (EPL)</h3>
+         <p class="list-item-meta" style="margin:-4px 0 10px">L’équipe qui préside cette assemblée locale — affectée depuis la Gestion des rôles, jamais issue du club lui-même.</p>
+         ${eplRosterMarkup(data.eplMembers||[])}
+         <h3 style="margin-top:22px">Présence et droits de vote — tous les membres du club</h3>
+         <p class="list-item-meta" style="margin:-4px 0 10px">${present} présent·e(s) sur ${data.attendance.length} membre(s) actif·ve(s). Chaque membre est listé automatiquement ; ajustez qui était présent, absent, excusé ou en retard.</p>
          <div class="table-wrap"><table class="portal-table"><thead><tr><th>Membre</th><th>Statut</th><th>Présence</th><th>Voix</th></tr></thead><tbody>${data.attendance.map(row => `<tr><td>${esc(row.display_name || row.username)}</td><td>${esc(row.membership_status || '—')}</td><td>${canEditAttendance ? `<select class="assembly-attendance" data-asmMember="${row.member_id}">${['invited','present','absent','excused','late'].map(s=>`<option value="${s}"${row.attendance_status===s?' selected':''}>${labels[s]}</option>`).join('')}</select>` : esc(labels[row.attendance_status] || row.attendance_status)}</td><td>${canEditAttendance ? `<input class="assembly-vote" data-asmMember="${row.member_id}" type="checkbox"${row.voting_rights?' checked':''}>` : (row.voting_rights ? 'Oui' : 'Non')}</td></tr>`).join('')}</tbody></table></div>`;
     const plenaries = data.plenaries || [];
     currentPlenaries = plenaries;

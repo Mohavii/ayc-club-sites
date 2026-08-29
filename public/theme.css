@@ -149,6 +149,12 @@ a{ color:inherit; }
 }
 .menu-panel a:hover{ color:var(--navy-1); background:var(--paper-2); }
 .menu-panel a.is-active{ color:var(--white); background:var(--navy-1); }
+.menu-panel a.nav-portal-link{
+  margin-top:6px; padding-top:11px;
+  border-top:1px solid var(--line);
+  color:var(--navy-1);
+}
+.menu-panel a.nav-portal-link:hover{ color:var(--white); background:var(--navy-1); }
 
 @media (max-width:520px){
   .menu-btn{ padding:7px 8px 7px 14px; }
