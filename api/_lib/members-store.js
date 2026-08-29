@@ -126,6 +126,24 @@ async function listActiveMembersBySchool(schoolId) {
   `;
 }
 
+// Free-text search across all active members regardless of club — used
+// by the admin "Équipe Plénière Nationale" tab to find someone to seat
+// on a national role, since national roles aren't scoped to a club and
+// so can't be reached through the club-first browse flow.
+async function searchActiveMembers(query) {
+  const db = sql();
+  const like = `%${String(query || "").trim().toLowerCase()}%`;
+  if (!like || like === "%%") return [];
+  return db`
+    select id, username, display_name, profile_picture_url, email
+    from portal_members
+    where status = 'active'
+      and (lower(username) like ${like} or lower(display_name) like ${like})
+    order by display_name asc
+    limit 20
+  `;
+}
+
 module.exports = {
   validateUsername,
   findMemberByGoogleId,
@@ -133,6 +151,7 @@ module.exports = {
   findMemberById,
   listSchools,
   listActiveMembersBySchool,
+  searchActiveMembers,
   createMemberFromOnboarding,
   listPendingMembers,
   decideMembership,

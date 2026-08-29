@@ -440,6 +440,37 @@ async function getMemberNationalRoles(memberId) {
   `;
 }
 
+// Every active member holding at least one current national role, each
+// with the full list of national roles they currently hold — feeds the
+// admin "Équipe Plénière Nationale" tab, which manages national roles
+// directly instead of requiring an admin to first pick a club (national
+// roles have no club scope, see the big comment above NATIONAL_ROLES).
+async function listNationalRoleHolders() {
+  const db = sql();
+  const rows = await db`
+    select m.id, m.username, m.display_name as "displayName", m.profile_picture_url as "profilePictureUrl",
+      r.role, r.started_at
+    from portal_national_roles r
+    join portal_members m on m.id = r.member_id
+    where r.ended_at is null and m.status = 'active'
+    order by m.display_name asc, r.started_at asc
+  `;
+  const byMember = new Map();
+  for (const row of rows) {
+    if (!byMember.has(row.id)) {
+      byMember.set(row.id, {
+        id: row.id,
+        username: row.username,
+        displayName: row.displayName,
+        profilePictureUrl: row.profilePictureUrl,
+        roles: [],
+      });
+    }
+    byMember.get(row.id).roles.push(row.role);
+  }
+  return [...byMember.values()];
+}
+
 // Whether a member currently holds a given national-scope title —
 // national admins are NOT auto-granted these (unlike capabilities):
 // EPN membership and the national secretary title are seats, not admin
@@ -580,6 +611,7 @@ module.exports = {
   getMemberNationalRoles,
   hasNationalRole,
   getEpnMembers,
+  listNationalRoleHolders,
   getMemberStatusHistory,
   setMembershipStatus,
   requireCapability,

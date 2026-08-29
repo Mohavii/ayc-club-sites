@@ -1296,8 +1296,9 @@ async function responsibilities(req, res, member, body) {
   return json(res, 201, { responsibility: rows[0] });
 }
 
-const ASSEMBLY_TYPES = ["alofm", "adhesion", "validation", "aloe", "dissolution", "ag_ordinaire", "ag_extraordinaire"];
-const ASSEMBLY_LABELS = { alofm: "ALOFM", adhesion: "AL d’adhésion", validation: "AL de validation", aloe: "ALOE", dissolution: "AL de dissolution", ag_ordinaire: "AG ordinaire", ag_extraordinaire: "AG extraordinaire" };
+const ASSEMBLY_TYPES = ["alofm", "ale", "aloe", "agomm", "agofm", "age"];
+const ASSEMBLY_LABELS = { alofm: "ALOFM", ale: "ALE", aloe: "ALOE", agomm: "AGOMM", agofm: "AGOFM", age: "AGE" };
+const NATIONAL_ASSEMBLY_TYPES = new Set(["agomm", "agofm", "age"]);
 const ELIGIBLE_MEMBER_STATUSES = new Set(["adherent", "responsable"]);
 
 function majorityOutcome(forVotes, againstVotes, abstentions, majorityType) {
@@ -1366,7 +1367,7 @@ async function assemblies(req, res, member, body) {
   const title = String(body.title || ASSEMBLY_LABELS[assemblyType]).trim();
   const startsAt = String(body.startsAt || "").trim();
   if (!title || !startsAt) return json(res, 400, { error: "Titre et date requis." });
-  const scope = assemblyType.startsWith("ag_") ? "national" : "local";
+  const scope = NATIONAL_ASSEMBLY_TYPES.has(assemblyType) ? "national" : "local";
   const meetingType = scope === "national" ? "assemblee_generale" : "assemblee_locale";
   const memberRows = scope === "local"
     ? await db`select id, display_name, username, membership_status from portal_members where school_id = ${schoolId} and status = 'active' order by display_name`
@@ -1730,6 +1731,49 @@ async function assemblyDetail(req, res, member, body) {
       returning *
     `;
     await recordAudit(db, { actorId: member.id, action: "assembly.motion.recorded", entityType: "assembly", entityId: id, afterData: rows[0] });
+    return json(res, 200, { motion: rows[0] });
+  }
+  // Single-field live save, restricted to secrétaires de la plénière
+  // (national secretaries) on national assemblies. Writing one column at
+  // a time — rather than the full-row upsert 'motion' uses — means a
+  // secretary's keystrokes land as they type/blur instead of requiring
+  // the whole motion form to be filled out and explicitly saved, and two
+  // secretaries working the same PV don't clobber each other's other
+  // fields the way a full-row save would.
+  if (body.action === "motion_field") {
+    const isNationalSecretaryLive = assembly.scope === "national" && (member.is_national_admin || await hasNationalRole(member.id, "secretaire_national"));
+    if (!isNationalSecretaryLive) return json(res, 403, { error: "Réservé aux secrétaires de la plénière pour les assemblées nationales." });
+    const position = Number(body.position);
+    const existing = motions.find(row => row.position === position);
+    if (!existing) return json(res, 404, { error: "Motion introuvable." });
+    const FIELD_COLUMNS = {
+      title: { column: "title", clip: 300, fallback: "Motion" },
+      proposerName: { column: "proposer_name", clip: 200 },
+      seconderName: { column: "seconder_name", clip: 200 },
+      amendment: { column: "amendment", clip: 2000 },
+      directNegative: { column: "direct_negative", clip: 2000 },
+      discussion: { column: "discussion", clip: 4000 },
+      consequence: { column: "consequence", clip: 2000 },
+      startsAtText: { column: "starts_at_text", clip: 40 },
+      closesAtText: { column: "closes_at_text", clip: 40 },
+      durationText: { column: "duration_text", clip: 60 },
+    };
+    const spec = FIELD_COLUMNS[body.field];
+    if (!spec) return json(res, 400, { error: "Champ invalide." });
+    const value = clip(body.value, spec.clip) || (spec.fallback ?? null);
+    let rows;
+    switch (spec.column) {
+      case "title": rows = await db`update portal_assembly_motions set title=${value}, updated_at=now() where assembly_id=${id} and position=${position} returning *`; break;
+      case "proposer_name": rows = await db`update portal_assembly_motions set proposer_name=${value}, updated_at=now() where assembly_id=${id} and position=${position} returning *`; break;
+      case "seconder_name": rows = await db`update portal_assembly_motions set seconder_name=${value}, updated_at=now() where assembly_id=${id} and position=${position} returning *`; break;
+      case "amendment": rows = await db`update portal_assembly_motions set amendment=${value}, updated_at=now() where assembly_id=${id} and position=${position} returning *`; break;
+      case "direct_negative": rows = await db`update portal_assembly_motions set direct_negative=${value}, updated_at=now() where assembly_id=${id} and position=${position} returning *`; break;
+      case "discussion": rows = await db`update portal_assembly_motions set discussion=${value}, updated_at=now() where assembly_id=${id} and position=${position} returning *`; break;
+      case "consequence": rows = await db`update portal_assembly_motions set consequence=${value}, updated_at=now() where assembly_id=${id} and position=${position} returning *`; break;
+      case "starts_at_text": rows = await db`update portal_assembly_motions set starts_at_text=${value}, updated_at=now() where assembly_id=${id} and position=${position} returning *`; break;
+      case "closes_at_text": rows = await db`update portal_assembly_motions set closes_at_text=${value}, updated_at=now() where assembly_id=${id} and position=${position} returning *`; break;
+      case "duration_text": rows = await db`update portal_assembly_motions set duration_text=${value}, updated_at=now() where assembly_id=${id} and position=${position} returning *`; break;
+    }
     return json(res, 200, { motion: rows[0] });
   }
   if (body.action === "delete_motion") {

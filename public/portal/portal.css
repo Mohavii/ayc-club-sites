@@ -97,6 +97,8 @@
 .empty-state{ text-align:center; color:var(--ink-soft); padding:40px 0; font-size:0.92rem; }
 
 /* --- Role management (admin-roles.html) --- */
+.role-tab.active{ background:var(--navy-1); color:#fff; border-color:var(--navy-1); }
+.epn-row{ display:block; padding:14px; }
 .role-two-col{ display:flex; gap:28px; align-items:flex-start; }
 @media (max-width:760px){ .role-two-col{ flex-direction:column; } }
 .role-col-members{ flex:1; min-width:0; }

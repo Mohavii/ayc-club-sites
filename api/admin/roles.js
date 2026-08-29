@@ -7,6 +7,8 @@
 // POST /api/admin/roles
 // Body shapes, by action:
 //   { action: "browse",             schoolId? }                      -> all schools, plus active members of schoolId if given (feeds the admin UI in one call)
+//   { action: "browseNational" }                                     -> every active member currently holding at least one national role (feeds the EPN tab, club-independent)
+//   { action: "searchMembers",     query }                           -> free-text active-member search across all clubs, to seat someone new onto a national role
 //   { action: "list",              memberId }                       -> current + past roles/capabilities for one member
 //   { action: "setDisplayRole",    memberId, schoolId, role }        -> ends any current display role for that club, starts the new one
 //   { action: "clearDisplayRole",  memberId, schoolId }              -> ends current display role, no replacement
@@ -21,7 +23,7 @@
 
 const { requireNationalAdmin } = require("../_lib/sessions");
 const { sql } = require("../_lib/db");
-const { findMemberById, listActiveMembersBySchool, listSchools } = require("../_lib/members-store");
+const { findMemberById, listActiveMembersBySchool, listSchools, searchActiveMembers } = require("../_lib/members-store");
 const {
   DISPLAY_ROLES,
   CAPABILITIES,
@@ -41,6 +43,7 @@ const {
   grantNationalCapability,
   revokeNationalCapability,
   setMembershipStatus,
+  listNationalRoleHolders,
 } = require("../_lib/roles");
 
 async function requireActiveTarget(res, memberId) {
@@ -98,10 +101,31 @@ module.exports = async (req, res) => {
         return;
       }
 
+      case "browseNational": {
+        const members = await listNationalRoleHolders();
+        res.status(200).json({ ok: true, members });
+        return;
+      }
+
+      case "searchMembers": {
+        const rows = await searchActiveMembers(body.query);
+        res.status(200).json({
+          ok: true,
+          members: rows.map((m) => ({
+            id: m.id,
+            username: m.username,
+            displayName: m.display_name,
+            profilePictureUrl: m.profile_picture_url,
+            email: m.email,
+          })),
+        });
+        return;
+      }
+
       case "list": {
         const target = await requireActiveTarget(res, memberId);
         if (!target) return;
-        const [roleHistory, capabilities, nationalRoles, trainerRows, documents] = await Promise.all([
+        const [roleHistory, capabilities, nationalRoles, nationalCapabilities, trainerRows, documents] = await Promise.all([
           getMemberRoleHistory(memberId),
           getMemberCapabilities(memberId),
           getMemberNationalRoles(memberId),

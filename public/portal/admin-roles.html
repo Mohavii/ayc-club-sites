@@ -23,20 +23,41 @@
       internes (validation de rapports, édition des PV…) et les rôles nationaux. Réservé aux admins
       nationaux.</p>
 
-    <div class="field" style="max-width:360px;">
-      <label for="school-select">Club</label>
-      <select id="school-select"><option value="">Choisissez un club…</option></select>
+    <div class="role-tab-row" id="admin-tabs" style="display:flex; gap:8px; margin-bottom:18px;">
+      <button type="button" class="btn btn-secondary btn-sm role-tab active" data-tab="clubs">Par club</button>
+      <button type="button" class="btn btn-secondary btn-sm role-tab" data-tab="epn">Équipe Plénière Nationale</button>
     </div>
 
-    <div class="role-two-col" id="two-col" style="display:none;">
-      <div class="role-col-members">
-        <div class="role-section-label">Membres actifs</div>
-        <div id="member-list"></div>
+    <div id="tab-clubs">
+      <div class="field" style="max-width:360px;">
+        <label for="school-select">Club</label>
+        <select id="school-select"><option value="">Choisissez un club…</option></select>
       </div>
 
-      <div class="role-col-detail" id="detail-panel">
-        <div class="empty-state">Sélectionnez un membre à gauche.</div>
+      <div class="role-two-col" id="two-col" style="display:none;">
+        <div class="role-col-members">
+          <div class="role-section-label">Membres actifs</div>
+          <div id="member-list"></div>
+        </div>
+
+        <div class="role-col-detail" id="detail-panel">
+          <div class="empty-state">Sélectionnez un membre à gauche.</div>
+        </div>
       </div>
+    </div>
+
+    <div id="tab-epn" style="display:none;">
+      <p class="portal-subtitle" style="margin-top:0;">Tous les rôles à portée nationale — EPN, secrétaires de la plénière,
+        BEN, SUPCO. Indépendant du club sélectionné ci-dessus. L'EPN est cumulable : plusieurs membres à la fois.</p>
+
+      <div class="field" style="max-width:420px; margin-bottom:18px;">
+        <label for="epn-search">Ajouter un membre (recherche par nom ou identifiant)</label>
+        <input id="epn-search" placeholder="Rechercher…" autocomplete="off">
+        <div id="epn-search-results" class="list-stack" style="margin-top:6px;"></div>
+      </div>
+
+      <div class="role-section-label">Membres avec un rôle national</div>
+      <div id="epn-roster" class="list-stack"></div>
     </div>
   </div>
 </main>
@@ -94,6 +115,11 @@
   const twoCol = document.getElementById("two-col");
   const memberListEl = document.getElementById("member-list");
   const detailPanel = document.getElementById("detail-panel");
+  const tabClubs = document.getElementById("tab-clubs");
+  const tabEpn = document.getElementById("tab-epn");
+  const epnRoster = document.getElementById("epn-roster");
+  const epnSearch = document.getElementById("epn-search");
+  const epnSearchResults = document.getElementById("epn-search-results");
 
   const esc = window.AYCPortal.escapeHtml;
   let schools = [];
@@ -304,6 +330,107 @@
     }
     twoCol.style.display = "flex";
     await loadMembers(currentSchoolId);
+  });
+
+  // ---- Équipe Plénière Nationale tab --------------------------------
+
+  document.querySelectorAll(".role-tab").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      document.querySelectorAll(".role-tab").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      tabClubs.style.display = tab === "clubs" ? "" : "none";
+      tabEpn.style.display = tab === "epn" ? "" : "none";
+      if (tab === "epn") await loadEpnRoster();
+    });
+  });
+
+  function epnRoleChipsMarkup(memberId, activeRoles) {
+    const activeSet = new Set(activeRoles);
+    return NATIONAL_ROLES.map(
+      (r) => `<button class="role-chip${activeSet.has(r.value) ? " granted" : ""}"
+                data-epn-member="${memberId}" data-epn-role="${r.value}">${r.label}${activeSet.has(r.value) ? " ✓" : ""}</button>`
+    ).join("");
+  }
+
+  function renderEpnRoster(members) {
+    if (!members.length) {
+      epnRoster.innerHTML = AYCPortal.renderEmpty("Aucun membre ne détient de rôle national pour le moment.");
+      return;
+    }
+    epnRoster.innerHTML = members
+      .map(
+        (m) => `<div class="list-item epn-row" data-epn-row="${m.id}">
+          <div class="list-item-main" style="margin-bottom:8px;">
+            ${m.profilePictureUrl ? `<img src="${m.profilePictureUrl}" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:8px;">` : ""}
+            <span class="list-item-title">${esc(m.displayName)}</span>
+            <span class="list-item-meta">@${esc(m.username)}</span>
+          </div>
+          <div class="role-chip-row">${epnRoleChipsMarkup(m.id, m.roles)}</div>
+        </div>`
+      )
+      .join("");
+  }
+
+  async function loadEpnRoster() {
+    epnRoster.innerHTML = '<div class="empty-state">Chargement…</div>';
+    const data = await callRoles({ action: "browseNational" });
+    renderEpnRoster(data.members);
+  }
+
+  epnRoster.addEventListener("click", async (e) => {
+    const chip = e.target.closest(".role-chip[data-epn-role]");
+    if (!chip) return;
+    const memberId = Number(chip.dataset.epnMember);
+    const role = chip.dataset.epnRole;
+    const holding = chip.classList.contains("granted");
+    chip.disabled = true;
+    try {
+      await callRoles({ action: holding ? "clearNationalRole" : "setNationalRole", memberId, role });
+      await loadEpnRoster();
+    } catch (err) {
+      chip.disabled = false;
+      alert(err.message || "Échec de la requête.");
+    }
+  });
+
+  let epnSearchTimer = null;
+  epnSearch.addEventListener("input", () => {
+    clearTimeout(epnSearchTimer);
+    const query = epnSearch.value.trim();
+    if (!query) {
+      epnSearchResults.innerHTML = "";
+      return;
+    }
+    epnSearchTimer = setTimeout(async () => {
+      const data = await callRoles({ action: "searchMembers", query });
+      if (!data.members.length) {
+        epnSearchResults.innerHTML = '<div class="empty-state">Aucun membre trouvé.</div>';
+        return;
+      }
+      epnSearchResults.innerHTML = data.members
+        .map(
+          (m) => `<div class="member-pick-row" data-add-epn="${m.id}">
+            ${m.profilePictureUrl ? `<img src="${m.profilePictureUrl}" alt="">` : `<img src="../assets/logo-secondary-color.png" alt="">`}
+            <div class="who"><strong>${esc(m.displayName)}</strong><span>@${esc(m.username)}</span></div>
+          </div>`
+        )
+        .join("");
+    }, 300);
+  });
+
+  epnSearchResults.addEventListener("click", async (e) => {
+    const row = e.target.closest("[data-add-epn]");
+    if (!row) return;
+    const memberId = Number(row.dataset.addEpn);
+    try {
+      await callRoles({ action: "setNationalRole", memberId, role: "epn_member" });
+      epnSearch.value = "";
+      epnSearchResults.innerHTML = "";
+      await loadEpnRoster();
+    } catch (err) {
+      alert(err.message || "Échec de la requête.");
+    }
   });
 
   await loadSchools();

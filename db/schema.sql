@@ -830,7 +830,7 @@ create table if not exists portal_assemblies (
   id uuid primary key default gen_random_uuid(),
   meeting_id uuid unique not null references portal_meetings(id) on delete cascade,
   school_id integer references portal_schools(id) on delete cascade,
-  assembly_type text not null check (assembly_type in ('alofm','adhesion','validation','aloe','dissolution','ag_ordinaire','ag_extraordinaire')),
+  assembly_type text not null check (assembly_type in ('alofm','ale','aloe','agomm','agofm','age')),
   scope text not null default 'local' check (scope in ('local','national')),
   status text not null default 'planned' check (status in ('planned','open','closed','cancelled')),
   member_snapshot_count integer not null default 0,
@@ -848,6 +848,27 @@ create table if not exists portal_assemblies (
   updated_at timestamptz not null default now()
 );
 create index if not exists idx_portal_assemblies_school on portal_assemblies(school_id, status, created_at desc);
+
+-- Migrate assembly types from the old set (alofm/adhesion/validation/aloe/
+-- dissolution/ag_ordinaire/ag_extraordinaire) to the new set (alofm/
+-- ale/aloe/agomm/agofm/age) on databases created before this change.
+-- ALOMM briefly existed as a type in between and doesn't correspond to a
+-- real AYC assembly, so any legacy row stamped 'alomm' is folded into
+-- 'alofm' the same way the other retired types are folded above.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'portal_assemblies' and column_name = 'assembly_type'
+  ) then
+    alter table portal_assemblies drop constraint if exists portal_assemblies_assembly_type_check;
+    update portal_assemblies set assembly_type = 'agomm' where assembly_type in ('ag_ordinaire', 'adhesion', 'validation');
+    update portal_assemblies set assembly_type = 'age' where assembly_type = 'ag_extraordinaire';
+    update portal_assemblies set assembly_type = 'ale' where assembly_type = 'dissolution';
+    update portal_assemblies set assembly_type = 'alofm' where assembly_type = 'alomm';
+    alter table portal_assemblies add constraint portal_assemblies_assembly_type_check check (assembly_type in ('alofm','ale','aloe','agomm','agofm','age'));
+  end if;
+end $$;
 
 -- Extra Contextualisation fields from the paper PV's "I. Contextualisation"
 -- block: adoption state and the named rédacteurs (with their club), shown
