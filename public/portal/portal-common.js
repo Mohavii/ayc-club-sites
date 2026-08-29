@@ -141,18 +141,46 @@
     return data.member || null;
   }
 
+  function showLoadingScreen() {
+    document.body.classList.add("portal-loading");
+    if (document.getElementById("portal-loading-screen")) return;
+    const overlay = document.createElement("div");
+    overlay.id = "portal-loading-screen";
+    overlay.className = "portal-loading-screen";
+    overlay.innerHTML = `
+      <div class="portal-loading-inner">
+        <div class="portal-loading-mark">Y</div>
+        <div class="portal-loading-ring"></div>
+        <span class="portal-loading-text">Chargement…</span>
+      </div>`;
+    document.body.appendChild(overlay);
+  }
+
+  function hideLoadingScreen() {
+    document.body.classList.remove("portal-loading");
+    const overlay = document.getElementById("portal-loading-screen");
+    if (!overlay) return;
+    overlay.classList.add("is-hidden");
+    setTimeout(() => overlay.remove(), 550);
+  }
+
   async function initPortalShell({ requireActive = false } = {}) {
     document.body.classList.add("portal-page");
-    const member = await fetchSession().catch(() => null);
-    renderShell(member);
-    installPortalMotion();
-    if (requireActive && !member) {
-      location.href = `login?next=${encodeURIComponent(location.pathname.split("/").pop())}`;
-      return null;
+    showLoadingScreen();
+    try {
+      const member = await fetchSession().catch(() => null);
+      renderShell(member);
+      installPortalMotion();
+      if (requireActive && !member) {
+        location.href = `login?next=${encodeURIComponent(location.pathname.split("/").pop())}`;
+        return null;
+      }
+      if (requireActive && member.status === "pending") { location.href = "pending"; return null; }
+      if (requireActive && member.status === "rejected") { location.href = "rejected"; return null; }
+      return member;
+    } finally {
+      hideLoadingScreen();
     }
-    if (requireActive && member.status === "pending") { location.href = "pending"; return null; }
-    if (requireActive && member.status === "rejected") { location.href = "rejected"; return null; }
-    return member;
   }
 
   async function api(action, options = {}) {
@@ -185,5 +213,5 @@
   function renderError(target, error) { target.innerHTML = `<div class="alert alert-error">${escapeHtml(error.message || error)}</div>`; }
   function renderEmpty(text) { return `<div class="empty-state"><strong>${escapeHtml(text)}</strong><span>Les éléments apparaîtront ici dès qu'ils seront créés.</span></div>`; }
 
-  window.AYCPortal = { initPortalShell, fetchSession, api, escapeHtml, formatDate, statusLabel, renderError, renderEmpty, installPortalMotion };
+  window.AYCPortal = { initPortalShell, fetchSession, api, escapeHtml, formatDate, statusLabel, renderError, renderEmpty, installPortalMotion, showLoadingScreen, hideLoadingScreen };
 })();

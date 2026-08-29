@@ -23,10 +23,13 @@ const { sql } = require("./db");
 const DISPLAY_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc", "supco_regional"];
 const BEL_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc"];
 const CAPABILITIES = ["membership_approver", "report_validator", "pv_editor", "meeting_organizer", "project_manager", "supervision_editor", "cscy_reviewer"];
-// 'epn_member' seats someone on the Équipe Plénière Nationale (EPN), the
-// standing body listed as attendees on every national AG — many members
-// hold this at once, unlike a single-seat title. 'secretaire_national' is
-// the national-scope counterpart of the club 'secretaire' display role:
+// The Équipe Plénière Nationale (EPN) is seated via five distinct posts
+// rather than a single generic 'epn_member' flag — 'epn_president',
+// 'epn_vice_president', 'epn_secretaire', 'epn_cscy', 'epn_comite_financier'.
+// Each is its own seat (a member can hold more than one), and holding ANY
+// of the five counts as "on the EPN" for AG attendance/PV purposes — see
+// isEpnMember and getEpnMembers below. 'secretaire_national' is the
+// national-scope counterpart of the club 'secretaire' display role:
 // it lets whoever holds it write the national AG's PV (see
 // requirePvEditorForAssembly below) without needing the pv_editor
 // capability, since that capability is meant for local club PVs.
@@ -35,7 +38,15 @@ const CAPABILITIES = ["membership_approver", "report_validator", "pv_editor", "m
 // the "Liste de présence du BEN et du Conseil de Supervision" on national AG
 // PVs can be driven from real member roles instead of free text — a vacant
 // post is simply "no current row for that role".
-const NATIONAL_ROLES = ["president_national", "epn_member", "secretaire_national", "secretaire_general_national", "tresorier_national", "vpa", "vpr", "vpcom", "supco_national"];
+const EPN_ROLES = ["epn_president", "epn_vice_president", "epn_secretaire", "epn_cscy", "epn_comite_financier"];
+const EPN_ROLE_LABELS = {
+  epn_president: "Président",
+  epn_vice_president: "Vice-Président",
+  epn_secretaire: "Secrétaire de la Plénière",
+  epn_cscy: "CSCY",
+  epn_comite_financier: "Comité Financier",
+};
+const NATIONAL_ROLES = ["president_national", ...EPN_ROLES, "secretaire_national", "secretaire_general_national", "tresorier_national", "vpa", "vpr", "vpcom", "supco_national"];
 const BEN_ROLE_LABELS = {
   president_national: "Président National",
   secretaire_general_national: "Secrétaire Générale Nationale",
@@ -303,7 +314,7 @@ async function getMemberPortalAccess(member) {
   // local meetings) treat as "holds the local pv_editor capability".
   // Assemblies.html checks this flag specifically for national scope.
   const isNationalSecretary = isNationalAdmin || nationalRoles.includes("secretaire_national");
-  const isEpnMember = isNationalAdmin || nationalRoles.includes("epn_member");
+  const isEpnMember = isNationalAdmin || EPN_ROLES.some(role => nationalRoles.includes(role));
   const isNewAdherent = member.membership_status === "nouveau_adherent";
   const isOrdinaryMember = !isNationalAdmin && !BEL_ROLES.includes(displayRole) && capabilities.length === 0;
   const canManageClubWork = isNationalAdmin || capabilities.some(capability => ["meeting_organizer", "pv_editor", "project_manager", "report_validator"].includes(capability));
@@ -493,11 +504,11 @@ async function hasNationalRole(memberId, role) {
 async function getEpnMembers() {
   const db = sql();
   return db`
-    select m.*, r.started_at as role_started_at
+    select distinct on (m.id) m.*, r.started_at as role_started_at
     from portal_national_roles r
     join portal_members m on m.id = r.member_id
-    where r.role = 'epn_member' and r.ended_at is null and m.status = 'active'
-    order by m.display_name asc
+    where r.role = any(${EPN_ROLES}) and r.ended_at is null and m.status = 'active'
+    order by m.id, r.started_at asc
   `;
 }
 
@@ -531,7 +542,7 @@ async function getMemberRoleLabel(memberId) {
     db`select display_name, membership_status from portal_members where id = ${memberId} limit 1`,
   ]);
   const clubRoleLabels = { president: "Président(e)", tresorier: "Trésorier(e)", secretaire: "Secrétaire", vpi: "VPI", vpe: "VPE", vpc: "VPC", supco_regional: "SupCo Régional" };
-  if (nationalRows[0]) return BEN_ROLE_LABELS[nationalRows[0].role] || nationalRows[0].role;
+  if (nationalRows[0]) return BEN_ROLE_LABELS[nationalRows[0].role] || EPN_ROLE_LABELS[nationalRows[0].role] || nationalRows[0].role;
   if (clubRows[0]) return `${clubRoleLabels[clubRows[0].role] || clubRows[0].role} · ${clubRows[0].school_name}`;
   if (memberRows[0]?.membership_status === "senior") return "Conseil National des Seniors";
   if (memberRows[0]?.membership_status === "membre_national") return "Entité des membres nationaux";
@@ -586,6 +597,8 @@ module.exports = {
   BEL_ROLES,
   CAPABILITIES,
   NATIONAL_ROLES,
+  EPN_ROLES,
+  EPN_ROLE_LABELS,
   MEMBERSHIP_STATUSES,
   assertValidMembershipStatus,
   setClubDisplayRole,

@@ -18,6 +18,8 @@ const {
   getBenRoster,
   getMemberRoleLabel,
   BEN_ROSTER_ROLES,
+  EPN_ROLES,
+  EPN_ROLE_LABELS,
 } = require("./_lib/roles");
 
 function parseBody(req) {
@@ -1474,10 +1476,12 @@ async function assemblyDetail(req, res, member, body) {
     assembly.scope === "national"
       ? db`
           select m.id, m.display_name, m.username, m.profile_picture_url,
+            array_agg(r.role order by r.started_at asc) as epn_roles,
             coalesce((select r2.role from portal_national_roles r2 where r2.member_id = m.id and r2.role = 'secretaire_national' and r2.ended_at is null limit 1) is not null, false) as is_national_secretary
           from portal_national_roles r
           join portal_members m on m.id = r.member_id
-          where r.role = 'epn_member' and r.ended_at is null and m.status = 'active'
+          where r.role = any(${EPN_ROLES}) and r.ended_at is null and m.status = 'active'
+          group by m.id, m.display_name, m.username, m.profile_picture_url
           order by m.display_name asc
         `
       : Promise.resolve([]),
@@ -1526,7 +1530,11 @@ async function assemblyDetail(req, res, member, body) {
   }
   const presentCount = attendance.filter(row => ["present", "late"].includes(row.attendance_status)).length;
   const quorumMet = assembly.scope === "local" ? presentCount >= assembly.quorum_required : null;
-  if (req.method === "GET" || body.action === "assembly") return json(res, 200, { assembly: { ...assembly, assembly_label: ASSEMBLY_LABELS[assembly.assembly_type] || assembly.assembly_type, present_count: presentCount, quorum_met_live: quorumMet }, attendance, roles, motions, elections, minutes: minutes[0] || null, minutesStructured, clubAttendance, epnMembers, plenaries, piBoxes, groundRules, movements, benRoster: benRosterWithPresence, cnsMembers: cnsMembersWithPresence, formateurs: formateursWithPresence, membresNationaux: membresNationauxWithPresence, canEditPV });
+  const epnMembersWithLabels = epnMembers.map(m => ({
+    ...m,
+    epn_role_labels: (m.epn_roles || []).map(role => EPN_ROLE_LABELS[role] || role),
+  }));
+  if (req.method === "GET" || body.action === "assembly") return json(res, 200, { assembly: { ...assembly, assembly_label: ASSEMBLY_LABELS[assembly.assembly_type] || assembly.assembly_type, present_count: presentCount, quorum_met_live: quorumMet }, attendance, roles, motions, elections, minutes: minutes[0] || null, minutesStructured, clubAttendance, epnMembers: epnMembersWithLabels, plenaries, piBoxes, groundRules, movements, benRoster: benRosterWithPresence, cnsMembers: cnsMembersWithPresence, formateurs: formateursWithPresence, membresNationaux: membresNationauxWithPresence, canEditPV });
   if (body.action === "attendance") {
     if (!(await requireClubCapability(req, res, member, "cscy_reviewer", assembly.school_id))) return;
     const target = attendance.find(row => row.member_id === body.memberId);

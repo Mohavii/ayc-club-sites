@@ -7,7 +7,7 @@
 // POST /api/admin/roles
 // Body shapes, by action:
 //   { action: "browse",             schoolId? }                      -> all schools, plus active members of schoolId if given (feeds the admin UI in one call)
-//   { action: "browseNational" }                                     -> every active member currently holding at least one national role (feeds the EPN tab, club-independent)
+//   { action: "browseNational" }                                     -> every active member currently holding at least one national role (club-independent; kept for tooling/future use)
 //   { action: "searchMembers",     query }                           -> free-text active-member search across all clubs, to seat someone new onto a national role
 //   { action: "list",              memberId }                       -> current + past roles/capabilities for one member
 //   { action: "setDisplayRole",    memberId, schoolId, role }        -> ends any current display role for that club, starts the new one

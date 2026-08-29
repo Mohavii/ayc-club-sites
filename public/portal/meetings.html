@@ -238,6 +238,36 @@
       const stateEl = card.querySelector('[data-save-state]');
       if (stateEl) { stateEl.textContent = 'Modifications non enregistrées.'; stateEl.classList.add('is-dirty'); stateEl.classList.remove('is-saved'); }
     }));
+    bindEditingIndicators(card);
+  }
+
+  // Shows a live "en cours de modification" badge on a field the moment
+  // someone focuses or types in it, separate from the saved/unsaved state
+  // which only updates after the field is left.
+  function bindEditingIndicators(scope) {
+    scope.querySelectorAll('.form-field, .al-motion-title-row').forEach(wrapper => {
+      const field = wrapper.querySelector('input, textarea, select');
+      if (!field || field.disabled || wrapper.dataset.editingBound) return;
+      wrapper.dataset.editingBound = 'true';
+      let badge = null;
+      const showBadge = () => {
+        wrapper.classList.add('is-editing-now');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'editing-now-badge';
+          badge.innerHTML = '<span class="editing-now-dot"></span>Modification en cours…';
+          wrapper.appendChild(badge);
+        }
+      };
+      const hideBadge = () => {
+        wrapper.classList.remove('is-editing-now');
+        badge?.remove();
+        badge = null;
+      };
+      field.addEventListener('focus', showBadge);
+      field.addEventListener('input', showBadge);
+      field.addEventListener('blur', hideBadge);
+    });
   }
 
   function clubAttendanceRowMarkup(row, canEditClubs) {
@@ -261,7 +291,11 @@
 
   function epnRosterMarkup(epnMembers) {
     if (!epnMembers.length) return AYCPortal.renderEmpty('Aucun membre inscrit à l’EPN pour le moment. Ajoutez-en depuis la Gestion des rôles.');
-    return `<div class="table-wrap"><table class="portal-table"><thead><tr><th>Prénom et nom</th><th>Rôle</th></tr></thead><tbody>${epnMembers.map(m => `<tr><td>${esc(m.display_name || m.username)}</td><td>${m.is_national_secretary ? 'Secrétaire National(e)' : 'Membre EPN'}</td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="table-wrap"><table class="portal-table"><thead><tr><th>Prénom et nom</th><th>Rôle</th></tr></thead><tbody>${epnMembers.map(m => {
+      const labels = (m.epn_role_labels && m.epn_role_labels.length ? m.epn_role_labels.join(', ') : 'Membre EPN');
+      const roleText = m.is_national_secretary ? `${labels} · Secrétaire National(e)` : labels;
+      return `<tr><td>${esc(m.display_name || m.username)}</td><td>${esc(roleText)}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
   }
 
   function rosterPresenceCell(member, roster, canEdit) {
@@ -451,6 +485,7 @@
     detail.insertAdjacentHTML('beforeend', renderPublishedPV(data));
     document.getElementById('close-detail').onclick=()=>{detail.innerHTML='';openMotionPositions=new Set();};
     detail.querySelectorAll('.al-motion-card').forEach(card => bindMotionCard(card, a.id, liveSaveMotions));
+    bindEditingIndicators(detail);
     if (canEditMotions) document.getElementById('add-motion')?.addEventListener('click', async () => {
       const nextPosition = data.motions.length;
       try { await AYCPortal.api('assembly', { method: 'POST', body: { action: 'motion', assemblyId: a.id, position: nextPosition, title: 'Nouvelle motion', motionType: 'decision' } }); openMotionPositions.add(nextPosition); await openAssembly(a.id); } catch (e) { apiError(e); }
@@ -492,6 +527,7 @@
       const html = `<div class="portal-card" id="plenary-form-card" style="margin-top:14px"><h3>${existing ? 'Modifier l’équipe de la plénière' : 'Nouvelle plénière'}</h3><div class="form-grid">${plenaryFormFields(existing)}</div><div class="form-actions"><button type="button" class="btn btn-quiet btn-sm" id="cancel-plenary">Annuler</button><button type="button" class="btn btn-primary btn-sm" id="save-plenary">Enregistrer</button></div></div>`;
       document.getElementById('plenary-form-card')?.remove();
       document.getElementById('plenaries-list').insertAdjacentHTML('afterend', html);
+      bindEditingIndicators(document.getElementById('plenary-form-card'));
       document.getElementById('cancel-plenary').onclick = () => document.getElementById('plenary-form-card').remove();
       document.getElementById('save-plenary').onclick = async () => {
         try {
@@ -550,6 +586,7 @@
         const motionId = btn.dataset.addPi;
         const html = `<div class="pi-box" id="pi-form-box" style="background:#fff"><div class="form-field"><label>Nom et prénom (ou choisir un membre existant si connu)</label><input id="pi-name"></div><div class="form-field"><label>Rôle (auto-rempli si le membre est trouvé, sinon libre)</label><input id="pi-role"></div><div class="form-field full"><label>Intervention</label><textarea id="pi-body"></textarea></div><div class="form-actions"><button type="button" class="btn btn-quiet btn-sm" id="cancel-pi">Annuler</button><button type="button" class="btn btn-primary btn-sm" id="save-pi">Ajouter le PI</button></div></div>`;
         btn.closest('.al-motion-add-row').insertAdjacentHTML('beforebegin', html);
+        bindEditingIndicators(document.getElementById('pi-form-box'));
         btn.hidden = true;
         document.getElementById('cancel-pi').onclick = () => { document.getElementById('pi-form-box').remove(); btn.hidden = false; };
         document.getElementById('save-pi').onclick = async () => {
