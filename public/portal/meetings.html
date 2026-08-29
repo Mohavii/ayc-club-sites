@@ -668,8 +668,7 @@
   function eplRosterMarkup(eplMembers) {
     if (!eplMembers.length) return AYCPortal.renderEmpty('Aucune Équipe Plénière Locale affectée pour le moment. Affectez-en depuis la Gestion des rôles.');
     return `<div class="table-wrap"><table class="portal-table"><thead><tr><th>Prénom et nom</th><th>Rôle</th><th>Club d’origine</th></tr></thead><tbody>${eplMembers.map(m => {
-      const roleLabels = (m.epl_role_labels && m.epl_role_labels.length ? m.epl_role_labels.join(', ') : 'Membre EPL');
-      const roleText = m.is_epl_secretaire ? `${roleLabels} · Rédige le PV` : roleLabels;
+      const roleText = (m.epl_role_labels && m.epl_role_labels.length ? m.epl_role_labels.join(', ') : 'Membre EPL');
       return `<tr><td>${esc(m.display_name || m.username)}</td><td>${esc(roleText)}</td><td>${esc(m.home_school_name || '—')}</td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
@@ -812,7 +811,6 @@
          <h3 style="margin-top:22px">Équipe Plénière Nationale (EPN)</h3>
          ${epnRosterMarkup(data.epnMembers||[])}`
       : `<h3>Équipe Plénière Locale (EPL)</h3>
-         <p class="list-item-meta" style="margin:-4px 0 10px">L’équipe qui préside cette assemblée locale — affectée depuis la Gestion des rôles, jamais issue du club lui-même.</p>
          ${eplRosterMarkup(data.eplMembers||[])}
          <h3 style="margin-top:22px">Présence et droits de vote — tous les membres du club</h3>
          <p class="list-item-meta" style="margin:-4px 0 10px">${present} présent·e(s) sur ${data.attendance.length} membre(s) actif·ve(s). Chaque membre est listé automatiquement ; ajustez qui était présent, absent, excusé ou en retard.</p>
@@ -825,7 +823,6 @@
       ? (data.movements || []).map(mv => movementRowMarkup(mv, canEditClubAttendance)).join('')
       : AYCPortal.renderEmpty('Aucun mouvement enregistré pour le moment.');
     detail.innerHTML=`<section class="portal-card assembly-detail-card"><div class="toolbar"><div><p class="eyebrow">${esc(a.assembly_label)}</p><h2>${esc(a.title)}</h2><p class="list-item-meta">${AYCPortal.formatDate(a.starts_at,true)} · ${esc(a.location || 'Format à préciser')} · ${esc(labels[a.status] || a.status)}</p></div><button class="btn btn-secondary btn-sm" id="close-detail">Fermer</button></div>
-      <div class="metric-strip"><div><strong>${a.member_snapshot_count}</strong><span>Membres au snapshot</span></div><div><strong>${a.eligible_voter_count}</strong><span>Électeur·rices éligibles</span></div><div><strong>${a.quorum_required || '—'}</strong><span>Quorum requis</span></div><div><strong>${present}</strong><span>Présent·es</span></div><div><strong>${a.quorum_met_live == null ? '—' : (a.quorum_met_live ? 'Oui' : 'Non')}</strong><span>Quorum en direct</span></div></div>
       <section class="pv-section"><div class="pv-section-heading"><div><h3>Contextualisation</h3><p>État, mandat, organisateur, rédacteurs et cadre de l’assemblée, tels qu’ils apparaîtront en tête du procès-verbal.</p></div></div>
         <div class="al-context-grid">
           <div class="form-field"><label>État</label>${canEditMotions ? `<select id="ctx-adoption-state">${Object.entries({draft:'Brouillon',submitted_for_adoption:'Soumis à l’adoption',adopted:'Adopté'}).map(([v,l])=>`<option value="${v}"${a.adoption_state===v?' selected':''}>${l}</option>`).join('')}</select>` : `<input value="${esc({draft:'Brouillon',submitted_for_adoption:'Soumis à l’adoption',adopted:'Adopté'}[a.adoption_state] || a.adoption_state)}" disabled>`}</div>
@@ -836,7 +833,13 @@
           <div class="form-field"><label>Date de fin</label><input value="${a.closed_at ? AYCPortal.formatDate(a.closed_at,true) : '—'}" disabled></div>
         </div>
         <div style="margin-top:14px"><p class="eyebrow" style="margin-bottom:8px">Noms et clubs des rédacteurs</p>
-          <div id="editors-list" class="list-stack" style="margin-bottom:10px">${(a.editors||[]).length ? a.editors.map((e,i)=>`<div class="list-item" data-editor-index="${i}"><div class="list-item-main"><span class="list-item-title">${esc(e.name)}</span><span class="list-item-meta">${esc(e.club||'—')}</span></div>${canEditMotions ? `<button type="button" class="btn btn-quiet btn-sm" data-remove-editor="${i}">Retirer</button>` : ''}</div>`).join('') : AYCPortal.renderEmpty('Aucun rédacteur renseigné')}</div>
+          <div id="editors-list" class="list-stack" style="margin-bottom:10px">${(() => {
+            const savedEditors = a.editors || [];
+            const eplEditors = (data.eplMembers || []).map(m => ({ name: m.display_name || m.username, club: m.home_school_name || '—' }));
+            const displayEditors = savedEditors.length ? savedEditors : eplEditors;
+            if (!displayEditors.length) return AYCPortal.renderEmpty('Aucun rédacteur renseigné');
+            return displayEditors.map((e,i) => `<div class="list-item" data-editor-index="${i}"><div class="list-item-main"><span class="list-item-title">${esc(e.name)}</span><span class="list-item-meta">${esc(e.club||'—')}</span></div>${canEditMotions && savedEditors.length ? `<button type="button" class="btn btn-quiet btn-sm" data-remove-editor="${i}">Retirer</button>` : ''}</div>`).join('');
+          })()}</div>
           ${canEditMotions ? `<div class="editors-row"><div class="form-field"><label>Nom et prénom</label><input id="editor-name"></div><div class="form-field"><label>Club</label><input id="editor-club"></div><button type="button" class="btn btn-secondary btn-sm" id="add-editor">Ajouter</button></div>
           <div class="form-actions"><button type="button" class="btn btn-primary btn-sm" id="save-editors">Enregistrer la contextualisation</button></div>` : ''}
         </div>

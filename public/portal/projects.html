@@ -51,9 +51,7 @@
     if (!rows.length) { list.innerHTML = AYCPortal.renderEmpty('Aucun projet dans cette vue'); return; }
     list.innerHTML = rows.map(p => `<article class="list-item project-list-item" data-open-project="${p.id}" style="cursor:pointer">
       <span class="scope-pill scope-pill-${p.scope === 'national' ? 'national' : 'local'}">${p.scope === 'national' ? 'National' : 'Local'}</span>
-      <div class="list-item-main"><span class="list-item-title">${esc(p.title)}</span>
-      <span class="list-item-meta">${esc(p.school_name || 'Association YOUTH CLUBs')} · Président : ${esc(p.president_name || '—')}</span>
-      <span class="list-item-meta">${esc(p.status || 'in_progress')} · ${p.team_count || 0} équipe(s) · ${p.member_count || 0} membre(s)</span></div>
+      <div class="list-item-main"><span class="list-item-title">${esc(p.title)}</span></div>
       <div class="heading-actions"><button class="btn btn-secondary btn-sm" data-open="${p.id}">Ouvrir</button></div>
     </article>`).join('');
   }

@@ -328,7 +328,7 @@ body.portal-page:before{
 .meeting-detail-card { margin-top: 20px; scroll-margin-top: 20px; border-top: 4px solid #e5b942; }
 .meeting-detail-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 28px; margin-top: 18px; }
 .project-list-item { align-items: center; gap: 10px; }
-.scope-pill { flex: none; width: 84px; text-align: center; padding: 4px 10px; border-radius: 999px; font-size: .68rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; line-height: 1.4; box-sizing: border-box; }
+.scope-pill { flex: none; min-width: 92px; text-align: center; padding: 4px 10px; border-radius: 999px; font-size: .68rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; line-height: 1.4; box-sizing: border-box; white-space: nowrap; }
 .scope-pill-national { background: #0b346f; color: #fff; }
 .scope-pill-local { background: #e7edf7; color: #24406f; }
 .project-summary { margin: 14px 0 18px; padding: 16px 18px; border-radius: 14px; background: #f4f7fc; }
