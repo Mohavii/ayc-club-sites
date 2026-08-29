@@ -3,645 +3,290 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Réunions & Assemblées · Portail YOUTHCLUBber</title>
+  <title>Réunions · Portail YOUTHCLUBber</title>
   <link rel="icon" href="../assets/favicon-32.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../theme.css">
   <link rel="stylesheet" href="portal.css">
+  <style>
+    .pv-table{width:100%;border-collapse:collapse}
+    .pv-table th,.pv-table td{border:1px solid var(--border,#dfe3ee);padding:10px;vertical-align:top;font-size:.92rem}
+    .pv-table thead th{background:#2f4bd0;color:#fff;font-weight:600}
+    .pv-table textarea{width:100%;min-height:64px;resize:vertical;font:inherit}
+    .pv-table input[type="text"],.pv-table input[type="number"],.pv-table input[type="url"]{width:100%;font:inherit}
+    .pv-attachments{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .pv-attachment-pill{display:inline-flex;align-items:center;gap:6px;background:#eef0fa;border-radius:999px;padding:4px 10px;font-size:.82rem}
+    .pv-attachment-pill button{border:none;background:none;cursor:pointer;color:#8a8fa6;font-size:.9rem;line-height:1}
+    .pv-add-file{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+    .pv-add-file input{flex:1;min-width:110px}
+    .pv-point-remove{margin-top:6px}
+    .agenda-builder-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+    .agenda-builder-row input[type="text"]{flex:3}
+    .agenda-builder-row input[type="number"]{flex:1}
+  </style>
 </head>
 <body>
   <div id="topbar-root"></div>
   <div class="workspace">
     <div id="sidebar-root"></div>
     <main class="portal-content">
-      <div class="portal-heading"><div><p class="eyebrow">Pouvoir législatif</p><h1>Réunions & Assemblées</h1><p>Prépare les réunions et assemblées, conserve le rôle de chaque participant et suis le quorum avec une photographie datée des membres.</p></div></div>
+      <div class="portal-heading"><div><p class="eyebrow">Pouvoir législatif</p><h1>Réunions</h1><p>Prépare les réunions locales et nationales et publie un procès-verbal simple : points, durées, discussions, conclusions, conduites à tenir et fichiers joints.</p></div></div>
       <div id="notice"></div>
       <div class="portal-grid">
-        <section class="portal-card card-span-12"><div class="toolbar"><div><p class="eyebrow">Calendrier institutionnel</p><h2>Réunions & assemblées</h2></div><button class="btn btn-secondary btn-sm" id="refresh">Actualiser</button></div><div id="assembly-list" class="list-stack"></div></section>
-      </div>
-      <div id="assembly-detail"></div>
-      <div class="portal-grid" style="margin-top:18px">
-        <section class="portal-card card-span-12" id="assembly-prep-card"><p class="eyebrow">Préparation</p><h2>Nouvelle réunion / assemblée</h2><form id="assembly-form" class="form-grid">
-          <div class="form-field"><label for="assemblyType">Type</label><select id="assemblyType"><option value="alofm">ALOFM</option><option value="ale">ALE</option><option value="aloe">ALOE</option><option value="agomm">AGOMM</option><option value="agofm">AGOFM</option><option value="age">AGE</option></select></div>
-          <div class="form-field"><label for="assemblyTitle">Titre</label><input id="assemblyTitle" required></div>
+        <section class="portal-card card-span-8"><div class="toolbar"><div><p class="eyebrow">Calendrier</p><h2>Réunions</h2></div><button class="btn btn-secondary btn-sm" id="refresh">Actualiser</button></div><div id="meeting-list" class="list-stack"></div></section>
+        <section class="portal-card card-span-4" id="meeting-prep-card"><p class="eyebrow">Préparation</p><h2>Nouvelle réunion</h2><form id="meeting-form">
+          <div class="form-field"><label for="meetingType">Type</label><select id="meetingType"><option value="reunion_locale">Réunion locale</option><option value="reunion_nationale">Réunion nationale</option></select></div>
+          <div class="form-field"><label for="meetingTitle">Titre</label><input id="meetingTitle" required placeholder="Réunion hebdomadaire du bureau"></div>
           <div class="form-field"><label for="startsAt">Date et heure</label><input id="startsAt" type="datetime-local" required></div>
           <div class="form-field"><label for="format">Format</label><select id="format"><option value="presentiel">Présentiel</option><option value="en_ligne">En ligne</option><option value="hybride">Hybride</option></select></div>
-          <div class="form-field"><label for="location">Lieu / lien</label><input id="location"></div>
-          <div class="form-field"><label for="projectUrl">Lien projet</label><input id="projectUrl" type="url"></div>
-          <div class="form-field"><label for="databaseUrl">Lien base de données</label><input id="databaseUrl" type="url"></div>
-          <div class="form-actions full"><button class="btn btn-primary" type="submit">Préparer</button></div>
+          <div class="form-field"><label for="location">Lieu / lien</label><input id="location" placeholder="Local, ou lien de visio"></div>
+          <div class="form-field"><label for="comments">Commentaires</label><input id="comments"></div>
+          <div class="form-field">
+            <label>Ordre du jour (point et durée estimée)</label>
+            <div id="agenda-builder"></div>
+            <button type="button" class="btn btn-quiet btn-sm" id="add-agenda-item">+ Ajouter un point</button>
+          </div>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">Préparer la réunion</button></div>
         </form></section>
       </div>
+      <div id="meeting-detail"></div>
     </main>
   </div>
 <script src="portal-common.js"></script>
 <script>
 (async () => {
-  const notice = document.getElementById('notice'); const list = document.getElementById('assembly-list'); const detail = document.getElementById('assembly-detail'); const esc = AYCPortal.escapeHtml;
-  const labels = { alofm:'ALOFM', ale:'ALE', aloe:'ALOE', agomm:'AGOMM', agofm:'AGOFM', age:'AGE', planned:'Planifiée', open:'Ouverte', closed:'Clôturée', cancelled:'Annulée', invited:'Invité·e', present:'Présent·e', absent:'Absent·e', excused:'Excusé·e', late:'En retard' };
-  const majorityLabels = { simple:'Majorité simple', absolute:'Majorité absolue', relative:'Majorité relative', two_thirds:'Majorité des deux tiers' };
-  const resultLabels = { adopted:'La motion passe', rejected:'La motion ne passe pas', tie:'Égalité des voix' };
+  const notice = document.getElementById('notice'); const list = document.getElementById('meeting-list'); const detail = document.getElementById('meeting-detail'); const esc = AYCPortal.escapeHtml;
+  const typeLabels = { reunion_locale: 'Réunion locale', reunion_nationale: 'Réunion nationale', reunion: 'Réunion' };
+  const statusLabels = { planned: 'Planifiée', live: 'En cours', completed: 'Terminée', cancelled: 'Annulée' };
+  const rsvpLabels = { pending: 'En attente', present: 'Présent·e', absent: 'Absent·e' };
+  const REUNION_TYPES = ['reunion_locale', 'reunion_nationale', 'reunion'];
   let member;
-  let openMotionPositions = new Set();
   const apiError = error => AYCPortal.renderError(notice, error);
-  function renderList(rows) {
-    if (!rows.length) { list.innerHTML = AYCPortal.renderEmpty('Aucune assemblée planifiée'); return; }
-    list.innerHTML = rows.map(a => `<article class="list-item assembly-row"><div class="meeting-date"><strong>${new Date(a.starts_at).toLocaleDateString('fr-FR',{day:'2-digit'})}</strong><span>${new Date(a.starts_at).toLocaleDateString('fr-FR',{month:'short'})}</span></div><div class="list-item-main"><span class="list-item-title">${esc(a.title)}</span><span class="list-item-meta">${esc(labels[a.assembly_type] || a.assembly_type)} · ${esc(a.school_name || 'Mon club')} · ${AYCPortal.formatDate(a.starts_at,true)}</span><span class="list-item-meta">${a.member_snapshot_count || 0} membres au snapshot · quorum ${a.quorum_required || '—'} · ${a.present_count || 0} présent·es</span></div><div class="heading-actions"><span class="status-badge">${esc(labels[a.status] || a.status)}</span><button class="btn btn-secondary btn-sm" data-open="${a.id}">Voir la base</button></div></article>`).join('');
+
+  // ---- Nouvelle réunion : constructeur d'ordre du jour ---------------------
+  let agendaRowId = 0;
+  function addAgendaRow(title = '', duration = '') {
+    const id = `agenda-row-${agendaRowId++}`;
+    const row = document.createElement('div');
+    row.className = 'agenda-builder-row';
+    row.id = id;
+    row.innerHTML = `<input type="text" class="agenda-item-title" placeholder="Point de l'ordre du jour" value="${esc(title)}"><input type="number" class="agenda-item-duration" min="0" placeholder="Durée est. (min)" value="${esc(duration)}"><button type="button" class="btn btn-quiet btn-sm" data-remove-agenda>✕</button>`;
+    document.getElementById('agenda-builder').appendChild(row);
+    row.querySelector('[data-remove-agenda]').addEventListener('click', () => row.remove());
   }
-  async function load() { const data = await AYCPortal.api('assemblies'); renderList(data.assemblies || []); }
+  document.getElementById('add-agenda-item').addEventListener('click', () => addAgendaRow());
+  addAgendaRow();
+
+  function collectAgendaItems() {
+    return Array.from(document.querySelectorAll('#agenda-builder .agenda-builder-row')).map(row => ({
+      title: row.querySelector('.agenda-item-title').value.trim(),
+      durationMinutes: row.querySelector('.agenda-item-duration').value ? Number(row.querySelector('.agenda-item-duration').value) : null,
+    })).filter(item => item.title);
+  }
+
+  // ---- Liste -----------------------------------------------------------
+  function renderList(rows) {
+    const filtered = rows.filter(m => REUNION_TYPES.includes(m.meeting_type));
+    if (!filtered.length) { list.innerHTML = AYCPortal.renderEmpty('Aucune réunion planifiée'); return; }
+    list.innerHTML = filtered.map(m => `<article class="list-item"><div class="meeting-date"><strong>${new Date(m.starts_at).toLocaleDateString('fr-FR',{day:'2-digit'})}</strong><span>${new Date(m.starts_at).toLocaleDateString('fr-FR',{month:'short'})}</span></div><div class="list-item-main"><span class="list-item-title">${esc(m.title)}</span><span class="list-item-meta">${esc(typeLabels[m.meeting_type] || m.meeting_type)} · ${esc(m.school_name || 'National')} · ${AYCPortal.formatDate(m.starts_at, true)}</span><span class="list-item-meta">${m.attendee_count || 0} réponse(s)</span></div><div class="heading-actions"><span class="status-badge">${esc(statusLabels[m.status] || m.status)}</span><button class="btn btn-secondary btn-sm" data-open="${m.id}">Ouvrir</button></div></article>`).join('');
+  }
+  async function load() { const data = await AYCPortal.api('meetings'); renderList(data.meetings || []); }
+
+  // ---- Silhouette PV : lecture seule ------------------------------------
   function renderPublishedPV(data) {
     const minutes = data.minutes;
-    if (!minutes || !['sent', 'validated'].includes(minutes.status)) return '<div class="restricted-note" style="margin-top:18px">Le procès-verbal sera visible ici dès qu’il sera publié par la personne responsable.</div>';
-    const structured = data.minutesStructured || {};
+    if (!minutes || !['sent', 'validated'].includes(minutes.status)) return '<div class="restricted-note" style="margin-top:18px">Le procès-verbal sera visible ici dès qu’il sera publié.</div>';
+    const blocks = data.structured?.agendaBlocks || [];
     const statusText = minutes.status === 'validated' ? 'Validé' : 'Publié';
-    const blocks = structured.agendaBlocks || [];
-    const motions = structured.motions || [];
-    const attendance = structured.attendance || [];
-    const blocksHtml = blocks.length ? blocks.map((block, index) => `<div class="list-item"><div class="meeting-date"><strong>${index + 1}</strong></div><div class="list-item-main"><span class="list-item-title">${esc(block.title || 'Point')}</span>${block.discussion ? `<p class="list-item-meta"><strong>Discussion :</strong> ${esc(block.discussion)}</p>` : ''}${block.decision ? `<p class="list-item-meta"><strong>Décision :</strong> ${esc(block.decision)}</p>` : ''}</div></div>`).join('') : AYCPortal.renderEmpty('Aucun point détaillé dans ce PV');
-    const motionsHtml = motions.length ? motions.map(motion => `<div class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(motion.title || 'Motion')}</span><span class="list-item-meta">${esc(motion.result || 'Résultat non renseigné')}${motion.consequence ? ` · ${esc(motion.consequence)}` : ''}</span></div></div>`).join('') : AYCPortal.renderEmpty('Aucune motion publiée');
-    const attendanceHtml = attendance.length ? `<div class="table-wrap"><table class="portal-table"><thead><tr><th>Membre</th><th>Présence</th></tr></thead><tbody>${attendance.map(row => `<tr><td>${esc(row.display_name || row.username)}</td><td>${esc(labels[row.attendance_status] || row.attendance_status || '—')}</td></tr>`).join('')}</tbody></table></div>` : AYCPortal.renderEmpty('Aucune feuille de présence publiée');
-    return `<section class="portal-card meeting-minutes-card" style="margin-top:18px"><div class="toolbar"><div><p class="eyebrow">Document officiel</p><h2>Procès-verbal publié</h2><p class="list-item-meta">${esc(statusText)}${minutes.organizer ? ` · Rédaction : ${esc(minutes.organizer)}` : ''}${minutes.duration_minutes ? ` · ${minutes.duration_minutes} min` : ''}</p></div><span class="status-badge">${esc(statusText)}</span></div><div class="meeting-detail-grid"><div><h3>Points discutés et décisions</h3><div class="list-stack">${blocksHtml}</div><h3 style="margin-top:22px">Motions et résultats</h3><div class="list-stack">${motionsHtml}</div></div><div><h3>Présence publiée</h3>${attendanceHtml}</div></div></section>`;
+    const rows = blocks.length ? blocks.map(b => `<tr>
+        <td>${esc(b.title || '—')}${b.duration_minutes ? `<br><span class="list-item-meta">${b.duration_minutes} min est.</span>` : ''}</td>
+        <td>${b.actual_duration_minutes ? `${b.actual_duration_minutes} min` : '—'}</td>
+        <td>${esc(b.discussion || '—')}</td>
+        <td>${esc(b.decision || '—')}</td>
+        <td>${esc(b.next_steps || '—')}</td>
+        <td>${(b.attachments || []).length ? b.attachments.map(f => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name || f.url)}</a>`).join('<br>') : '—'}</td>
+      </tr>`).join('') : `<tr><td colspan="6">${AYCPortal.renderEmpty('Aucun point détaillé dans ce PV')}</td></tr>`;
+    return `<section class="portal-card meeting-minutes-card" style="margin-top:18px"><div class="toolbar"><div><p class="eyebrow">Document officiel</p><h2>Procès-verbal publié</h2><p class="list-item-meta">${esc(statusText)}${minutes.organizer ? ` · Rédaction : ${esc(minutes.organizer)}` : ''}</p></div><span class="status-badge">${esc(statusText)}</span></div>
+      <div class="table-wrap"><table class="pv-table"><thead><tr><th>Point de l'ordre du jour et sa durée estimée</th><th>Durée réelle du point</th><th>Discussions</th><th>Conclusions</th><th>Conduites à tenir et échéances</th><th>Fichiers joints</th></tr></thead><tbody>${rows}</tbody></table></div>
+    </section>`;
   }
 
-  function motionResultPill(m) {
-    const key = m.vote_mode === 'manual' ? (m.manual_result || null) : (m.result || null);
-    if (!key || !resultLabels[key]) return `<span class="al-result-pill al-result-pending">À trancher</span>`;
-    const cls = key === 'adopted' ? 'al-result-adopted' : key === 'rejected' ? 'al-result-rejected' : 'al-result-tie';
-    return `<span class="al-result-pill ${cls}">${esc(resultLabels[key])}</span>`;
-  }
-
-  function motionSummaryMeta(m) {
-    const parts = [];
-    if (m.proposer_name) parts.push(`Proposant : ${m.proposer_name}`);
-    if (m.starts_at_text) parts.push(`Début ${m.starts_at_text}`);
-    if (!parts.length) parts.push(m.required_motion ? 'Motion obligatoire' : 'Délibération');
-    return esc(parts.join(' · '));
-  }
-
-  function motionCardMarkup(m, index, canEditMotions, piBoxes, liveSave) {
-    const isOpen = openMotionPositions.has(m.position);
-    const voteMode = m.vote_mode === 'manual' ? 'manual' : 'count';
-    const disabled = canEditMotions ? '' : ' disabled';
-    const motionPis = (piBoxes || []).filter(pi => pi.motion_id === m.id);
-    return `<article class="al-motion-card${isOpen ? ' is-open' : ''}" data-position="${m.position}" data-motion-id="${m.id}" id="motion-${m.position}">
-      <div class="al-motion-summary" data-toggle-motion="${m.position}">
-        <span class="al-motion-index">${index + 1}</span>
-        <span class="al-motion-summary-main">
-          <span class="al-motion-summary-title">${esc(m.title || 'Motion sans titre')}</span>
-          <span class="al-motion-summary-meta">${motionSummaryMeta(m)}</span>
-        </span>
-        ${m.required_motion ? '<span class="al-motion-required">Obligatoire</span>' : ''}
-        ${motionResultPill(m)}
-        <svg class="al-motion-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-      </div>
-      <div class="al-motion-body" ${isOpen ? '' : 'hidden'}>
-        <div class="al-motion-title-row">
-          <label>Motion ${index + 1} — nom de la motion</label>
-          <input class="al-title" data-live-field="title" value="${esc(m.title || '')}"${disabled}>
-        </div>
-        <div class="al-motion-grid">
-          <div class="form-field"><label>Plénière</label><select class="al-plenary"${disabled}><option value="">—</option>${currentPlenaries.map(p=>`<option value="${p.id}"${m.plenary_id===p.id?' selected':''}>${esc(p.label)}</option>`).join('')}</select></div>
-          <div class="form-field"><label>Proposant</label><input class="al-proposer" data-live-field="proposerName" value="${esc(m.proposer_name || '')}"${disabled}></div>
-          <div class="form-field"><label>Secondant</label><input class="al-seconder" data-live-field="seconderName" value="${esc(m.seconder_name || '')}"${disabled}></div>
-          <div class="form-field"><label>Majorité utilisée</label><select class="al-majority"${disabled}>${Object.entries(majorityLabels).map(([v,l])=>`<option value="${v}"${m.majority_type===v?' selected':''}>${l}</option>`).join('')}</select></div>
-          <div class="form-field"><label>Amendement</label><input class="al-amendment" data-live-field="amendment" value="${esc(m.amendment || '')}"${disabled}></div>
-          <div class="form-field"><label>Direct négatif</label><input class="al-direct-negative" data-live-field="directNegative" value="${esc(m.direct_negative || '')}"${disabled}></div>
-          <div class="form-field"><label>Heure de début</label><input class="al-starts" data-live-field="startsAtText" value="${esc(m.starts_at_text || '')}"${disabled}></div>
-          <div class="form-field"><label>Heure de clôture</label><input class="al-closes" data-live-field="closesAtText" value="${esc(m.closes_at_text || '')}"${disabled}></div>
-          <div class="form-field"><label>Durée</label><input class="al-duration" data-live-field="durationText" value="${esc(m.duration_text || '')}"${disabled}></div>
-          <div class="form-field full"><label>Discussion</label><textarea class="al-discussion" data-live-field="discussion"${disabled}>${esc(m.discussion || '')}</textarea></div>
-          <div class="form-field full"><label>Conséquence</label><textarea class="al-consequence" data-live-field="consequence"${disabled}>${esc(m.consequence || '')}</textarea></div>
-        </div>
-        <div>
-          <div class="al-vote-mode-toggle">
-            <button type="button" class="al-mode-btn${voteMode==='count'?' active':''}" data-mode="count"${disabled}>Compter les voix</button>
-            <button type="button" class="al-mode-btn${voteMode==='manual'?' active':''}" data-mode="manual"${disabled}>Écrire le résultat directement</button>
-          </div>
-          <div class="al-vote-count-fields"${voteMode==='manual' ? ' hidden' : ''}>
-            <div class="al-vote-row">
-              <div class="form-field"><label>Voix pour</label><input class="al-votes-for" type="number" min="0" value="${m.votes_for ?? 0}"${disabled}></div>
-              <div class="form-field"><label>Voix contre</label><input class="al-votes-against" type="number" min="0" value="${m.votes_against ?? 0}"${disabled}></div>
-              <div class="form-field"><label>Abstentions</label><input class="al-abstentions" type="number" min="0" value="${m.abstentions ?? 0}"${disabled}></div>
-            </div>
-          </div>
-          <div class="al-vote-manual-fields"${voteMode==='count' ? ' hidden' : ''}>
-            <p class="field-hint" style="margin:0 0 8px">Résultat de la motion</p>
-            <div class="al-manual-result-row">
-              <button type="button" class="al-manual-btn${m.manual_result==='adopted'?' active':''}" data-manual="adopted"${disabled}>La motion passe</button>
-              <button type="button" class="al-manual-btn${m.manual_result==='rejected'?' active':''}" data-manual="rejected"${disabled}>La motion ne passe pas</button>
-              <button type="button" class="al-manual-btn${m.manual_result==='tie'?' active':''}" data-manual="tie"${disabled}>Égalité</button>
-            </div>
-          </div>
-        </div>
-        ${canEditMotions ? `<div class="al-motion-footer">
-          <span class="al-motion-save-state" data-save-state>${liveSave ? 'Écriture en direct : chaque champ est enregistré dès que vous en sortez.' : 'Modifications non enregistrées seront perdues si vous fermez sans sauver.'}</span>
-          <div class="form-actions" style="margin:0">
-            ${m.required_motion ? '' : `<button type="button" class="btn btn-quiet btn-sm" data-delete-motion="${m.position}">Supprimer</button>`}
-            <button type="button" class="btn btn-primary btn-sm" data-save-motion="${m.position}">${liveSave ? 'Enregistrer le vote / résultat' : 'Enregistrer la motion'}</button>
-          </div>
-        </div>` : ''}
-        <div class="motion-pi-list">${motionPis.map(pi => piBoxMarkup(pi, canEditMotions)).join('')}</div>
-        ${canEditMotions ? addPiButtonMarkup(m.id) : ''}
-      </div>
-    </article>`;
-  }
-
-  function bindMotionCard(card, assemblyId, liveSave) {
-    const position = Number(card.dataset.position);
-    const summary = card.querySelector('.al-motion-summary');
-    summary.addEventListener('click', () => {
-      const body = card.querySelector('.al-motion-body');
-      const nowOpen = body.hasAttribute('hidden');
-      body.toggleAttribute('hidden', !nowOpen);
-      card.classList.toggle('is-open', nowOpen);
-      if (nowOpen) openMotionPositions.add(position); else openMotionPositions.delete(position);
-    });
-    if (liveSave) {
-      const stateEl = card.querySelector('[data-save-state]');
-      card.querySelectorAll('[data-live-field]').forEach(field => {
-        const initialValue = field.value;
-        let lastSaved = initialValue;
-        field.addEventListener('blur', async () => {
-          if (field.value === lastSaved) return;
-          const fieldName = field.dataset.liveField;
-          const value = field.value.trim();
-          try {
-            await AYCPortal.api('assembly', { method: 'POST', body: {
-              action: 'motion_field', assemblyId, position, field: fieldName, value,
-            } });
-            lastSaved = field.value;
-            if (fieldName === 'title') {
-              const titleEl = card.querySelector('.al-motion-summary-title');
-              if (titleEl) titleEl.textContent = value || 'Motion sans titre';
-            }
-            if (stateEl) {
-              stateEl.textContent = 'Enregistré.';
-              stateEl.classList.add('is-saved');
-              setTimeout(() => {
-                if (stateEl.classList.contains('is-saved')) stateEl.textContent = 'Écriture en direct : chaque champ est enregistré dès que vous en sortez.';
-              }, 1800);
-            }
-          } catch (e) {
-            if (stateEl) { stateEl.textContent = 'Échec de l’enregistrement de ce champ — réessayez.'; stateEl.classList.remove('is-saved'); }
-          }
-        });
-      });
+  // ---- Silhouette PV : édition -------------------------------------------
+  let pvBlocks = [];
+  function seedPvBlocks(data) {
+    const saved = data.structured?.agendaBlocks || [];
+    if (saved.length) {
+      pvBlocks = saved.map(b => ({ title: b.title || '', durationMinutes: b.duration_minutes || null, actualDurationMinutes: b.actual_duration_minutes || null, discussion: b.discussion || '', decision: b.decision || '', nextSteps: b.next_steps || '', attachments: b.attachments || [] }));
+    } else {
+      pvBlocks = (data.agendaItems || []).map(item => ({ title: item.title || '', durationMinutes: item.duration_minutes || null, actualDurationMinutes: null, discussion: '', decision: '', nextSteps: '', attachments: [] }));
     }
-    const modeButtons = card.querySelectorAll('.al-mode-btn');
-    const countFields = card.querySelector('.al-vote-count-fields');
-    const manualFields = card.querySelector('.al-vote-manual-fields');
-    modeButtons.forEach(btn => btn.addEventListener('click', () => {
-      modeButtons.forEach(b => b.classList.toggle('active', b === btn));
-      countFields.toggleAttribute('hidden', btn.dataset.mode !== 'count');
-      manualFields.toggleAttribute('hidden', btn.dataset.mode !== 'manual');
-    }));
-    card.querySelectorAll('.al-manual-btn').forEach(btn => btn.addEventListener('click', () => {
-      card.querySelectorAll('.al-manual-btn').forEach(b => b.classList.toggle('active', b === btn));
-    }));
-    const saveBtn = card.querySelector('[data-save-motion]');
-    if (saveBtn) saveBtn.addEventListener('click', async () => {
-      const voteMode = card.querySelector('.al-mode-btn.active')?.dataset.mode === 'manual' ? 'manual' : 'count';
-      const manualResult = card.querySelector('.al-manual-btn.active')?.dataset.manual || null;
-      const stateEl = card.querySelector('[data-save-state]');
-      try {
-        const { motion } = await AYCPortal.api('assembly', { method: 'POST', body: {
-          action: 'motion', assemblyId, position,
-          title: card.querySelector('.al-title').value.trim(),
-          plenaryId: card.querySelector('.al-plenary')?.value || null,
-          proposerName: card.querySelector('.al-proposer').value.trim(),
-          seconderName: card.querySelector('.al-seconder').value.trim(),
-          majorityType: card.querySelector('.al-majority').value,
-          amendment: card.querySelector('.al-amendment').value.trim(),
-          directNegative: card.querySelector('.al-direct-negative').value.trim(),
-          startsAtText: card.querySelector('.al-starts').value.trim(),
-          closesAtText: card.querySelector('.al-closes').value.trim(),
-          durationText: card.querySelector('.al-duration').value.trim(),
-          discussion: card.querySelector('.al-discussion').value.trim(),
-          consequence: card.querySelector('.al-consequence').value.trim(),
-          voteMode,
-          votesFor: card.querySelector('.al-votes-for').value,
-          votesAgainst: card.querySelector('.al-votes-against').value,
-          abstentions: card.querySelector('.al-abstentions').value,
-          manualResult,
-        } });
-        if (stateEl) { stateEl.textContent = 'Motion enregistrée.'; stateEl.classList.add('is-saved'); stateEl.classList.remove('is-dirty'); }
-        openMotionPositions.add(position);
-        await openAssembly(assemblyId);
-      } catch (e) { apiError(e); }
-    });
-    const deleteBtn = card.querySelector('[data-delete-motion]');
-    if (deleteBtn) deleteBtn.addEventListener('click', async () => {
-      if (!confirm('Supprimer cette motion ? Cette action est définitive.')) return;
-      try { await AYCPortal.api('assembly', { method: 'POST', body: { action: 'delete_motion', assemblyId, position } }); openMotionPositions.delete(position); await openAssembly(assemblyId); } catch (e) { apiError(e); }
-    });
-    card.querySelectorAll('input, textarea, select').forEach(field => field.addEventListener('input', () => {
-      const stateEl = card.querySelector('[data-save-state]');
-      if (stateEl) { stateEl.textContent = 'Modifications non enregistrées.'; stateEl.classList.add('is-dirty'); stateEl.classList.remove('is-saved'); }
-    }));
-    bindEditingIndicators(card);
+    if (!pvBlocks.length) pvBlocks = [{ title: '', durationMinutes: null, actualDurationMinutes: null, discussion: '', decision: '', nextSteps: '', attachments: [] }];
   }
 
-  // Shows a live "en cours de modification" badge on a field the moment
-  // someone focuses or types in it, separate from the saved/unsaved state
-  // which only updates after the field is left.
-  function bindEditingIndicators(scope) {
-    scope.querySelectorAll('.form-field, .al-motion-title-row').forEach(wrapper => {
-      const field = wrapper.querySelector('input, textarea, select');
-      if (!field || field.disabled || wrapper.dataset.editingBound) return;
-      wrapper.dataset.editingBound = 'true';
-      let badge = null;
-      const showBadge = () => {
-        wrapper.classList.add('is-editing-now');
-        if (!badge) {
-          badge = document.createElement('span');
-          badge.className = 'editing-now-badge';
-          badge.innerHTML = '<span class="editing-now-dot"></span>Modification en cours…';
-          wrapper.appendChild(badge);
-        }
-      };
-      const hideBadge = () => {
-        wrapper.classList.remove('is-editing-now');
-        badge?.remove();
-        badge = null;
-      };
-      field.addEventListener('focus', showBadge);
-      field.addEventListener('input', showBadge);
-      field.addEventListener('blur', hideBadge);
-    });
-  }
-
-  function clubAttendanceRowMarkup(row, canEditClubs) {
-    const presentSelected = row.attendance_status === 'present';
-    const votantSelected = row.voting_status === 'votant';
-    const statusLabels = { club_membre: 'Club membre', nouveau_club: 'Nouveau Club' };
-    return `<tr data-school="${row.school_id}">
-      <td>${esc(row.school_name)}</td>
-      <td>${canEditClubs
-        ? `<input class="club-attendance-rep" data-school="${row.school_id}" value="${esc(row.representative_name || '')}">`
-        : esc(row.representative_name || 'N/A')}</td>
-      <td>${esc(statusLabels[row.club_status] || row.club_status || 'Club membre')}</td>
-      <td>${canEditClubs
-        ? `<select class="club-attendance-status" data-school="${row.school_id}"><option value="absent"${!presentSelected?' selected':''}>Absent</option><option value="present"${presentSelected?' selected':''}>Présent</option></select>`
-        : `<span class="status-badge${presentSelected?' status-active':' status-invalidated'}">${presentSelected?'Présent':'Absent'}</span>`}</td>
-      <td>${canEditClubs
-        ? `<select class="club-attendance-vote" data-school="${row.school_id}"><option value="non_votant"${!votantSelected?' selected':''}>Non votant</option><option value="votant"${votantSelected?' selected':''}>Votant</option></select>`
-        : `<span class="status-badge${votantSelected?' status-active':' status-invalidated'}">${votantSelected?'Votant':'Non votant'}</span>`}</td>
+  function pvEditorRow(block, index) {
+    const attachmentsHtml = (block.attachments || []).map((f, fi) => `<span class="pv-attachment-pill">${esc(f.name || f.url)}<button type="button" data-remove-file="${index}:${fi}">✕</button></span>`).join('');
+    return `<tr data-block="${index}">
+      <td>
+        <input type="text" class="pv-title" placeholder="Point de l'ordre du jour" value="${esc(block.title)}">
+        <input type="number" class="pv-duration" min="0" placeholder="Durée estimée (min)" value="${block.durationMinutes ?? ''}" style="margin-top:6px">
+      </td>
+      <td><input type="number" class="pv-actual-duration" min="0" placeholder="min" value="${block.actualDurationMinutes ?? ''}"></td>
+      <td><textarea class="pv-discussion" placeholder="Discussions">${esc(block.discussion)}</textarea></td>
+      <td><textarea class="pv-decision" placeholder="Conclusions">${esc(block.decision)}</textarea></td>
+      <td><textarea class="pv-next-steps" placeholder="Conduites à tenir et échéances">${esc(block.nextSteps)}</textarea></td>
+      <td>
+        <div class="pv-attachments">${attachmentsHtml}</div>
+        <div class="pv-add-file"><input type="text" class="pv-file-name" placeholder="Nom du fichier"><input type="url" class="pv-file-url" placeholder="Lien"><button type="button" class="btn btn-quiet btn-sm" data-add-file="${index}">+</button></div>
+        <button type="button" class="btn btn-quiet btn-sm pv-point-remove" data-remove-point="${index}">Supprimer ce point</button>
+      </td>
     </tr>`;
   }
 
-  function epnRosterMarkup(epnMembers) {
-    if (!epnMembers.length) return AYCPortal.renderEmpty('Aucun membre inscrit à l’EPN pour le moment. Ajoutez-en depuis la Gestion des rôles.');
-    return `<div class="table-wrap"><table class="portal-table"><thead><tr><th>Prénom et nom</th><th>Rôle</th></tr></thead><tbody>${epnMembers.map(m => {
-      const labels = (m.epn_role_labels && m.epn_role_labels.length ? m.epn_role_labels.join(', ') : 'Membre EPN');
-      const roleText = m.is_national_secretary ? `${labels} · Secrétaire National(e)` : labels;
-      return `<tr><td>${esc(m.display_name || m.username)}</td><td>${esc(roleText)}</td></tr>`;
-    }).join('')}</tbody></table></div>`;
-  }
-
-  function rosterPresenceCell(member, roster, canEdit) {
-    const presentSelected = member.attendance_status === 'present';
-    if (!canEdit) return `<span class="status-badge${presentSelected?' status-active':' status-invalidated'}">${presentSelected?'Présent':'Absent'}</span>`;
-    return `<select class="roster-presence-status" data-roster="${roster}" data-member="${member.id}"><option value="absent"${!presentSelected?' selected':''}>Absent</option><option value="present"${presentSelected?' selected':''}>Présent</option></select>`;
-  }
-
-  function rosterVoteCell(member, roster, canEdit) {
-    const votantSelected = member.voting_status === 'votant';
-    if (!canEdit) return `<span class="status-badge${votantSelected?' status-active':' status-invalidated'}">${votantSelected?'Votant':'Non votant'}</span>`;
-    return `<select class="roster-presence-vote" data-roster="${roster}" data-member="${member.id}"><option value="non_votant"${!votantSelected?' selected':''}>Non votant</option><option value="votant"${votantSelected?' selected':''}>Votant</option></select>`;
-  }
-
-  function benRosterMarkup(benRoster, canEdit) {
-    if (!benRoster || !benRoster.length) return '';
-    return `<h3 style="margin-top:22px">Bureau Exécutif National (BEN) &amp; Conseil de Supervision</h3>
-      <div class="table-wrap"><table class="portal-table"><thead><tr><th>Poste</th><th>Prénom et nom</th><th>Présence</th></tr></thead><tbody>${benRoster.map(row => `<tr><td>${esc(row.label)}</td><td>${row.holder ? esc(row.holder.displayName || row.holder.username) : 'Vacant'}</td><td>${row.holder ? rosterPresenceCell(row.holder, 'ben', canEdit) : '<span class="status-badge status-invalidated">Poste vacant</span>'}</td></tr>`).join('')}</tbody></table></div>`;
-  }
-
-  function simplePresenceListMarkup(title, roster, members, withVote, canEdit) {
-    if (!members || !members.length) return `<h3 style="margin-top:22px">${esc(title)}</h3>${AYCPortal.renderEmpty('Personne dans cette liste pour le moment.')}`;
-    return `<h3 style="margin-top:22px">${esc(title)}</h3><div class="table-wrap"><table class="portal-table"><thead><tr><th>Prénom et nom</th><th>Présence</th>${withVote ? '<th>Droit de vote</th>' : ''}</tr></thead><tbody>${members.map(m => `<tr><td>${esc(m.display_name || m.username)}</td><td>${rosterPresenceCell(m, roster, canEdit)}</td>${withVote ? `<td>${rosterVoteCell(m, roster, canEdit)}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
-  }
-
-  function seniorsFormateursNationauxMarkup(data, canEdit) {
-    return benRosterMarkup(data.benRoster, canEdit)
-      + simplePresenceListMarkup('Conseil National des Seniors (CNS)', 'cns', data.cnsMembers, true, canEdit)
-      + simplePresenceListMarkup('Formateurs homologués', 'formateurs', data.formateurs, false, canEdit)
-      + simplePresenceListMarkup('Membres nationaux', 'membres_nationaux', data.membresNationaux, true, canEdit);
-  }
-
-  function piBoxMarkup(pi, canEdit) {
-    return `<div class="pi-box" data-pi="${pi.id}"><span class="pi-box-name">PI : ${esc(pi.display_name)}</span>${pi.role_label ? ` <span class="pi-box-role">(${esc(pi.role_label)})</span>` : ''}<div class="pi-box-body">${esc(pi.body)}</div>${canEdit ? `<div class="pi-box-actions"><button type="button" class="btn btn-quiet btn-sm" data-delete-pi="${pi.id}">Supprimer</button></div>` : ''}</div>`;
-  }
-
-  function addPiButtonMarkup(motionId) {
-    return `<div class="al-motion-add-row" style="justify-content:flex-start"><button type="button" class="btn btn-secondary btn-sm" data-add-pi="${motionId}">+ Ajouter un PI</button></div>`;
-  }
-
-  let currentPlenaries = []; let currentMembers = null;
-  function agendaLabelFor(m) {
-    if (m.motion_type === 'procedural' && /procédure/i.test(m.title || '')) return `Motion de procédure ${m.position + 1} :`;
-    return `Motion ${m.position + 1} :`;
-  }
-
-  function plenariesMarkup(assemblyId, plenaries, motions, canEdit) {
-    if (!plenaries.length) return AYCPortal.renderEmpty('Aucune plénière planifiée. Ajoutez-en une pour organiser l’agenda.');
-    return plenaries.map((p, idx) => {
-      const plenaryMotions = motions.filter(m => m.plenary_id === p.id);
-      return `<div class="plenary-block" data-plenary="${p.id}">
-        <div class="plenary-block-head"><div><h4>${esc(p.label || `Plénière ${idx + 1}`)}</h4><p class="list-item-meta">${p.starts_at_text ? `Début ${esc(p.starts_at_text)}` : ''}${p.closes_at_text ? ` · Clôture ${esc(p.closes_at_text)}` : ''}</p></div>${canEdit ? `<div class="heading-actions"><button type="button" class="btn btn-quiet btn-sm" data-edit-plenary="${p.id}">Modifier l’équipe</button>${!plenaryMotions.length ? `<button type="button" class="btn btn-quiet btn-sm" data-delete-plenary="${p.id}">Supprimer</button>` : ''}</div>` : ''}</div>
-        <div class="plenary-team-grid">
-          <div class="form-field"><label>Président(e)</label><input value="${esc(p.president_name||'')}" disabled></div>
-          <div class="form-field"><label>Vice-président(e)</label><input value="${esc(p.vice_president_name||'')}" disabled></div>
-          <div class="form-field"><label>CSCY</label><input value="${esc(p.cscy_name||'')}" disabled></div>
-        </div>
-        ${p.secretaries ? `<p class="list-item-meta" style="margin:-4px 0 10px"><strong>Secrétaires :</strong> ${esc(p.secretaries)}</p>` : ''}
-        ${p.cf_name ? `<p class="list-item-meta" style="margin:-4px 0 10px"><strong>Comité Financier :</strong> ${esc(p.cf_name)}</p>` : '<p class="list-item-meta" style="margin:-4px 0 10px">Comité Financier : pas de CF</p>'}
-        <div class="plenary-agenda-list">${plenaryMotions.length ? plenaryMotions.map(m => `<a href="#motion-${m.position}" class="plenary-agenda-item" data-agenda-link="${m.position}"><span class="agenda-index">${agendaLabelFor(m)}</span><span>${esc(m.title || 'Motion sans titre')}</span>${m.required_motion ? '<span class="agenda-required">Obligatoire</span>' : ''}</a>`).join('') : AYCPortal.renderEmpty('Aucune motion rattachée à cette plénière')}</div>
-      </div>`;
-    }).join('');
-  }
-
-  function plenaryFormFields(p) {
-    return `<div class="form-field"><label>Libellé</label><input id="pf-label" value="${esc(p?.label||'')}"></div>
-      <div class="form-field"><label>Heure de début</label><input id="pf-starts" value="${esc(p?.starts_at_text||'')}"></div>
-      <div class="form-field"><label>Heure de clôture</label><input id="pf-closes" value="${esc(p?.closes_at_text||'')}"></div>
-      <div class="form-field"><label>Président(e) de la plénière</label><input id="pf-president" value="${esc(p?.president_name||'')}"></div>
-      <div class="form-field"><label>Vice-président(e) de la plénière</label><input id="pf-vp" value="${esc(p?.vice_president_name||'')}"></div>
-      <div class="form-field full"><label>Secrétaires (séparés par des virgules)</label><input id="pf-secretaries" value="${esc(p?.secretaries||'')}"></div>
-      <div class="form-field"><label>Comité de Sauvegarde de la Constitution YOUTH [CSCY]</label><input id="pf-cscy" value="${esc(p?.cscy_name||'')}"></div>
-      <div class="form-field"><label>Comité Financier [CF]</label><input id="pf-cf" value="${esc(p?.cf_name||'')}"></div>`;
-  }
-
-  function groundRulesSectionMarkup(groundRules, canEdit) {
-    const rules = groundRules.rules || [];
-    if (!canEdit && !rules.length && !groundRules.intro) return '';
-    return `<section class="pv-section"><div class="pv-section-heading"><div><h3>Règles du jeu</h3><p>Introduction et règles présentées en ouverture de la plénière.</p></div>${canEdit ? `<button type="button" class="btn btn-secondary btn-sm" id="edit-ground-rules">Modifier</button>` : ''}</div>
-      <div id="ground-rules-view">${groundRules.intro ? `<p class="list-item-meta" style="margin:0 0 10px">${esc(groundRules.intro)}</p>` : ''}${rules.length ? `<ol class="ground-rules-list">${rules.map(r => `<li>${esc(r)}</li>`).join('')}</ol>` : (canEdit ? AYCPortal.renderEmpty('Aucune règle du jeu définie pour le moment.') : '')}</div>
-      <div id="ground-rules-form" hidden>
-        <div class="form-field full"><label>Introduction</label><textarea id="gr-intro">${esc(groundRules.intro||'')}</textarea></div>
-        <div class="form-field full"><label>Règles (une par ligne)</label><textarea id="gr-rules" style="min-height:140px">${esc(rules.join('\n'))}</textarea></div>
-        <div class="form-actions"><button type="button" class="btn btn-quiet btn-sm" id="cancel-ground-rules">Annuler</button><button type="button" class="btn btn-primary btn-sm" id="save-ground-rules">Enregistrer</button></div>
+  function renderPvEditor(meetingId, canEditPV, minutes) {
+    if (!canEditPV) return '';
+    const rowsHtml = pvBlocks.map((b, i) => pvEditorRow(b, i)).join('');
+    return `<section class="portal-card" style="margin-top:18px"><div class="toolbar"><div><p class="eyebrow">Procès-verbal</p><h2>Rédiger le PV</h2></div></div>
+      <div class="table-wrap"><table class="pv-table" id="pv-editor-table"><thead><tr><th>Point de l'ordre du jour et sa durée estimée</th><th>Durée réelle du point</th><th>Discussions</th><th>Conclusions</th><th>Conduites à tenir et échéances</th><th>Fichiers joints</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+      <button type="button" class="btn btn-quiet btn-sm" id="pv-add-point" style="margin-top:10px">+ Ajouter un point</button>
+      <div class="form-grid" style="margin-top:14px">
+        <div class="form-field"><label for="pv-organizer">Rédigé par</label><input id="pv-organizer" value="${esc(minutes?.organizer || '')}"></div>
+        <div class="form-field"><label for="pv-status">Statut</label><select id="pv-status"><option value="draft"${(!minutes || minutes.status==='draft') ? ' selected' : ''}>Brouillon</option><option value="sent"${minutes?.status==='sent' ? ' selected' : ''}>Publié</option><option value="validated"${minutes?.status==='validated' ? ' selected' : ''}>Validé</option></select></div>
       </div>
+      <div class="form-actions"><button type="button" class="btn btn-primary" id="pv-save" data-meeting="${meetingId}">Enregistrer le PV</button></div>
     </section>`;
   }
 
-  function movementRowMarkup(mv, canEdit) {
-    const typeLabels = { sortie: 'Sortie', entree: 'Entrée', changement_representant: 'Changement de représentant' };
-    return `<div class="movement-row" data-movement="${mv.id}">
-      <span class="list-item-title" style="font-size:.84rem">${esc(mv.display_name)}</span>
-      <span class="list-item-meta">${esc(mv.status_club || mv.school_name || '—')}</span>
-      <span class="movement-pill ${mv.movement_type}">${typeLabels[mv.movement_type]}</span>
-      <span class="list-item-meta">${esc(mv.occurred_at_text)}</span>
-      ${canEdit ? `<button type="button" class="btn btn-quiet btn-sm" data-delete-movement="${mv.id}">Retirer</button>` : '<span></span>'}
-    </div>`;
-  }
-
-  function movementFormMarkup(data) {
-    const schoolOptions = (data.clubAttendance||[]).map(c => `<option value="${c.school_id}">${esc(c.school_name)}</option>`).join('');
-    return `<div class="compact-form">
-      <div class="form-field"><label>Nom et prénom</label><input id="mv-name"></div>
-      <div class="form-field"><label>Statut / Club</label><input id="mv-status"></div>
-      <div class="form-field"><label>Heure</label><input id="mv-time"></div>
-      <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap">
-        <button type="button" class="btn btn-secondary btn-sm" data-movement-type="sortie">Enregistrer une sortie</button>
-        <button type="button" class="btn btn-secondary btn-sm" data-movement-type="entree">Enregistrer une entrée</button>
-      </div>
-      ${schoolOptions ? `<div style="margin-top:14px;padding-top:14px;border-top:1px dashed #e5eaf2">
-        <p class="eyebrow" style="margin-bottom:8px">Changement de représentant (club déjà présent)</p>
-        <div class="form-field"><label>Club</label><select id="cr-school">${schoolOptions}</select></div>
-        <div class="form-field"><label>Nouveau représentant (membre du BEL, nom libre sinon)</label><input id="cr-name"></div>
-        <div class="form-actions" style="justify-content:flex-start"><button type="button" class="btn btn-secondary btn-sm" id="save-rep-change">Enregistrer le changement</button></div>
-      </div>` : ''}
-    </div>`;
-  }
-
-  function renderDetail(data) {
-    const a=data.assembly; const isNational = a.scope === 'national';
-    const canEditAttendance=Boolean(member.access?.canEditAssemblyAttendance||member.isNationalAdmin);
-    const canEditClubAttendance=Boolean(member.access?.canEditAssemblyAttendance||member.access?.isNationalSecretary||member.isNationalAdmin);
-    const canClose=Boolean(member.access?.canCloseAssembly||member.isNationalAdmin);
-    const canEditMotions=Boolean(member.access?.canEditPV||member.isNationalAdmin||(isNational&&member.access?.isNationalSecretary));
-    // Secrétaires de la plénière (national secretaries) work live on
-    // national AG PVs: each text field saves as they leave it, instead
-    // of the full-motion save-button flow local pv_editors use.
-    const liveSaveMotions = Boolean(isNational && (member.access?.isNationalSecretary || member.isNationalAdmin));
-    const present=data.attendance.filter(x=>['present','late'].includes(x.attendance_status)).length;
-    const clubsPresent=(data.clubAttendance||[]).filter(x=>x.attendance_status==='present').length;
-    const motionsMarkup = data.motions.length
-      ? data.motions.map((m,i)=>motionCardMarkup(m,i,canEditMotions,data.piBoxes,liveSaveMotions)).join('')
-      : '<div class="pv-empty-blocks">Aucune motion pour le moment.</div>';
-    const attendanceSectionMarkup = isNational
-      ? `<h3>Clubs — présence et droit de vote</h3>
-         <p class="list-item-meta" style="margin:-4px 0 10px">${clubsPresent} club(s) présent(s) sur ${(data.clubAttendance||[]).length}</p>
-         <div class="table-wrap"><table class="portal-table"><thead><tr><th>Club</th><th>Représentant</th><th>Statut</th><th>Présence</th><th>Vote</th></tr></thead><tbody>${(data.clubAttendance||[]).map(row=>clubAttendanceRowMarkup(row, canEditClubAttendance)).join('')}</tbody></table></div>
-         <h3 style="margin-top:22px">Équipe Plénière Nationale (EPN)</h3>
-         ${epnRosterMarkup(data.epnMembers||[])}`
-      : `<h3>Présence et droits de vote</h3>
-         <div class="table-wrap"><table class="portal-table"><thead><tr><th>Membre</th><th>Statut</th><th>Présence</th><th>Voix</th></tr></thead><tbody>${data.attendance.map(row => `<tr><td>${esc(row.display_name || row.username)}</td><td>${esc(row.membership_status || '—')}</td><td>${canEditAttendance ? `<select class="assembly-attendance" data-member="${row.member_id}">${['invited','present','absent','excused','late'].map(s=>`<option value="${s}"${row.attendance_status===s?' selected':''}>${labels[s]}</option>`).join('')}</select>` : esc(labels[row.attendance_status] || row.attendance_status)}</td><td>${canEditAttendance ? `<input class="assembly-vote" data-member="${row.member_id}" type="checkbox"${row.voting_rights?' checked':''}>` : (row.voting_rights ? 'Oui' : 'Non')}</td></tr>`).join('')}</tbody></table></div>`;
-    const plenaries = data.plenaries || [];
-    currentPlenaries = plenaries;
-    const plenariesMarkupStr = plenariesMarkup(a.id, plenaries, data.motions, canEditMotions);
-    const groundRulesMarkup = groundRulesSectionMarkup(data.groundRules || { intro: '', rules: [] }, canEditMotions);
-    const movementsMarkup = (data.movements || []).length
-      ? (data.movements || []).map(mv => movementRowMarkup(mv, canEditClubAttendance)).join('')
-      : AYCPortal.renderEmpty('Aucun mouvement enregistré pour le moment.');
-    detail.innerHTML=`<section class="portal-card assembly-detail-card"><div class="toolbar"><div><p class="eyebrow">${esc(a.assembly_label)}</p><h2>${esc(a.title)}</h2><p class="list-item-meta">${AYCPortal.formatDate(a.starts_at,true)} · ${esc(a.location || 'Format à préciser')} · ${esc(labels[a.status] || a.status)}</p></div><button class="btn btn-secondary btn-sm" id="close-detail">Fermer</button></div>
-      <div class="metric-strip"><div><strong>${a.member_snapshot_count}</strong><span>Membres au snapshot</span></div><div><strong>${a.eligible_voter_count}</strong><span>Électeur·rices éligibles</span></div><div><strong>${a.quorum_required || '—'}</strong><span>Quorum requis</span></div><div><strong>${present}</strong><span>Présent·es</span></div><div><strong>${a.quorum_met_live == null ? '—' : (a.quorum_met_live ? 'Oui' : 'Non')}</strong><span>Quorum en direct</span></div></div>
-      <section class="pv-section"><div class="pv-section-heading"><div><h3>Contextualisation</h3><p>État, mandat, organisateur, rédacteurs et cadre de l’assemblée, tels qu’ils apparaîtront en tête du procès-verbal.</p></div></div>
-        <div class="al-context-grid">
-          <div class="form-field"><label>État</label>${canEditMotions ? `<select id="ctx-adoption-state">${Object.entries({draft:'Brouillon',submitted_for_adoption:'Soumis à l’adoption',adopted:'Adopté'}).map(([v,l])=>`<option value="${v}"${a.adoption_state===v?' selected':''}>${l}</option>`).join('')}</select>` : `<input value="${esc({draft:'Brouillon',submitted_for_adoption:'Soumis à l’adoption',adopted:'Adopté'}[a.adoption_state] || a.adoption_state)}" disabled>`}</div>
-          <div class="form-field"><label>Type de l’assemblée</label><input value="${esc(a.assembly_label)}" disabled></div>
-          <div class="form-field"><label>Organisateur</label><input value="${esc(a.school_name || 'Bureau Exécutif National')}" disabled></div>
-          <div class="form-field"><label>Lieu / plateforme</label><input value="${esc(a.location || 'En ligne')}" disabled></div>
-          <div class="form-field"><label>Date de début</label><input value="${AYCPortal.formatDate(a.starts_at,true)}" disabled></div>
-          <div class="form-field"><label>Date de fin</label><input value="${a.closed_at ? AYCPortal.formatDate(a.closed_at,true) : '—'}" disabled></div>
-        </div>
-        <div style="margin-top:14px"><p class="eyebrow" style="margin-bottom:8px">Noms et clubs des rédacteurs</p>
-          <div id="editors-list" class="list-stack" style="margin-bottom:10px">${(a.editors||[]).length ? a.editors.map((e,i)=>`<div class="list-item" data-editor-index="${i}"><div class="list-item-main"><span class="list-item-title">${esc(e.name)}</span><span class="list-item-meta">${esc(e.club||'—')}</span></div>${canEditMotions ? `<button type="button" class="btn btn-quiet btn-sm" data-remove-editor="${i}">Retirer</button>` : ''}</div>`).join('') : AYCPortal.renderEmpty('Aucun rédacteur renseigné')}</div>
-          ${canEditMotions ? `<div class="editors-row"><div class="form-field"><label>Nom et prénom</label><input id="editor-name"></div><div class="form-field"><label>Club</label><input id="editor-club"></div><button type="button" class="btn btn-secondary btn-sm" id="add-editor">Ajouter</button></div>
-          <div class="form-actions"><button type="button" class="btn btn-primary btn-sm" id="save-editors">Enregistrer la contextualisation</button></div>` : ''}
-        </div>
-      </section>
-      <section class="pv-section"><div class="pv-section-heading"><div><h3>Sommaire</h3><p>Équipe plénière, comités et agenda de chaque plénière — cliquez une motion pour y être transporté·e.</p></div>${canEditMotions ? `<button type="button" class="btn btn-secondary btn-sm" id="add-plenary">+ Ajouter une plénière</button>` : ''}</div>
-        <div id="plenaries-list">${plenariesMarkupStr}</div>
-      </section>
-      ${isNational ? groundRulesMarkup : ''}
-      <div class="governance-grid">
-        <div>
-          <div class="pv-section-heading" style="margin-bottom:12px"><div><h3>Le procès-verbal — motion par motion</h3><p>Clique sur une motion pour la déplier : proposant, secondant, amendement, direct négatif, discussion et résultat, exactement comme sur le PV papier.</p></div><span class="pv-section-count">${data.motions.length} motion(s)</span></div>
-          <div class="al-motion-list" id="al-motions">${motionsMarkup}</div>
-          ${canEditMotions ? `<div class="al-motion-add-row"><button type="button" class="btn btn-secondary btn-sm" id="add-motion">+ Ajouter une motion</button></div>` : ''}
-        </div>
-        <div>
-          ${attendanceSectionMarkup}
-          ${isNational ? seniorsFormateursNationauxMarkup(data, canEditClubAttendance) : ''}
-          <h3 style="margin-top:22px">Mouvements</h3>
-          <p class="list-item-meta" style="margin:-4px 0 10px">Sorties, entrées et changements de représentant, comme sur la feuille de mouvement papier.</p>
-          <div id="movements-list" class="list-stack">${movementsMarkup}</div>
-          ${canEditClubAttendance ? movementFormMarkup(data) : ''}
-          ${canClose ? `<div class="form-actions"><button class="btn btn-secondary btn-sm" id="close-assembly">Clôturer et figer le quorum</button></div>` : ''}
-        </div>
-      </div>
-    </section>`;
-    detail.insertAdjacentHTML('beforeend', renderPublishedPV(data));
-    document.getElementById('close-detail').onclick=()=>{detail.innerHTML='';openMotionPositions=new Set();};
-    detail.querySelectorAll('.al-motion-card').forEach(card => bindMotionCard(card, a.id, liveSaveMotions));
-    bindEditingIndicators(detail);
-    if (canEditMotions) document.getElementById('add-motion')?.addEventListener('click', async () => {
-      const nextPosition = data.motions.length;
-      try { await AYCPortal.api('assembly', { method: 'POST', body: { action: 'motion', assemblyId: a.id, position: nextPosition, title: 'Nouvelle motion', motionType: 'decision' } }); openMotionPositions.add(nextPosition); await openAssembly(a.id); } catch (e) { apiError(e); }
+  function bindPvEditor(meetingId) {
+    const table = document.getElementById('pv-editor-table');
+    if (!table) return;
+    function readRowsIntoState() {
+      table.querySelectorAll('tr[data-block]').forEach(row => {
+        const i = Number(row.dataset.block);
+        if (!pvBlocks[i]) return;
+        pvBlocks[i].title = row.querySelector('.pv-title').value.trim();
+        pvBlocks[i].durationMinutes = row.querySelector('.pv-duration').value ? Number(row.querySelector('.pv-duration').value) : null;
+        pvBlocks[i].actualDurationMinutes = row.querySelector('.pv-actual-duration').value ? Number(row.querySelector('.pv-actual-duration').value) : null;
+        pvBlocks[i].discussion = row.querySelector('.pv-discussion').value.trim();
+        pvBlocks[i].decision = row.querySelector('.pv-decision').value.trim();
+        pvBlocks[i].nextSteps = row.querySelector('.pv-next-steps').value.trim();
+      });
+    }
+    document.getElementById('pv-add-point').addEventListener('click', () => {
+      readRowsIntoState();
+      pvBlocks.push({ title: '', durationMinutes: null, actualDurationMinutes: null, discussion: '', decision: '', nextSteps: '', attachments: [] });
+      table.querySelector('tbody').innerHTML = pvBlocks.map((b, i) => pvEditorRow(b, i)).join('');
+      bindRowFileButtons();
     });
-    if (canEditAttendance) {
-      detail.querySelectorAll('.assembly-attendance').forEach(select=>select.addEventListener('change',async()=>{const memberId=select.dataset.member; const vote=detail.querySelector(`.assembly-vote[data-member="${memberId}"]`).checked; try{await AYCPortal.api('assembly',{method:'POST',body:{action:'attendance',assemblyId:a.id,memberId,attendanceStatus:select.value,votingRights:vote}}); await openAssembly(a.id);}catch(e){apiError(e)}}));
-      detail.querySelectorAll('.assembly-vote').forEach(input=>input.addEventListener('change',async()=>{const memberId=input.dataset.member; const status=detail.querySelector(`.assembly-attendance[data-member="${memberId}"]`).value; try{await AYCPortal.api('assembly',{method:'POST',body:{action:'attendance',assemblyId:a.id,memberId,attendanceStatus:status,votingRights:input.checked}}); await openAssembly(a.id);}catch(e){apiError(e)}}));
-    }
-    if (canEditClubAttendance) {
-      detail.querySelectorAll('.club-attendance-status').forEach(select=>select.addEventListener('change',async()=>{const schoolId=select.dataset.school; const voteSelect=detail.querySelector(`.club-attendance-vote[data-school="${schoolId}"]`); try{await AYCPortal.api('assembly',{method:'POST',body:{action:'club_attendance',assemblyId:a.id,schoolId,attendanceStatus:select.value,votingStatus:voteSelect?voteSelect.value:'non_votant'}}); await openAssembly(a.id);}catch(e){apiError(e)}}));
-      detail.querySelectorAll('.club-attendance-vote').forEach(select=>select.addEventListener('change',async()=>{const schoolId=select.dataset.school; const statusSelect=detail.querySelector(`.club-attendance-status[data-school="${schoolId}"]`); try{await AYCPortal.api('assembly',{method:'POST',body:{action:'club_attendance',assemblyId:a.id,schoolId,attendanceStatus:statusSelect?statusSelect.value:'absent',votingStatus:select.value}}); await openAssembly(a.id);}catch(e){apiError(e)}}));
-      detail.querySelectorAll('.roster-presence-status').forEach(select=>select.addEventListener('change',async()=>{const roster=select.dataset.roster; const memberId=select.dataset.member; const voteSelect=detail.querySelector(`.roster-presence-vote[data-roster="${roster}"][data-member="${memberId}"]`); try{await AYCPortal.api('assembly',{method:'POST',body:{action:'roster_presence',assemblyId:a.id,roster,memberId,attendanceStatus:select.value,votingStatus:voteSelect?voteSelect.value:'non_votant'}}); await openAssembly(a.id);}catch(e){apiError(e)}}));
-      detail.querySelectorAll('.roster-presence-vote').forEach(select=>select.addEventListener('change',async()=>{const roster=select.dataset.roster; const memberId=select.dataset.member; const statusSelect=detail.querySelector(`.roster-presence-status[data-roster="${roster}"][data-member="${memberId}"]`); try{await AYCPortal.api('assembly',{method:'POST',body:{action:'roster_presence',assemblyId:a.id,roster,memberId,attendanceStatus:statusSelect?statusSelect.value:'absent',votingStatus:select.value}}); await openAssembly(a.id);}catch(e){apiError(e)}}));
-    }
-    if (canClose) document.getElementById('close-assembly').onclick=async()=>{try{await AYCPortal.api('assembly',{method:'POST',body:{action:'close',assemblyId:a.id,outcomeSummary:'Clôture documentée dans le portail.'}}); await load(); await openAssembly(a.id);}catch(e){apiError(e)}};
-
-    // --- Contextualisation : rédacteurs + état d'adoption -----------------
-    if (canEditMotions) {
-      let editorsDraft = (a.editors || []).slice();
-      document.getElementById('add-editor')?.addEventListener('click', () => {
-        const nameEl = document.getElementById('editor-name'); const clubEl = document.getElementById('editor-club');
-        const name = nameEl.value.trim(); if (!name) return;
-        editorsDraft.push({ name, club: clubEl.value.trim() }); nameEl.value=''; clubEl.value='';
-        const list = document.getElementById('editors-list');
-        list.innerHTML = editorsDraft.map((ed,i)=>`<div class="list-item" data-editor-index="${i}"><div class="list-item-main"><span class="list-item-title">${esc(ed.name)}</span><span class="list-item-meta">${esc(ed.club||'—')}</span></div><button type="button" class="btn btn-quiet btn-sm" data-remove-editor="${i}">Retirer</button></div>`).join('');
-      });
-      detail.querySelector('#editors-list')?.addEventListener('click', e => {
-        const b = e.target.closest('[data-remove-editor]'); if (!b) return;
-        editorsDraft.splice(Number(b.dataset.removeEditor), 1);
-        b.closest('[data-editor-index]').remove();
-      });
-      document.getElementById('save-editors')?.addEventListener('click', async () => {
-        try { await AYCPortal.api('assembly', { method: 'POST', body: { action: 'editors', assemblyId: a.id, editors: editorsDraft, adoptionState: document.getElementById('ctx-adoption-state')?.value } }); await openAssembly(a.id); } catch (e) { apiError(e); }
-      });
-    }
-
-    // --- Sommaire : plénières ----------------------------------------------
-    function openPlenaryForm(existing) {
-      const html = `<div class="portal-card" id="plenary-form-card" style="margin-top:14px"><h3>${existing ? 'Modifier l’équipe de la plénière' : 'Nouvelle plénière'}</h3><div class="form-grid">${plenaryFormFields(existing)}</div><div class="form-actions"><button type="button" class="btn btn-quiet btn-sm" id="cancel-plenary">Annuler</button><button type="button" class="btn btn-primary btn-sm" id="save-plenary">Enregistrer</button></div></div>`;
-      document.getElementById('plenary-form-card')?.remove();
-      document.getElementById('plenaries-list').insertAdjacentHTML('afterend', html);
-      bindEditingIndicators(document.getElementById('plenary-form-card'));
-      document.getElementById('cancel-plenary').onclick = () => document.getElementById('plenary-form-card').remove();
-      document.getElementById('save-plenary').onclick = async () => {
-        try {
-          await AYCPortal.api('assembly', { method: 'POST', body: {
-            action: 'plenary', assemblyId: a.id, plenaryId: existing?.id,
-            label: document.getElementById('pf-label').value.trim(),
-            startsAtText: document.getElementById('pf-starts').value.trim(),
-            closesAtText: document.getElementById('pf-closes').value.trim(),
-            presidentName: document.getElementById('pf-president').value.trim(),
-            vicePresidentName: document.getElementById('pf-vp').value.trim(),
-            secretaries: document.getElementById('pf-secretaries').value.trim(),
-            cscyName: document.getElementById('pf-cscy').value.trim(),
-            cfName: document.getElementById('pf-cf').value.trim(),
-          } });
-          await openAssembly(a.id);
-        } catch (e) { apiError(e); }
-      };
-    }
-    if (canEditMotions) {
-      document.getElementById('add-plenary')?.addEventListener('click', () => openPlenaryForm(null));
-      detail.querySelectorAll('[data-edit-plenary]').forEach(btn => btn.addEventListener('click', () => openPlenaryForm(plenaries.find(p => p.id === btn.dataset.editPlenary))));
-      detail.querySelectorAll('[data-delete-plenary]').forEach(btn => btn.addEventListener('click', async () => {
-        if (!confirm('Supprimer cette plénière ?')) return;
-        try { await AYCPortal.api('assembly', { method: 'POST', body: { action: 'delete_plenary', assemblyId: a.id, plenaryId: btn.dataset.deletePlenary } }); await openAssembly(a.id); } catch (e) { apiError(e); }
+    function bindRowFileButtons() {
+      table.querySelectorAll('[data-add-file]').forEach(btn => btn.addEventListener('click', () => {
+        readRowsIntoState();
+        const i = Number(btn.dataset.addFile);
+        const row = table.querySelector(`tr[data-block="${i}"]`);
+        const name = row.querySelector('.pv-file-name').value.trim();
+        const url = row.querySelector('.pv-file-url').value.trim();
+        if (!url) return;
+        pvBlocks[i].attachments = [...(pvBlocks[i].attachments || []), { name: name || url, url }];
+        table.querySelector('tbody').innerHTML = pvBlocks.map((b, ii) => pvEditorRow(b, ii)).join('');
+        bindRowFileButtons();
+      }));
+      table.querySelectorAll('[data-remove-file]').forEach(btn => btn.addEventListener('click', () => {
+        readRowsIntoState();
+        const [i, fi] = btn.dataset.removeFile.split(':').map(Number);
+        pvBlocks[i].attachments.splice(fi, 1);
+        table.querySelector('tbody').innerHTML = pvBlocks.map((b, ii) => pvEditorRow(b, ii)).join('');
+        bindRowFileButtons();
+      }));
+      table.querySelectorAll('[data-remove-point]').forEach(btn => btn.addEventListener('click', () => {
+        readRowsIntoState();
+        const i = Number(btn.dataset.removePoint);
+        if (pvBlocks.length <= 1) return;
+        pvBlocks.splice(i, 1);
+        table.querySelector('tbody').innerHTML = pvBlocks.map((b, ii) => pvEditorRow(b, ii)).join('');
+        bindRowFileButtons();
       }));
     }
-    detail.querySelectorAll('[data-agenda-link]').forEach(link => link.addEventListener('click', e => {
-      e.preventDefault();
-      const position = Number(link.dataset.agendaLink);
-      const card = detail.querySelector(`.al-motion-card[data-position="${position}"]`);
-      if (!card) return;
-      const body = card.querySelector('.al-motion-body');
-      if (body.hasAttribute('hidden')) { body.removeAttribute('hidden'); card.classList.add('is-open'); openMotionPositions.add(position); }
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }));
-
-    // --- Règles du jeu -------------------------------------------------------
-    if (canEditMotions) {
-      document.getElementById('edit-ground-rules')?.addEventListener('click', () => {
-        detail.querySelector('#ground-rules-view').hidden = true;
-        detail.querySelector('#ground-rules-form').hidden = false;
-      });
-      document.getElementById('cancel-ground-rules')?.addEventListener('click', () => {
-        detail.querySelector('#ground-rules-view').hidden = false;
-        detail.querySelector('#ground-rules-form').hidden = true;
-      });
-      document.getElementById('save-ground-rules')?.addEventListener('click', async () => {
-        const rules = document.getElementById('gr-rules').value.split('\n').map(r => r.trim()).filter(Boolean);
-        try { await AYCPortal.api('assembly', { method: 'POST', body: { action: 'ground_rules', assemblyId: a.id, intro: document.getElementById('gr-intro').value.trim(), rules } }); await openAssembly(a.id); } catch (e) { apiError(e); }
-      });
-    }
-
-    // --- PI (points d'intervention) -----------------------------------------
-    if (canEditMotions) {
-      detail.querySelectorAll('[data-add-pi]').forEach(btn => btn.addEventListener('click', () => {
-        const motionId = btn.dataset.addPi;
-        const html = `<div class="pi-box" id="pi-form-box" style="background:#fff"><div class="form-field"><label>Nom et prénom (ou choisir un membre existant si connu)</label><input id="pi-name"></div><div class="form-field"><label>Rôle (auto-rempli si le membre est trouvé, sinon libre)</label><input id="pi-role"></div><div class="form-field full"><label>Intervention</label><textarea id="pi-body"></textarea></div><div class="form-actions"><button type="button" class="btn btn-quiet btn-sm" id="cancel-pi">Annuler</button><button type="button" class="btn btn-primary btn-sm" id="save-pi">Ajouter le PI</button></div></div>`;
-        btn.closest('.al-motion-add-row').insertAdjacentHTML('beforebegin', html);
-        bindEditingIndicators(document.getElementById('pi-form-box'));
-        btn.hidden = true;
-        document.getElementById('cancel-pi').onclick = () => { document.getElementById('pi-form-box').remove(); btn.hidden = false; };
-        document.getElementById('save-pi').onclick = async () => {
-          const bodyText = document.getElementById('pi-body').value.trim();
-          const displayName = document.getElementById('pi-name').value.trim();
-          if (!displayName || !bodyText) return;
-          try {
-            await AYCPortal.api('assembly', { method: 'POST', body: { action: 'pi', assemblyId: a.id, motionId, displayName, roleLabel: document.getElementById('pi-role').value.trim(), body: bodyText } });
-            await openAssembly(a.id);
-          } catch (e) { apiError(e); }
-        };
-      }));
-      detail.querySelectorAll('[data-delete-pi]').forEach(btn => btn.addEventListener('click', async () => {
-        if (!confirm('Supprimer ce PI ?')) return;
-        try { await AYCPortal.api('assembly', { method: 'POST', body: { action: 'delete_pi', assemblyId: a.id, piId: btn.dataset.deletePi } }); await openAssembly(a.id); } catch (e) { apiError(e); }
-      }));
-    }
-
-    // --- Mouvements & changement de représentant ----------------------------
-    if (canEditClubAttendance) {
-      detail.querySelectorAll('.club-attendance-rep').forEach(input => input.addEventListener('change', async () => {
-        const schoolId = input.dataset.school;
-        try { await AYCPortal.api('assembly', { method: 'POST', body: { action: 'club_attendance', assemblyId: a.id, schoolId, attendanceStatus: detail.querySelector(`.club-attendance-status[data-school="${schoolId}"]`)?.value || 'absent', votingStatus: detail.querySelector(`.club-attendance-vote[data-school="${schoolId}"]`)?.value || 'non_votant', representativeName: input.value.trim() } }); } catch (e) { apiError(e); }
-      }));
-      detail.querySelectorAll('[data-movement-type]').forEach(btn => btn.addEventListener('click', async () => {
-        const displayName = document.getElementById('mv-name').value.trim();
-        if (!displayName) return;
-        try {
-          await AYCPortal.api('assembly', { method: 'POST', body: { action: 'movement', assemblyId: a.id, movementType: btn.dataset.movementType, displayName, statusClub: document.getElementById('mv-status').value.trim(), occurredAtText: document.getElementById('mv-time').value.trim() } });
-          await openAssembly(a.id);
-        } catch (e) { apiError(e); }
-      }));
-      document.getElementById('save-rep-change')?.addEventListener('click', async () => {
-        const schoolId = document.getElementById('cr-school').value;
-        const name = document.getElementById('cr-name').value.trim();
-        if (!schoolId || !name) return;
-        try {
-          await AYCPortal.api('assembly', { method: 'POST', body: { action: 'changement_representant', assemblyId: a.id, schoolId, newRepresentativeName: name } });
-          await openAssembly(a.id);
-        } catch (e) { apiError(e); }
-      });
-      detail.querySelectorAll('[data-delete-movement]').forEach(btn => btn.addEventListener('click', async () => {
-        try { await AYCPortal.api('assembly', { method: 'POST', body: { action: 'delete_movement', assemblyId: a.id, movementId: btn.dataset.deleteMovement } }); await openAssembly(a.id); } catch (e) { apiError(e); }
-      }));
-    }
-
-    detail.scrollIntoView({behavior:'smooth',block:'start'});
+    bindRowFileButtons();
+    document.getElementById('pv-save').addEventListener('click', async () => {
+      readRowsIntoState();
+      try {
+        await AYCPortal.api('meeting', { method: 'POST', body: {
+          action: 'save_minutes', meetingId,
+          organizer: document.getElementById('pv-organizer').value.trim(),
+          status: document.getElementById('pv-status').value,
+          agendaBlocks: pvBlocks.filter(b => b.title),
+        } });
+        notice.innerHTML = '<div class="alert alert-success">Le procès-verbal a été enregistré.</div>';
+        await openMeeting(meetingId);
+      } catch (e) { apiError(e); }
+    });
   }
-  async function openAssembly(id){ try{renderDetail(await AYCPortal.api('assembly',{query:{assemblyId:id}}));}catch(e){apiError(e)} }
-  list.addEventListener('click',e=>{const b=e.target.closest('[data-open]');if(b)openAssembly(b.dataset.open)});
-  document.getElementById('refresh').onclick=()=>load().catch(apiError);
-  document.getElementById('assembly-form').addEventListener('submit',async e=>{e.preventDefault();try{await AYCPortal.api('assemblies',{method:'POST',body:{action:'create',assemblyType:document.getElementById('assemblyType').value,title:document.getElementById('assemblyTitle').value,startsAt:document.getElementById('startsAt').value,format:document.getElementById('format').value,location:document.getElementById('location').value,projectUrl:document.getElementById('projectUrl').value,databaseUrl:document.getElementById('databaseUrl').value}});e.target.reset();notice.innerHTML='<div class="alert alert-success">L’assemblée a été préparée sans modifier les membres.</div>';await load()}catch(err){apiError(err)}});
-  try{member=await AYCPortal.initPortalShell({requireActive:true});if(!member)return;const canCreate=Boolean(member.access?.canCreateAssembly||member.isNationalAdmin);if(!canCreate){document.getElementById('assembly-prep-card').hidden=true;}await load()}catch(e){apiError(e)}
+
+  // ---- Détail -------------------------------------------------------------
+  function renderDetail(data) {
+    const m = data.meeting;
+    const canEditPV = Boolean(data.canEditPV || member?.isNationalAdmin);
+    seedPvBlocks(data);
+    const agendaHtml = (data.agendaItems || []).length ? `<ul class="list-stack">${data.agendaItems.map(i => `<li class="list-item"><div class="list-item-main"><span class="list-item-title">${esc(i.title)}</span>${i.duration_minutes ? `<span class="list-item-meta">${i.duration_minutes} min estimées</span>` : ''}</div></li>`).join('')}</ul>` : AYCPortal.renderEmpty('Aucun point à l’ordre du jour');
+    const attendeesHtml = (data.attendees || []).length ? `<div class="table-wrap"><table class="portal-table"><thead><tr><th>Membre</th><th>Réponse</th></tr></thead><tbody>${data.attendees.map(a => `<tr><td>${esc(a.display_name || a.username)}</td><td>${esc(rsvpLabels[a.rsvp] || a.rsvp)}</td></tr>`).join('')}</tbody></table></div>` : AYCPortal.renderEmpty('Aucune réponse pour le moment');
+    const myRsvp = (data.attendees || []).find(a => a.member_id === member.id)?.rsvp || 'pending';
+    detail.innerHTML = `<div class="portal-grid" style="margin-top:18px">
+        <section class="portal-card card-span-8"><div class="toolbar"><div><p class="eyebrow">${esc(typeLabels[m.meeting_type] || m.meeting_type)}</p><h2>${esc(m.title)}</h2><p class="list-item-meta">${AYCPortal.formatDate(m.starts_at, true)} · ${esc(m.location || 'Lieu à confirmer')}${m.school_name ? ` · ${esc(m.school_name)}` : ''}</p></div><span class="status-badge">${esc(statusLabels[m.status] || m.status)}</span></div>
+          <h3>Ordre du jour</h3>${agendaHtml}
+          ${m.comments ? `<h3 style="margin-top:18px">Commentaires</h3><p>${esc(m.comments)}</p>` : ''}
+        </section>
+        <section class="portal-card card-span-4">
+          <p class="eyebrow">Ma présence</p><h2>RSVP</h2>
+          <div class="form-actions">
+            <button class="btn btn-sm ${myRsvp==='present'?'btn-primary':'btn-secondary'}" data-rsvp="present">Présent·e</button>
+            <button class="btn btn-sm ${myRsvp==='absent'?'btn-primary':'btn-secondary'}" data-rsvp="absent">Absent·e</button>
+          </div>
+          <h3 style="margin-top:18px">Réponses</h3>${attendeesHtml}
+        </section>
+      </div>
+      ${renderPvEditor(m.id, canEditPV, data.minutes)}
+      ${!canEditPV ? renderPublishedPV(data) : ''}
+    `;
+    detail.querySelectorAll('[data-rsvp]').forEach(btn => btn.addEventListener('click', async () => {
+      try { await AYCPortal.api('meeting', { method: 'POST', body: { action: 'rsvp', meetingId: m.id, rsvp: btn.dataset.rsvp } }); await openMeeting(m.id); } catch (e) { apiError(e); }
+    }));
+    bindPvEditor(m.id);
+    detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  async function openMeeting(id) { try { renderDetail(await AYCPortal.api('meeting', { query: { meetingId: id } })); } catch (e) { apiError(e); } }
+  list.addEventListener('click', e => { const b = e.target.closest('[data-open]'); if (b) openMeeting(b.dataset.open); });
+  document.getElementById('refresh').onclick = () => load().catch(apiError);
+
+  document.getElementById('meeting-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    try {
+      await AYCPortal.api('meetings', { method: 'POST', body: {
+        action: 'create',
+        meetingType: document.getElementById('meetingType').value,
+        title: document.getElementById('meetingTitle').value,
+        startsAt: document.getElementById('startsAt').value,
+        format: document.getElementById('format').value,
+        location: document.getElementById('location').value,
+        comments: document.getElementById('comments').value,
+        agendaItems: collectAgendaItems(),
+      } });
+      e.target.reset();
+      document.getElementById('agenda-builder').innerHTML = '';
+      addAgendaRow();
+      notice.innerHTML = '<div class="alert alert-success">La réunion a été préparée.</div>';
+      await load();
+    } catch (err) { apiError(err); }
+  });
+
+  try {
+    member = await AYCPortal.initPortalShell({ requireActive: true });
+    if (!member) return;
+    if (!member.isNationalAdmin) {
+      document.querySelectorAll('#meetingType option[value="reunion_nationale"]').forEach(o => o.remove());
+    }
+    await load();
+  } catch (e) { apiError(e); }
 })();
 </script>
 </body>

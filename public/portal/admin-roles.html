@@ -88,6 +88,13 @@
     { value: "epn_cscy", label: "CSCY" },
     { value: "epn_comite_financier", label: "Comité Financier" },
   ];
+  const EPL_ROLES = [
+    { value: "epl_president", label: "Président" },
+    { value: "epl_vice_president", label: "Vice-Président" },
+    { value: "epl_secretaire", label: "Secrétaire de la Plénière" },
+    { value: "epl_cscy", label: "CSCY" },
+    { value: "epl_comite_financier", label: "Comité Financier" },
+  ];
   const NATIONAL_CAPABILITIES = [{ value: "national_projects", label: "Créer et piloter des projets nationaux" }];
   const MEMBERSHIP_STATUSES = [
     { value: "nouveau_adherent", label: "Nouveau adhérent" },
@@ -157,9 +164,132 @@
     await renderDetail();
   }
 
+  // ---- Équipe Plénière Locale (EPL) --------------------------------------
+  // Unlike every other section on this page, EPL isn't about the member
+  // selected on the left — it's "who from OTHER clubs sits on THIS
+  // club's plenary team". So it keeps its own small bit of state (the
+  // current search results) and re-renders itself independently after
+  // every grant/revoke, rather than depending on currentMemberId at all.
+  let eplSearchResults = [];
+
+  function renderEplSection(currentEplMembers) {
+    const byRole = new Map();
+    for (const m of currentEplMembers) {
+      if (!byRole.has(m.role)) byRole.set(m.role, []);
+      byRole.get(m.role).push(m);
+    }
+    const rosterHtml = EPL_ROLES.map((r) => {
+      const holders = byRole.get(r.value) || [];
+      return `<div class="history-row" data-epl-roster-role="${r.value}">
+        <span class="role-name">${r.label}</span>
+        <span class="dates">${
+          holders.length
+            ? holders.map((h) => `${esc(h.displayName)} (@${esc(h.username)}) <button type="button" class="role-chip" data-epl-remove="${r.value}" data-epl-remove-member="${h.id}" style="color:#B23A3A;padding:1px 8px;margin-left:6px;">Retirer</button>`).join(" · ")
+            : '<span class="field-hint" style="margin:0;">Vacant</span>'
+        }</span>
+      </div>`;
+    }).join("");
+
+    return `
+      <div class="list-stack" style="margin-bottom:12px;">${rosterHtml}</div>
+      <div class="form-grid" style="align-items:end; margin-bottom:8px;">
+        <div class="form-field" style="grid-column:1/-1;">
+          <label for="epl-search">Chercher un membre à ajouter (nom ou @identifiant, hors membres de ce club)</label>
+          <input id="epl-search" placeholder="Tapez un nom…" autocomplete="off">
+        </div>
+      </div>
+      <div id="epl-search-results" class="list-stack" style="margin-bottom:6px;"></div>
+    `;
+  }
+
+  async function runEplSearch(query, schoolId) {
+    const resultsEl = document.getElementById("epl-search-results");
+    if (!resultsEl) return;
+    const q = query.trim();
+    if (!q) { resultsEl.innerHTML = ""; eplSearchResults = []; return; }
+    resultsEl.innerHTML = '<div class="empty-state">Recherche…</div>';
+    const data = await callRoles({ action: "searchMembers", query: q });
+    // The whole point of the EPL is that it's staffed from OUTSIDE the
+    // club being served — filter out anyone who currently belongs to
+    // schoolId, in addition to the server-side check on the write path.
+    eplSearchResults = (data.members || []).filter((m) => m.schoolId !== schoolId);
+    if (!eplSearchResults.length) {
+      resultsEl.innerHTML = '<div class="empty-state">Aucun membre trouvé hors de ce club.</div>';
+      return;
+    }
+    resultsEl.innerHTML = eplSearchResults.map((m) => `
+      <div class="list-item" data-epl-candidate="${m.id}">
+        <div class="who" style="display:flex;align-items:center;gap:8px;">
+          ${m.profilePictureUrl ? `<img src="${m.profilePictureUrl}" alt="" style="width:28px;height:28px;border-radius:50%;">` : ""}
+          <strong>${esc(m.displayName)}</strong><span style="opacity:.7;">@${esc(m.username)}</span>
+        </div>
+        <div class="role-chip-row" style="margin-top:6px;">
+          ${EPL_ROLES.map((r) => `<button type="button" class="role-chip" data-epl-assign="${r.value}" data-epl-assign-member="${m.id}">${r.label}</button>`).join("")}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  async function loadEplForCurrentSchool() {
+    if (!currentSchoolId) return [];
+    const data = await callRoles({ action: "listEpl", schoolId: currentSchoolId });
+    return data.members || [];
+  }
+
+  function bindEplHandlers() {
+    const searchInput = document.getElementById("epl-search");
+    if (searchInput) {
+      let debounceTimer = null;
+      searchInput.addEventListener("input", () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          runEplSearch(searchInput.value, currentSchoolId).catch((err) => alert(err.message || "Échec de la recherche."));
+        }, 250);
+      });
+    }
+
+    const resultsEl = document.getElementById("epl-search-results");
+    if (resultsEl) {
+      resultsEl.addEventListener("click", async (e) => {
+        const btn = e.target.closest("[data-epl-assign]");
+        if (!btn) return;
+        try {
+          await callRoles({
+            action: "setEplRole",
+            memberId: btn.dataset.eplAssignMember,
+            schoolId: currentSchoolId,
+            role: btn.dataset.eplAssign,
+          });
+          await renderDetail();
+        } catch (err) {
+          alert(err.message || "Échec de la requête.");
+        }
+      });
+    }
+
+    detailPanel.querySelectorAll("[data-epl-remove]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        try {
+          await callRoles({
+            action: "clearEplRole",
+            memberId: btn.dataset.eplRemoveMember,
+            schoolId: currentSchoolId,
+            role: btn.dataset.eplRemove,
+          });
+          await renderDetail();
+        } catch (err) {
+          alert(err.message || "Échec de la requête.");
+        }
+      });
+    });
+  }
+
   async function renderDetail() {
     detailPanel.innerHTML = '<div class="empty-state">Chargement…</div>';
-    const data = await callRoles({ action: "list", memberId: currentMemberId });
+    const [data, eplForSchool] = await Promise.all([
+      callRoles({ action: "list", memberId: currentMemberId }),
+      loadEplForCurrentSchool(),
+    ]);
 
     const currentDisplay = data.roleHistory.find(
       (r) => !r.ended_at && r.school_id === currentSchoolId
@@ -228,6 +358,10 @@
                     data-national="${r.value}">${r.label}${activeNationalValues.has(r.value) ? " ✓" : ""}</button>`
         ).join("")}
       </div>
+
+      <div class="role-section-label">Équipe Plénière Locale (EPL) — pour ce club</div>
+      <p class="field-hint" style="margin:-4px 0 10px;">L'équipe qui préside les assemblées locales (ALOFM/ALE/ALOE) de ce club. Ses membres doivent obligatoirement venir d'un <strong>autre</strong> club — recherchez-les par nom ci-dessous.</p>
+      ${renderEplSection(eplForSchool)}
 
       <div class="role-section-label">Historique des postes (ce club)</div>
       ${
@@ -332,19 +466,37 @@
       await callRoles({ action, memberId: currentMemberId, role });
       await renderDetail();
     }));
+
+    bindEplHandlers();
   }
 
   schoolSelect.addEventListener("change", async () => {
     currentSchoolId = schoolSelect.value ? Number(schoolSelect.value) : null;
     currentMemberId = null;
-    detailPanel.innerHTML = '<div class="empty-state">Sélectionnez un membre à gauche.</div>';
     if (!currentSchoolId) {
       twoCol.style.display = "none";
+      detailPanel.innerHTML = '<div class="empty-state">Sélectionnez un membre à gauche.</div>';
       return;
     }
     twoCol.style.display = "flex";
+    await renderEplOnlyPanel();
     await loadMembers(currentSchoolId);
   });
+
+  // Shown right after picking a club, before any member is selected —
+  // EPL is a per-club roster, not a per-member one, so an admin
+  // shouldn't have to click an arbitrary member first just to see or
+  // edit who's currently seated on this club's plenary team.
+  async function renderEplOnlyPanel() {
+    const eplForSchool = await loadEplForCurrentSchool();
+    detailPanel.innerHTML = `
+      <div class="role-section-label">Équipe Plénière Locale (EPL) — pour ce club</div>
+      <p class="field-hint" style="margin:-4px 0 10px;">L'équipe qui préside les assemblées locales (ALOFM/ALE/ALOE) de ce club. Ses membres doivent obligatoirement venir d'un <strong>autre</strong> club — recherchez-les par nom ci-dessous.</p>
+      ${renderEplSection(eplForSchool)}
+      <p class="field-hint" style="margin-top:16px;">Sélectionnez un membre à gauche pour gérer ses autres rôles (affichage, capacités, rôles nationaux…).</p>
+    `;
+    bindEplHandlers();
+  }
 
   await loadSchools();
 })();

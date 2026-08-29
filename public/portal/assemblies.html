@@ -16,29 +16,31 @@
   <div class="workspace">
     <div id="sidebar-root"></div>
     <main class="portal-content">
-      <div class="portal-heading"><div><p class="eyebrow">Pouvoir législatif</p><h1>Assemblées locales & générales</h1><p>Prépare les assemblées, conserve le rôle de chaque participant et suis le quorum avec une photographie datée des membres.</p></div></div>
+      <div class="portal-heading"><div><p class="eyebrow">Pouvoir législatif</p><h1>Assemblées</h1><p>Prépare les assemblées locales et générales, conserve le rôle de chaque participant et suis le quorum avec une photographie datée des membres.</p></div></div>
       <div id="notice"></div>
       <div class="portal-grid">
-        <section class="portal-card card-span-8"><div class="toolbar"><div><p class="eyebrow">Calendrier institutionnel</p><h2>Assemblées</h2></div><button class="btn btn-secondary btn-sm" id="refresh">Actualiser</button></div><div id="assembly-list" class="list-stack"></div></section>
-        <section class="portal-card card-span-4"><p class="eyebrow">Préparation</p><h2>Nouvelle assemblée</h2><form id="assembly-form">
-          <div class="form-field"><label for="assemblyType">Type</label><select id="assemblyType"><option value="alofm">ALOFM · Fin de mandat</option><option value="adhesion">AL d’adhésion</option><option value="validation">AL de validation</option><option value="aloe">ALOE · Élective</option><option value="dissolution">AL de dissolution</option><option value="ag_ordinaire">AG ordinaire</option><option value="ag_extraordinaire">AG extraordinaire</option></select></div>
-          <div class="form-field"><label for="assemblyTitle">Titre</label><input id="assemblyTitle" required placeholder="Assemblée locale ordinaire"></div>
-          <div class="form-field"><label for="startsAt">Date et heure</label><input id="startsAt" type="datetime-local" required></div>
-          <div class="form-field"><label for="format">Format</label><select id="format"><option value="presentiel">Présentiel</option><option value="en_ligne">En ligne</option><option value="hybride">Hybride</option></select></div>
-          <div class="form-field"><label for="location">Lieu / lien</label><input id="location" placeholder="Établissement, maison de jeunes ou lien"></div>
-          <div class="form-field"><label for="projectUrl">Lien projet</label><input id="projectUrl" type="url" placeholder="https://…"></div>
-          <div class="form-field"><label for="databaseUrl">Lien base de données</label><input id="databaseUrl" type="url" placeholder="https://…"></div>
-          <div class="form-actions"><button class="btn btn-primary" type="submit">Préparer l’assemblée</button></div>
-        </form></section>
+        <section class="portal-card card-span-12"><div class="toolbar"><div><p class="eyebrow">Calendrier institutionnel</p><h2>Assemblées</h2></div><button class="btn btn-secondary btn-sm" id="refresh">Actualiser</button></div><div id="assembly-list" class="list-stack"></div></section>
       </div>
       <div id="assembly-detail"></div>
+      <div class="portal-grid" style="margin-top:18px">
+        <section class="portal-card card-span-12" id="assembly-prep-card"><p class="eyebrow">Préparation</p><h2>Nouvelle assemblée</h2><form id="assembly-form" class="form-grid">
+          <div class="form-field"><label for="assemblyType">Type</label><select id="assemblyType"><option value="alofm">ALOFM</option><option value="ale">ALE</option><option value="aloe">ALOE</option><option value="agomm">AGOMM</option><option value="agofm">AGOFM</option><option value="age">AGE</option></select></div>
+          <div class="form-field"><label for="assemblyTitle">Titre</label><input id="assemblyTitle" required></div>
+          <div class="form-field"><label for="startsAt">Date et heure</label><input id="startsAt" type="datetime-local" required></div>
+          <div class="form-field"><label for="format">Format</label><select id="format"><option value="presentiel">Présentiel</option><option value="en_ligne">En ligne</option><option value="hybride">Hybride</option></select></div>
+          <div class="form-field"><label for="location">Lieu / lien</label><input id="location"></div>
+          <div class="form-field"><label for="projectUrl">Lien projet</label><input id="projectUrl" type="url"></div>
+          <div class="form-field"><label for="databaseUrl">Lien base de données</label><input id="databaseUrl" type="url"></div>
+          <div class="form-actions full"><button class="btn btn-primary" type="submit">Préparer</button></div>
+        </form></section>
+      </div>
     </main>
   </div>
 <script src="portal-common.js"></script>
 <script>
 (async () => {
   const notice = document.getElementById('notice'); const list = document.getElementById('assembly-list'); const detail = document.getElementById('assembly-detail'); const esc = AYCPortal.escapeHtml;
-  const labels = { alofm:'ALOFM · Fin de mandat', adhesion:'AL d’adhésion', validation:'AL de validation', aloe:'ALOE · Élective', dissolution:'AL de dissolution', ag_ordinaire:'AG ordinaire', ag_extraordinaire:'AG extraordinaire', planned:'Planifiée', open:'Ouverte', closed:'Clôturée', cancelled:'Annulée', invited:'Invité·e', present:'Présent·e', absent:'Absent·e', excused:'Excusé·e', late:'En retard' };
+  const labels = { alofm:'ALOFM', ale:'ALE', aloe:'ALOE', agomm:'AGOMM', agofm:'AGOFM', age:'AGE', planned:'Planifiée', open:'Ouverte', closed:'Clôturée', cancelled:'Annulée', invited:'Invité·e', present:'Présent·e', absent:'Absent·e', excused:'Excusé·e', late:'En retard' };
   const majorityLabels = { simple:'Majorité simple', absolute:'Majorité absolue', relative:'Majorité relative', two_thirds:'Majorité des deux tiers' };
   const resultLabels = { adopted:'La motion passe', rejected:'La motion ne passe pas', tie:'Égalité des voix' };
   let member;
@@ -78,7 +80,7 @@
     return esc(parts.join(' · '));
   }
 
-  function motionCardMarkup(m, index, canEditMotions, piBoxes) {
+  function motionCardMarkup(m, index, canEditMotions, piBoxes, liveSave) {
     const isOpen = openMotionPositions.has(m.position);
     const voteMode = m.vote_mode === 'manual' ? 'manual' : 'count';
     const disabled = canEditMotions ? '' : ' disabled';
@@ -97,20 +99,20 @@
       <div class="al-motion-body" ${isOpen ? '' : 'hidden'}>
         <div class="al-motion-title-row">
           <label>Motion ${index + 1} — nom de la motion</label>
-          <input class="al-title" value="${esc(m.title || '')}" placeholder="Ex. Adoption du rapport préliminaire du CSCY"${disabled}>
+          <input class="al-title" data-live-field="title" value="${esc(m.title || '')}"${disabled}>
         </div>
         <div class="al-motion-grid">
           <div class="form-field"><label>Plénière</label><select class="al-plenary"${disabled}><option value="">—</option>${currentPlenaries.map(p=>`<option value="${p.id}"${m.plenary_id===p.id?' selected':''}>${esc(p.label)}</option>`).join('')}</select></div>
-          <div class="form-field"><label>Proposant</label><input class="al-proposer" value="${esc(m.proposer_name || '')}" placeholder="Nom du club ou de la personne"${disabled}></div>
-          <div class="form-field"><label>Secondant</label><input class="al-seconder" value="${esc(m.seconder_name || '')}" placeholder="Nom du club ou de la personne"${disabled}></div>
+          <div class="form-field"><label>Proposant</label><input class="al-proposer" data-live-field="proposerName" value="${esc(m.proposer_name || '')}"${disabled}></div>
+          <div class="form-field"><label>Secondant</label><input class="al-seconder" data-live-field="seconderName" value="${esc(m.seconder_name || '')}"${disabled}></div>
           <div class="form-field"><label>Majorité utilisée</label><select class="al-majority"${disabled}>${Object.entries(majorityLabels).map(([v,l])=>`<option value="${v}"${m.majority_type===v?' selected':''}>${l}</option>`).join('')}</select></div>
-          <div class="form-field"><label>Amendement</label><input class="al-amendment" value="${esc(m.amendment || '')}" placeholder="Aucun"${disabled}></div>
-          <div class="form-field"><label>Direct négatif</label><input class="al-direct-negative" value="${esc(m.direct_negative || '')}" placeholder="Aucun"${disabled}></div>
-          <div class="form-field"><label>Heure de début</label><input class="al-starts" value="${esc(m.starts_at_text || '')}" placeholder="20h31"${disabled}></div>
-          <div class="form-field"><label>Heure de clôture</label><input class="al-closes" value="${esc(m.closes_at_text || '')}" placeholder="20h34"${disabled}></div>
-          <div class="form-field"><label>Durée</label><input class="al-duration" value="${esc(m.duration_text || '')}" placeholder="3 minutes"${disabled}></div>
-          <div class="form-field full"><label>Discussion</label><textarea class="al-discussion" placeholder="Résumé des échanges pendant la motion"${disabled}>${esc(m.discussion || '')}</textarea></div>
-          <div class="form-field full"><label>Conséquence</label><textarea class="al-consequence" placeholder="Ce que la motion change concrètement"${disabled}>${esc(m.consequence || '')}</textarea></div>
+          <div class="form-field"><label>Amendement</label><input class="al-amendment" data-live-field="amendment" value="${esc(m.amendment || '')}"${disabled}></div>
+          <div class="form-field"><label>Direct négatif</label><input class="al-direct-negative" data-live-field="directNegative" value="${esc(m.direct_negative || '')}"${disabled}></div>
+          <div class="form-field"><label>Heure de début</label><input class="al-starts" data-live-field="startsAtText" value="${esc(m.starts_at_text || '')}"${disabled}></div>
+          <div class="form-field"><label>Heure de clôture</label><input class="al-closes" data-live-field="closesAtText" value="${esc(m.closes_at_text || '')}"${disabled}></div>
+          <div class="form-field"><label>Durée</label><input class="al-duration" data-live-field="durationText" value="${esc(m.duration_text || '')}"${disabled}></div>
+          <div class="form-field full"><label>Discussion</label><textarea class="al-discussion" data-live-field="discussion"${disabled}>${esc(m.discussion || '')}</textarea></div>
+          <div class="form-field full"><label>Conséquence</label><textarea class="al-consequence" data-live-field="consequence"${disabled}>${esc(m.consequence || '')}</textarea></div>
         </div>
         <div>
           <div class="al-vote-mode-toggle">
@@ -134,10 +136,10 @@
           </div>
         </div>
         ${canEditMotions ? `<div class="al-motion-footer">
-          <span class="al-motion-save-state" data-save-state>Modifications non enregistrées seront perdues si vous fermez sans sauver.</span>
+          <span class="al-motion-save-state" data-save-state>${liveSave ? 'Écriture en direct : chaque champ est enregistré dès que vous en sortez.' : 'Modifications non enregistrées seront perdues si vous fermez sans sauver.'}</span>
           <div class="form-actions" style="margin:0">
             ${m.required_motion ? '' : `<button type="button" class="btn btn-quiet btn-sm" data-delete-motion="${m.position}">Supprimer</button>`}
-            <button type="button" class="btn btn-primary btn-sm" data-save-motion="${m.position}">Enregistrer la motion</button>
+            <button type="button" class="btn btn-primary btn-sm" data-save-motion="${m.position}">${liveSave ? 'Enregistrer le vote / résultat' : 'Enregistrer la motion'}</button>
           </div>
         </div>` : ''}
         <div class="motion-pi-list">${motionPis.map(pi => piBoxMarkup(pi, canEditMotions)).join('')}</div>
@@ -146,7 +148,7 @@
     </article>`;
   }
 
-  function bindMotionCard(card, assemblyId) {
+  function bindMotionCard(card, assemblyId, liveSave) {
     const position = Number(card.dataset.position);
     const summary = card.querySelector('.al-motion-summary');
     summary.addEventListener('click', () => {
@@ -156,6 +158,37 @@
       card.classList.toggle('is-open', nowOpen);
       if (nowOpen) openMotionPositions.add(position); else openMotionPositions.delete(position);
     });
+    if (liveSave) {
+      const stateEl = card.querySelector('[data-save-state]');
+      card.querySelectorAll('[data-live-field]').forEach(field => {
+        const initialValue = field.value;
+        let lastSaved = initialValue;
+        field.addEventListener('blur', async () => {
+          if (field.value === lastSaved) return;
+          const fieldName = field.dataset.liveField;
+          const value = field.value.trim();
+          try {
+            await AYCPortal.api('assembly', { method: 'POST', body: {
+              action: 'motion_field', assemblyId, position, field: fieldName, value,
+            } });
+            lastSaved = field.value;
+            if (fieldName === 'title') {
+              const titleEl = card.querySelector('.al-motion-summary-title');
+              if (titleEl) titleEl.textContent = value || 'Motion sans titre';
+            }
+            if (stateEl) {
+              stateEl.textContent = 'Enregistré.';
+              stateEl.classList.add('is-saved');
+              setTimeout(() => {
+                if (stateEl.classList.contains('is-saved')) stateEl.textContent = 'Écriture en direct : chaque champ est enregistré dès que vous en sortez.';
+              }, 1800);
+            }
+          } catch (e) {
+            if (stateEl) { stateEl.textContent = 'Échec de l’enregistrement de ce champ — réessayez.'; stateEl.classList.remove('is-saved'); }
+          }
+        });
+      });
+    }
     const modeButtons = card.querySelectorAll('.al-mode-btn');
     const countFields = card.querySelector('.al-vote-count-fields');
     const manualFields = card.querySelector('.al-vote-manual-fields');
@@ -207,6 +240,36 @@
       const stateEl = card.querySelector('[data-save-state]');
       if (stateEl) { stateEl.textContent = 'Modifications non enregistrées.'; stateEl.classList.add('is-dirty'); stateEl.classList.remove('is-saved'); }
     }));
+    bindEditingIndicators(card);
+  }
+
+  // Shows a live "en cours de modification" badge on a field the moment
+  // someone focuses or types in it, separate from the saved/unsaved state
+  // which only updates after the field is left.
+  function bindEditingIndicators(scope) {
+    scope.querySelectorAll('.form-field, .al-motion-title-row').forEach(wrapper => {
+      const field = wrapper.querySelector('input, textarea, select');
+      if (!field || field.disabled || wrapper.dataset.editingBound) return;
+      wrapper.dataset.editingBound = 'true';
+      let badge = null;
+      const showBadge = () => {
+        wrapper.classList.add('is-editing-now');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'editing-now-badge';
+          badge.innerHTML = '<span class="editing-now-dot"></span>Modification en cours…';
+          wrapper.appendChild(badge);
+        }
+      };
+      const hideBadge = () => {
+        wrapper.classList.remove('is-editing-now');
+        badge?.remove();
+        badge = null;
+      };
+      field.addEventListener('focus', showBadge);
+      field.addEventListener('input', showBadge);
+      field.addEventListener('blur', hideBadge);
+    });
   }
 
   function clubAttendanceRowMarkup(row, canEditClubs) {
@@ -216,7 +279,7 @@
     return `<tr data-school="${row.school_id}">
       <td>${esc(row.school_name)}</td>
       <td>${canEditClubs
-        ? `<input class="club-attendance-rep" data-school="${row.school_id}" value="${esc(row.representative_name || '')}" placeholder="N/A">`
+        ? `<input class="club-attendance-rep" data-school="${row.school_id}" value="${esc(row.representative_name || '')}">`
         : esc(row.representative_name || 'N/A')}</td>
       <td>${esc(statusLabels[row.club_status] || row.club_status || 'Club membre')}</td>
       <td>${canEditClubs
@@ -230,7 +293,11 @@
 
   function epnRosterMarkup(epnMembers) {
     if (!epnMembers.length) return AYCPortal.renderEmpty('Aucun membre inscrit à l’EPN pour le moment. Ajoutez-en depuis la Gestion des rôles.');
-    return `<div class="table-wrap"><table class="portal-table"><thead><tr><th>Prénom et nom</th><th>Rôle</th></tr></thead><tbody>${epnMembers.map(m => `<tr><td>${esc(m.display_name || m.username)}</td><td>${m.is_national_secretary ? 'Secrétaire National(e)' : 'Membre EPN'}</td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="table-wrap"><table class="portal-table"><thead><tr><th>Prénom et nom</th><th>Rôle</th></tr></thead><tbody>${epnMembers.map(m => {
+      const labels = (m.epn_role_labels && m.epn_role_labels.length ? m.epn_role_labels.join(', ') : 'Membre EPN');
+      const roleText = m.is_national_secretary ? `${labels} · Secrétaire National(e)` : labels;
+      return `<tr><td>${esc(m.display_name || m.username)}</td><td>${esc(roleText)}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
   }
 
   function rosterPresenceCell(member, roster, canEdit) {
@@ -296,14 +363,14 @@
   }
 
   function plenaryFormFields(p) {
-    return `<div class="form-field"><label>Libellé</label><input id="pf-label" value="${esc(p?.label||'')}" placeholder="Ex. Plénière 2"></div>
-      <div class="form-field"><label>Heure de début</label><input id="pf-starts" value="${esc(p?.starts_at_text||'')}" placeholder="10:35"></div>
-      <div class="form-field"><label>Heure de clôture</label><input id="pf-closes" value="${esc(p?.closes_at_text||'')}" placeholder="17:17"></div>
+    return `<div class="form-field"><label>Libellé</label><input id="pf-label" value="${esc(p?.label||'')}"></div>
+      <div class="form-field"><label>Heure de début</label><input id="pf-starts" value="${esc(p?.starts_at_text||'')}"></div>
+      <div class="form-field"><label>Heure de clôture</label><input id="pf-closes" value="${esc(p?.closes_at_text||'')}"></div>
       <div class="form-field"><label>Président(e) de la plénière</label><input id="pf-president" value="${esc(p?.president_name||'')}"></div>
       <div class="form-field"><label>Vice-président(e) de la plénière</label><input id="pf-vp" value="${esc(p?.vice_president_name||'')}"></div>
       <div class="form-field full"><label>Secrétaires (séparés par des virgules)</label><input id="pf-secretaries" value="${esc(p?.secretaries||'')}"></div>
       <div class="form-field"><label>Comité de Sauvegarde de la Constitution YOUTH [CSCY]</label><input id="pf-cscy" value="${esc(p?.cscy_name||'')}"></div>
-      <div class="form-field"><label>Comité Financier [CF]</label><input id="pf-cf" value="${esc(p?.cf_name||'')}" placeholder="pas de CF"></div>`;
+      <div class="form-field"><label>Comité Financier [CF]</label><input id="pf-cf" value="${esc(p?.cf_name||'')}"></div>`;
   }
 
   function groundRulesSectionMarkup(groundRules, canEdit) {
@@ -333,9 +400,9 @@
   function movementFormMarkup(data) {
     const schoolOptions = (data.clubAttendance||[]).map(c => `<option value="${c.school_id}">${esc(c.school_name)}</option>`).join('');
     return `<div class="compact-form">
-      <div class="form-field"><label>Nom et prénom</label><input id="mv-name" placeholder="Ex. Mohamed Ayari"></div>
-      <div class="form-field"><label>Statut / Club</label><input id="mv-status" placeholder="Ex. Trésorier National"></div>
-      <div class="form-field"><label>Heure</label><input id="mv-time" placeholder="10:41"></div>
+      <div class="form-field"><label>Nom et prénom</label><input id="mv-name"></div>
+      <div class="form-field"><label>Statut / Club</label><input id="mv-status"></div>
+      <div class="form-field"><label>Heure</label><input id="mv-time"></div>
       <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap">
         <button type="button" class="btn btn-secondary btn-sm" data-movement-type="sortie">Enregistrer une sortie</button>
         <button type="button" class="btn btn-secondary btn-sm" data-movement-type="entree">Enregistrer une entrée</button>
@@ -343,7 +410,7 @@
       ${schoolOptions ? `<div style="margin-top:14px;padding-top:14px;border-top:1px dashed #e5eaf2">
         <p class="eyebrow" style="margin-bottom:8px">Changement de représentant (club déjà présent)</p>
         <div class="form-field"><label>Club</label><select id="cr-school">${schoolOptions}</select></div>
-        <div class="form-field"><label>Nouveau représentant (membre du BEL, nom libre sinon)</label><input id="cr-name" placeholder="Ex. Rayen Selmi"></div>
+        <div class="form-field"><label>Nouveau représentant (membre du BEL, nom libre sinon)</label><input id="cr-name"></div>
         <div class="form-actions" style="justify-content:flex-start"><button type="button" class="btn btn-secondary btn-sm" id="save-rep-change">Enregistrer le changement</button></div>
       </div>` : ''}
     </div>`;
@@ -355,10 +422,14 @@
     const canEditClubAttendance=Boolean(member.access?.canEditAssemblyAttendance||member.access?.isNationalSecretary||member.isNationalAdmin);
     const canClose=Boolean(member.access?.canCloseAssembly||member.isNationalAdmin);
     const canEditMotions=Boolean(member.access?.canEditPV||member.isNationalAdmin||(isNational&&member.access?.isNationalSecretary));
+    // Secrétaires de la plénière (national secretaries) work live on
+    // national AG PVs: each text field saves as they leave it, instead
+    // of the full-motion save-button flow local pv_editors use.
+    const liveSaveMotions = Boolean(isNational && (member.access?.isNationalSecretary || member.isNationalAdmin));
     const present=data.attendance.filter(x=>['present','late'].includes(x.attendance_status)).length;
     const clubsPresent=(data.clubAttendance||[]).filter(x=>x.attendance_status==='present').length;
     const motionsMarkup = data.motions.length
-      ? data.motions.map((m,i)=>motionCardMarkup(m,i,canEditMotions,data.piBoxes)).join('')
+      ? data.motions.map((m,i)=>motionCardMarkup(m,i,canEditMotions,data.piBoxes,liveSaveMotions)).join('')
       : '<div class="pv-empty-blocks">Aucune motion pour le moment.</div>';
     const attendanceSectionMarkup = isNational
       ? `<h3>Clubs — présence et droit de vote</h3>
@@ -388,7 +459,7 @@
         </div>
         <div style="margin-top:14px"><p class="eyebrow" style="margin-bottom:8px">Noms et clubs des rédacteurs</p>
           <div id="editors-list" class="list-stack" style="margin-bottom:10px">${(a.editors||[]).length ? a.editors.map((e,i)=>`<div class="list-item" data-editor-index="${i}"><div class="list-item-main"><span class="list-item-title">${esc(e.name)}</span><span class="list-item-meta">${esc(e.club||'—')}</span></div>${canEditMotions ? `<button type="button" class="btn btn-quiet btn-sm" data-remove-editor="${i}">Retirer</button>` : ''}</div>`).join('') : AYCPortal.renderEmpty('Aucun rédacteur renseigné')}</div>
-          ${canEditMotions ? `<div class="editors-row"><div class="form-field"><label>Nom et prénom</label><input id="editor-name" placeholder="Ex. Salma Jdidi"></div><div class="form-field"><label>Club</label><input id="editor-club" placeholder="Membre au sein du…"></div><button type="button" class="btn btn-secondary btn-sm" id="add-editor">Ajouter</button></div>
+          ${canEditMotions ? `<div class="editors-row"><div class="form-field"><label>Nom et prénom</label><input id="editor-name"></div><div class="form-field"><label>Club</label><input id="editor-club"></div><button type="button" class="btn btn-secondary btn-sm" id="add-editor">Ajouter</button></div>
           <div class="form-actions"><button type="button" class="btn btn-primary btn-sm" id="save-editors">Enregistrer la contextualisation</button></div>` : ''}
         </div>
       </section>
@@ -415,7 +486,8 @@
     </section>`;
     detail.insertAdjacentHTML('beforeend', renderPublishedPV(data));
     document.getElementById('close-detail').onclick=()=>{detail.innerHTML='';openMotionPositions=new Set();};
-    detail.querySelectorAll('.al-motion-card').forEach(card => bindMotionCard(card, a.id));
+    detail.querySelectorAll('.al-motion-card').forEach(card => bindMotionCard(card, a.id, liveSaveMotions));
+    bindEditingIndicators(detail);
     if (canEditMotions) document.getElementById('add-motion')?.addEventListener('click', async () => {
       const nextPosition = data.motions.length;
       try { await AYCPortal.api('assembly', { method: 'POST', body: { action: 'motion', assemblyId: a.id, position: nextPosition, title: 'Nouvelle motion', motionType: 'decision' } }); openMotionPositions.add(nextPosition); await openAssembly(a.id); } catch (e) { apiError(e); }
@@ -457,6 +529,7 @@
       const html = `<div class="portal-card" id="plenary-form-card" style="margin-top:14px"><h3>${existing ? 'Modifier l’équipe de la plénière' : 'Nouvelle plénière'}</h3><div class="form-grid">${plenaryFormFields(existing)}</div><div class="form-actions"><button type="button" class="btn btn-quiet btn-sm" id="cancel-plenary">Annuler</button><button type="button" class="btn btn-primary btn-sm" id="save-plenary">Enregistrer</button></div></div>`;
       document.getElementById('plenary-form-card')?.remove();
       document.getElementById('plenaries-list').insertAdjacentHTML('afterend', html);
+      bindEditingIndicators(document.getElementById('plenary-form-card'));
       document.getElementById('cancel-plenary').onclick = () => document.getElementById('plenary-form-card').remove();
       document.getElementById('save-plenary').onclick = async () => {
         try {
@@ -513,8 +586,9 @@
     if (canEditMotions) {
       detail.querySelectorAll('[data-add-pi]').forEach(btn => btn.addEventListener('click', () => {
         const motionId = btn.dataset.addPi;
-        const html = `<div class="pi-box" id="pi-form-box" style="background:#fff"><div class="form-field"><label>Nom et prénom (ou choisir un membre existant si connu)</label><input id="pi-name" placeholder="Ex. Zeineb Aissa"></div><div class="form-field"><label>Rôle (auto-rempli si le membre est trouvé, sinon libre)</label><input id="pi-role" placeholder="Ex. Responsable LIAYC"></div><div class="form-field full"><label>Intervention</label><textarea id="pi-body" placeholder="Ce qu'a dit ou demandé la personne"></textarea></div><div class="form-actions"><button type="button" class="btn btn-quiet btn-sm" id="cancel-pi">Annuler</button><button type="button" class="btn btn-primary btn-sm" id="save-pi">Ajouter le PI</button></div></div>`;
+        const html = `<div class="pi-box" id="pi-form-box" style="background:#fff"><div class="form-field"><label>Nom et prénom (ou choisir un membre existant si connu)</label><input id="pi-name"></div><div class="form-field"><label>Rôle (auto-rempli si le membre est trouvé, sinon libre)</label><input id="pi-role"></div><div class="form-field full"><label>Intervention</label><textarea id="pi-body"></textarea></div><div class="form-actions"><button type="button" class="btn btn-quiet btn-sm" id="cancel-pi">Annuler</button><button type="button" class="btn btn-primary btn-sm" id="save-pi">Ajouter le PI</button></div></div>`;
         btn.closest('.al-motion-add-row').insertAdjacentHTML('beforebegin', html);
+        bindEditingIndicators(document.getElementById('pi-form-box'));
         btn.hidden = true;
         document.getElementById('cancel-pi').onclick = () => { document.getElementById('pi-form-box').remove(); btn.hidden = false; };
         document.getElementById('save-pi').onclick = async () => {
@@ -567,7 +641,7 @@
   list.addEventListener('click',e=>{const b=e.target.closest('[data-open]');if(b)openAssembly(b.dataset.open)});
   document.getElementById('refresh').onclick=()=>load().catch(apiError);
   document.getElementById('assembly-form').addEventListener('submit',async e=>{e.preventDefault();try{await AYCPortal.api('assemblies',{method:'POST',body:{action:'create',assemblyType:document.getElementById('assemblyType').value,title:document.getElementById('assemblyTitle').value,startsAt:document.getElementById('startsAt').value,format:document.getElementById('format').value,location:document.getElementById('location').value,projectUrl:document.getElementById('projectUrl').value,databaseUrl:document.getElementById('databaseUrl').value}});e.target.reset();notice.innerHTML='<div class="alert alert-success">L’assemblée a été préparée sans modifier les membres.</div>';await load()}catch(err){apiError(err)}});
-  try{member=await AYCPortal.initPortalShell({requireActive:true});if(!member)return;const canCreate=Boolean(member.access?.canCreateAssembly||member.isNationalAdmin);if(!canCreate){const form=document.getElementById('assembly-form');form.hidden=true;form.insertAdjacentHTML('beforebegin','<p class="restricted-note">La préparation des assemblées est gérée par les responsables désignés et les instances compétentes.</p>');document.querySelector('#assembly-form').closest('.portal-card').querySelector('h2').textContent='Préparation réservée';}await load()}catch(e){apiError(e)}
+  try{member=await AYCPortal.initPortalShell({requireActive:true});if(!member)return;const canCreate=Boolean(member.access?.canCreateAssembly||member.isNationalAdmin);if(!canCreate){document.getElementById('assembly-prep-card').hidden=true;}else{const canCreateNational=Boolean(member.access?.canCreateNationalAssembly||member.isNationalAdmin);if(!canCreateNational){document.querySelectorAll('#assemblyType option[value="agomm"],#assemblyType option[value="agofm"],#assemblyType option[value="age"]').forEach(o=>o.remove());}}await load()}catch(e){apiError(e)}
 })();
 </script>
 </body>

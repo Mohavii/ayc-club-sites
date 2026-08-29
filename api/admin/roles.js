@@ -28,6 +28,7 @@ const {
   DISPLAY_ROLES,
   CAPABILITIES,
   NATIONAL_ROLES,
+  EPL_ROLES,
   MEMBERSHIP_STATUSES,
   setClubDisplayRole,
   clearClubDisplayRole,
@@ -44,6 +45,10 @@ const {
   revokeNationalCapability,
   setMembershipStatus,
   listNationalRoleHolders,
+  setEplMember,
+  clearEplMember,
+  getMemberEplRoles,
+  getEplMembers,
 } = require("../_lib/roles");
 
 async function requireActiveTarget(res, memberId) {
@@ -107,6 +112,28 @@ module.exports = async (req, res) => {
         return;
       }
 
+      // Who currently sits on a given club's Équipe Plénière Locale —
+      // used to render that club's EPL section in the admin UI
+      // independently of whichever member is selected on the left.
+      case "listEpl": {
+        if (!schoolId) {
+          res.status(400).json({ error: "schoolId manquant." });
+          return;
+        }
+        const members = await getEplMembers(schoolId);
+        res.status(200).json({
+          ok: true,
+          members: members.map((m) => ({
+            id: m.id,
+            username: m.username,
+            displayName: m.display_name,
+            profilePictureUrl: m.profile_picture_url,
+            role: m.epl_role,
+          })),
+        });
+        return;
+      }
+
       case "searchMembers": {
         const rows = await searchActiveMembers(body.query);
         res.status(200).json({
@@ -117,6 +144,7 @@ module.exports = async (req, res) => {
             displayName: m.display_name,
             profilePictureUrl: m.profile_picture_url,
             email: m.email,
+            schoolId: m.school_id,
           })),
         });
         return;
@@ -125,15 +153,16 @@ module.exports = async (req, res) => {
       case "list": {
         const target = await requireActiveTarget(res, memberId);
         if (!target) return;
-        const [roleHistory, capabilities, nationalRoles, nationalCapabilities, trainerRows, documents] = await Promise.all([
+        const [roleHistory, capabilities, nationalRoles, nationalCapabilities, eplRoles, trainerRows, documents] = await Promise.all([
           getMemberRoleHistory(memberId),
           getMemberCapabilities(memberId),
           getMemberNationalRoles(memberId),
           getMemberNationalCapabilities(memberId),
+          getMemberEplRoles(memberId),
           sql()`select * from portal_trainer_profiles where member_id = ${memberId}`,
           sql()`select id, document_type, title, original_filename, visibility, status, created_at from portal_member_documents where member_id = ${memberId} and status <> 'archived' order by created_at desc`,
         ]);
-        res.status(200).json({ ok: true, roleHistory, capabilities, nationalRoles, nationalCapabilities, membershipStatus: target.membership_status, trainerProfile: trainerRows[0] || null, documents });
+        res.status(200).json({ ok: true, roleHistory, capabilities, nationalRoles, nationalCapabilities, eplRoles, membershipStatus: target.membership_status, trainerProfile: trainerRows[0] || null, documents, targetSchoolId: target.school_id });
         return;
       }
 
@@ -278,6 +307,43 @@ module.exports = async (req, res) => {
         const target = await requireActiveTarget(res, memberId);
         if (!target) return;
         await clearNationalRole({ memberId, role });
+        res.status(200).json({ ok: true });
+        return;
+      }
+
+      // Équipe Plénière Locale — same shape as setNationalRole/
+      // clearNationalRole, but scoped to a club (schoolId) and seating
+      // members from OTHER clubs only. setEplMember itself throws if the
+      // target belongs to schoolId, so that's surfaced as a normal error
+      // via the catch block below rather than re-checked here.
+      case "setEplRole": {
+        if (!EPL_ROLES.includes(role)) {
+          res.status(400).json({ error: `Rôle d'Équipe Plénière Locale invalide. Attendu : ${EPL_ROLES.join(", ")}` });
+          return;
+        }
+        const target = await requireActiveTarget(res, memberId);
+        if (!target) return;
+        if (!schoolId) {
+          res.status(400).json({ error: "schoolId manquant." });
+          return;
+        }
+        await setEplMember({ memberId, schoolId, role, grantedBy: admin.id });
+        res.status(200).json({ ok: true });
+        return;
+      }
+
+      case "clearEplRole": {
+        if (!EPL_ROLES.includes(role)) {
+          res.status(400).json({ error: `Rôle d'Équipe Plénière Locale invalide. Attendu : ${EPL_ROLES.join(", ")}` });
+          return;
+        }
+        const target = await requireActiveTarget(res, memberId);
+        if (!target) return;
+        if (!schoolId) {
+          res.status(400).json({ error: "schoolId manquant." });
+          return;
+        }
+        await clearEplMember({ memberId, schoolId, role });
         res.status(200).json({ ok: true });
         return;
       }

@@ -135,7 +135,7 @@ async function searchActiveMembers(query) {
   const like = `%${String(query || "").trim().toLowerCase()}%`;
   if (!like || like === "%%") return [];
   return db`
-    select id, username, display_name, profile_picture_url, email
+    select id, username, display_name, profile_picture_url, email, school_id
     from portal_members
     where status = 'active'
       and (lower(username) like ${like} or lower(display_name) like ${like})

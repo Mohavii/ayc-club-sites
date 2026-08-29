@@ -20,6 +20,9 @@ const {
   BEN_ROSTER_ROLES,
   EPN_ROLES,
   EPN_ROLE_LABELS,
+  EPL_ROLES,
+  EPL_ROLE_LABELS,
+  hasEplRole,
 } = require("./_lib/roles");
 
 function parseBody(req) {
@@ -336,7 +339,7 @@ async function meetingDetail(req, res, member, body) {
     ]);
     structured = { attendance, agendaBlocks, motions };
   }
-  if (req.method === "GET" || body.action === "meeting") return json(res, 200, { meeting, agendaItems, attendees, roster, nationalClubs, minutes: minutes[0] || null, structured });
+  if (req.method === "GET" || body.action === "meeting") return json(res, 200, { meeting, agendaItems, attendees, roster, nationalClubs, minutes: minutes[0] || null, structured, canEditPV });
   if (body.action === "rsvp") {
     const rsvp = ["pending", "present", "absent"].includes(body.rsvp) ? body.rsvp : "pending";
     const result = await db`
@@ -414,8 +417,8 @@ async function meetingDetail(req, res, member, body) {
         values (${minutesId}, ${row.memberId}, ${row.attendanceStatus}, ${row.votingRights}, ${row.memberRole}, ${row.note})
       `;
       for (const [position, block] of agendaBlocks.entries()) await tx`
-        insert into portal_minutes_agenda_blocks (minutes_id, position, title, discussion, decision, duration_minutes)
-        values (${minutesId}, ${position}, ${String(block.title || 'Point').slice(0, 300)}, ${block.discussion || null}, ${block.decision || null}, ${block.durationMinutes ? Number(block.durationMinutes) : null})
+        insert into portal_minutes_agenda_blocks (minutes_id, position, title, discussion, decision, duration_minutes, actual_duration_minutes, next_steps, attachments)
+        values (${minutesId}, ${position}, ${String(block.title || 'Point').slice(0, 300)}, ${block.discussion || null}, ${block.decision || null}, ${block.durationMinutes ? Number(block.durationMinutes) : null}, ${block.actualDurationMinutes ? Number(block.actualDurationMinutes) : null}, ${block.nextSteps || null}, ${JSON.stringify(Array.isArray(block.attachments) ? block.attachments.slice(0, 20) : [])}::jsonb)
       `;
       for (const [position, motion] of motions.entries()) await tx`
         insert into portal_minutes_motions (minutes_id, position, motion_type, title, proposer_id, seconder_id, amendment, direct_negative, majority_type, votes_for, votes_against, abstentions, result, consequence)
@@ -1366,6 +1369,15 @@ async function assemblies(req, res, member, body) {
   if (!(await requireClubCapability(req, res, member, "meeting_organizer", schoolId))) return;
   const assemblyType = String(body.assemblyType || "");
   if (!ASSEMBLY_TYPES.includes(assemblyType)) return json(res, 400, { error: "Type d’assemblée invalide." });
+  // A club's "Organisateur de réunions" (meeting_organizer capability)
+  // only ever acts within their own club, so they can only ever prepare
+  // local assemblies (ALOFM/ALE/ALOE) — never a national AGOMM/AGOFM/AGE.
+  // Only national admins can create those. This is enforced here rather
+  // than just hidden in the <select>, since the option list is
+  // client-side and this endpoint is the actual authority boundary.
+  if (NATIONAL_ASSEMBLY_TYPES.has(assemblyType) && !member.is_national_admin) {
+    return json(res, 403, { error: "Seule l’administration nationale peut préparer une assemblée générale nationale (AGOMM/AGOFM/AGE)." });
+  }
   const title = String(body.title || ASSEMBLY_LABELS[assemblyType]).trim();
   const startsAt = String(body.startsAt || "").trim();
   if (!title || !startsAt) return json(res, 400, { error: "Titre et date requis." });
@@ -1392,19 +1404,26 @@ async function assemblies(req, res, member, body) {
     returning *
   `;
   const assembly = assemblyRows[0];
-  for (const row of memberRows) await db`insert into portal_assembly_attendance (assembly_id, member_id, attendance_status, voting_rights, eligibility_basis, assigned_by) values (${assembly.id}, ${row.id}, 'invited', ${ELIGIBLE_MEMBER_STATUSES.has(row.membership_status)}, ${row.membership_status}, ${member.id}) on conflict (assembly_id, member_id) do nothing`;
-  for (const [position, motionTitle] of assemblyMotionSeed(assemblyType).entries()) await db`insert into portal_assembly_motions (assembly_id, position, motion_type, title, majority_type, required_motion) values (${assembly.id}, ${position}, ${position < 5 || position >= assemblyMotionSeed(assemblyType).length - 3 ? "procedural" : "decision"}, ${motionTitle}, 'simple', ${position < 5 || position >= assemblyMotionSeed(assemblyType).length - 3})`;
+  const motionSeed = assemblyMotionSeed(assemblyType);
+  const seedStatements = [
+    ...memberRows.map(row => db`insert into portal_assembly_attendance (assembly_id, member_id, attendance_status, voting_rights, eligibility_basis, assigned_by) values (${assembly.id}, ${row.id}, 'invited', ${ELIGIBLE_MEMBER_STATUSES.has(row.membership_status)}, ${row.membership_status}, ${member.id}) on conflict (assembly_id, member_id) do nothing`),
+    ...motionSeed.map((motionTitle, position) => db`insert into portal_assembly_motions (assembly_id, position, motion_type, title, majority_type, required_motion) values (${assembly.id}, ${position}, ${position < 5 || position >= motionSeed.length - 3 ? "procedural" : "decision"}, ${motionTitle}, 'simple', ${position < 5 || position >= motionSeed.length - 3})`),
+  ];
+  if (seedStatements.length) await db.transaction(seedStatements);
   // National AGs list every active CLUB as an attendee row (Présent/Absent
   // + Votant/Non votant, defaulting to Absent/Non votant), matching the
   // paper attendance sheet — separate from the per-member roster above,
   // which still covers the EPN/BEN individuals.
   if (scope === "national") {
     const allSchools = await db`select id from portal_schools where is_active = true`;
-    for (const school of allSchools) await db`insert into portal_assembly_club_attendance (assembly_id, school_id, attendance_status, voting_status, assigned_by) values (${assembly.id}, ${school.id}, 'absent', 'non_votant', ${member.id}) on conflict (assembly_id, school_id) do nothing`;
-    // National AGs run across several plénières on the paper PV ("La
-    // première plénière", "Plénière 2", ...) — seed the first one so
-    // there's somewhere for the opening motions to attach right away.
-    await db`insert into portal_assembly_plenaries (assembly_id, position, label) values (${assembly.id}, 0, 'Plénière 1') on conflict (assembly_id, position) do nothing`;
+    const clubStatements = [
+      ...allSchools.map(school => db`insert into portal_assembly_club_attendance (assembly_id, school_id, attendance_status, voting_status, assigned_by) values (${assembly.id}, ${school.id}, 'absent', 'non_votant', ${member.id}) on conflict (assembly_id, school_id) do nothing`),
+      // National AGs run across several plénières on the paper PV ("La
+      // première plénière", "Plénière 2", ...) — seed the first one so
+      // there's somewhere for the opening motions to attach right away.
+      db`insert into portal_assembly_plenaries (assembly_id, position, label) values (${assembly.id}, 0, 'Plénière 1') on conflict (assembly_id, position) do nothing`,
+    ];
+    await db.transaction(clubStatements);
   }
   await recordAudit(db, { actorId: member.id, action: "assembly.created", entityType: "assembly", entityId: assembly.id, afterData: { assemblyType, scope, memberSnapshotCount: memberRows.length, quorumRequired } });
   return json(res, 201, { assembly, meeting });
@@ -1418,7 +1437,8 @@ async function assemblyDetail(req, res, member, body) {
   const assembly = assemblyRows[0];
   if (!assembly || (!member.is_national_admin && assembly.school_id !== member.school_id)) return json(res, 404, { error: "Assemblée introuvable." });
   const access = await getMemberPortalAccess(member);
-  const canEditPV = Boolean(member.is_national_admin || access.canEditPV || (assembly.scope === "national" && access.isNationalSecretary));
+  const isEplSecretaryLive = assembly.scope === "local" && (member.is_national_admin || await hasEplRole(member.id, assembly.school_id, "epl_secretaire"));
+  const canEditPV = Boolean(member.is_national_admin || access.canEditPV || (assembly.scope === "national" && access.isNationalSecretary) || isEplSecretaryLive);
   // Backfill club-attendance rows for national AGs created before this
   // feature existed, or for clubs added after the AG was created — keeps
   // "always show all active clubs" true without a one-off migration.
@@ -1462,7 +1482,7 @@ async function assemblyDetail(req, res, member, body) {
       on conflict (assembly_id, member_id, roster) do nothing
     `;
   }
-  const [attendance, roles, motions, elections, minutes, clubAttendance, epnMembers, plenaries, piBoxes, groundRulesRows, movements, benRoster, cnsMembers, formateurs, membresNationaux, rosterPresenceRows] = await Promise.all([
+  const [attendance, roles, motions, elections, minutes, clubAttendance, epnMembers, eplMembers, plenaries, piBoxes, groundRulesRows, movements, benRoster, cnsMembers, formateurs, membresNationaux, rosterPresenceRows] = await Promise.all([
     db`select a.*, m.display_name, m.username, m.membership_status from portal_assembly_attendance a join portal_members m on m.id = a.member_id where a.assembly_id = ${id} order by m.display_name`,
     db`select ar.*, m.display_name, m.username from portal_assembly_roles ar join portal_members m on m.id = ar.member_id where ar.assembly_id = ${id} order by m.display_name`,
     db`select * from portal_assembly_motions where assembly_id = ${id} order by position`,
@@ -1482,6 +1502,22 @@ async function assemblyDetail(req, res, member, body) {
           join portal_members m on m.id = r.member_id
           where r.role = any(${EPN_ROLES}) and r.ended_at is null and m.status = 'active'
           group by m.id, m.display_name, m.username, m.profile_picture_url
+          order by m.display_name asc
+        `
+      : Promise.resolve([]),
+    // Équipe Plénière Locale — the presiding team for THIS club's local
+    // assembly, drawn from members of OTHER clubs (see setEplMember).
+    // Mirrors the EPN query above, just scoped to assembly.school_id.
+    assembly.scope === "local"
+      ? db`
+          select m.id, m.display_name, m.username, m.profile_picture_url, s.name as home_school_name,
+            array_agg(r.role order by r.started_at asc) as epl_roles,
+            coalesce((select r2.role from portal_epl_roles r2 where r2.member_id = m.id and r2.school_id = ${assembly.school_id} and r2.role = 'epl_secretaire' and r2.ended_at is null limit 1) is not null, false) as is_epl_secretaire
+          from portal_epl_roles r
+          join portal_members m on m.id = r.member_id
+          left join portal_schools s on s.id = m.school_id
+          where r.school_id = ${assembly.school_id} and r.role = any(${EPL_ROLES}) and r.ended_at is null and m.status = 'active'
+          group by m.id, m.display_name, m.username, m.profile_picture_url, s.name
           order by m.display_name asc
         `
       : Promise.resolve([]),
@@ -1534,7 +1570,11 @@ async function assemblyDetail(req, res, member, body) {
     ...m,
     epn_role_labels: (m.epn_roles || []).map(role => EPN_ROLE_LABELS[role] || role),
   }));
-  if (req.method === "GET" || body.action === "assembly") return json(res, 200, { assembly: { ...assembly, assembly_label: ASSEMBLY_LABELS[assembly.assembly_type] || assembly.assembly_type, present_count: presentCount, quorum_met_live: quorumMet }, attendance, roles, motions, elections, minutes: minutes[0] || null, minutesStructured, clubAttendance, epnMembers: epnMembersWithLabels, plenaries, piBoxes, groundRules, movements, benRoster: benRosterWithPresence, cnsMembers: cnsMembersWithPresence, formateurs: formateursWithPresence, membresNationaux: membresNationauxWithPresence, canEditPV });
+  const eplMembersWithLabels = eplMembers.map(m => ({
+    ...m,
+    epl_role_labels: (m.epl_roles || []).map(role => EPL_ROLE_LABELS[role] || role),
+  }));
+  if (req.method === "GET" || body.action === "assembly") return json(res, 200, { assembly: { ...assembly, assembly_label: ASSEMBLY_LABELS[assembly.assembly_type] || assembly.assembly_type, present_count: presentCount, quorum_met_live: quorumMet }, attendance, roles, motions, elections, minutes: minutes[0] || null, minutesStructured, clubAttendance, epnMembers: epnMembersWithLabels, eplMembers: eplMembersWithLabels, plenaries, piBoxes, groundRules, movements, benRoster: benRosterWithPresence, cnsMembers: cnsMembersWithPresence, formateurs: formateursWithPresence, membresNationaux: membresNationauxWithPresence, canEditPV });
   if (body.action === "attendance") {
     if (!(await requireClubCapability(req, res, member, "cscy_reviewer", assembly.school_id))) return;
     const target = attendance.find(row => row.member_id === body.memberId);

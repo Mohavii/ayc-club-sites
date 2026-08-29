@@ -299,6 +299,37 @@ create table if not exists portal_national_roles (
 
 create index if not exists idx_national_roles_member on portal_national_roles(member_id);
 
+-- ---------------------------------------------------------------------
+-- Équipe Plénière Locale (EPL) — the local-assembly counterpart of the
+-- EPN, but scoped to a club (school_id) instead of the whole org. Seated
+-- the same way as club display roles (one active row per member+club,
+-- history via ended_at), EXCEPT a member can never be seated as EPL for
+-- their OWN club (school_id) — the presiding plenary team for a club's
+-- local assembly (ALOE/ALOFM/ALE) has to come from outside that club.
+-- That rule is enforced in application code (setEplMember below) since
+-- it depends on the target member's own school_id at grant time, not
+-- something a DB check constraint on this table alone can express.
+-- ---------------------------------------------------------------------
+create table if not exists portal_epl_roles (
+  id          uuid primary key default gen_random_uuid(),
+  member_id   uuid not null references portal_members(id) on delete cascade,
+  school_id   integer not null references portal_schools(id) on delete cascade,
+  role        text not null check (role in (
+                'epl_president', 'epl_vice_president', 'epl_secretaire',
+                'epl_cscy', 'epl_comite_financier'
+              )),
+  granted_by  uuid references portal_members(id),
+  started_at  timestamptz not null default now(),
+  ended_at    timestamptz,
+
+  constraint one_current_epl_role_per_member_per_club
+    exclude using gist (member_id with =, school_id with =, role with =)
+    where (ended_at is null)
+);
+
+create index if not exists idx_epl_roles_member on portal_epl_roles(member_id);
+create index if not exists idx_epl_roles_school on portal_epl_roles(school_id, role) where ended_at is null;
+
 
 -- =======================================================================
 -- MEMBER PORTAL WORKSPACE FEATURES
@@ -1195,3 +1226,17 @@ create table if not exists portal_assembly_roster_presence (
   unique (assembly_id, member_id, roster)
 );
 create index if not exists idx_portal_assembly_roster_presence_assembly on portal_assembly_roster_presence(assembly_id, roster);
+
+-- =======================================================================
+-- REUNION PV SILHOUETTE — "durée réelle", "conduites à tenir et
+-- échéances" and "fichiers joints" per agenda point (PHASE 8)
+-- =======================================================================
+-- The simple réunion PV (distinct from the AL/AG assembly PV) tracks, per
+-- agenda point: the point and its estimated duration (title/duration_minutes,
+-- already present), the actual time it took, the follow-up actions and their
+-- deadlines, and any files attached to that point. Nullable/optional so the
+-- richer assembly PV (which also reuses this table via portal_minutes) is
+-- unaffected.
+alter table portal_minutes_agenda_blocks add column if not exists actual_duration_minutes integer;
+alter table portal_minutes_agenda_blocks add column if not exists next_steps text;
+alter table portal_minutes_agenda_blocks add column if not exists attachments jsonb not null default '[]'::jsonb;

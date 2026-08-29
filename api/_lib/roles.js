@@ -47,6 +47,19 @@ const EPN_ROLE_LABELS = {
   epn_comite_financier: "Comité Financier",
 };
 const NATIONAL_ROLES = ["president_national", ...EPN_ROLES, "secretaire_national", "secretaire_general_national", "tresorier_national", "vpa", "vpr", "vpcom", "supco_national"];
+// The Équipe Plénière Locale (EPL) mirrors the EPN's five posts, but
+// seated per-club for local assemblies (ALOE/ALOFM/ALE) instead of
+// once for the whole org. Crucially, a member can never be seated as
+// EPL for their OWN club — see setEplMember, which is the only write
+// path onto portal_epl_roles and enforces that there.
+const EPL_ROLES = ["epl_president", "epl_vice_president", "epl_secretaire", "epl_cscy", "epl_comite_financier"];
+const EPL_ROLE_LABELS = {
+  epl_president: "Président",
+  epl_vice_president: "Vice-Président",
+  epl_secretaire: "Secrétaire de la Plénière",
+  epl_cscy: "CSCY",
+  epl_comite_financier: "Comité Financier",
+};
 const BEN_ROLE_LABELS = {
   president_national: "Président National",
   secretaire_general_national: "Secrétaire Générale Nationale",
@@ -72,6 +85,9 @@ function assertValidCapability(capability) {
 }
 function assertValidNationalRole(role) {
   if (!NATIONAL_ROLES.includes(role)) throw new Error(`Rôle national inconnu : ${role}`);
+}
+function assertValidEplRole(role) {
+  if (!EPL_ROLES.includes(role)) throw new Error(`Rôle d'Équipe Plénière Locale inconnu : ${role}`);
 }
 
 // ---- Club display roles -----------------------------------------------
@@ -338,6 +354,12 @@ async function getMemberPortalAccess(member) {
     canManageSupervision: has("supervision_editor"),
     canReviewSupervision: has("supervision_editor") || has("cscy_reviewer"),
     canCreateAssembly: has("meeting_organizer"),
+    // A club's meeting_organizer can only ever prepare LOCAL assemblies
+    // (ALOFM/ALE/ALOE) for their own club — national AGOMM/AGOFM/AGE are
+    // reserved to national admins. See portal.js's assemblies() handler,
+    // which is the actual enforcement point; this flag just drives the
+    // assembly-type picker in the UI so the option never even shows up.
+    canCreateNationalAssembly: isNationalAdmin,
     canEditAssemblyAttendance: has("cscy_reviewer"),
     canCloseAssembly: has("supervision_editor") || has("cscy_reviewer"),
     canEditTrainingRecord: isNationalAdmin || isVerifiedTrainer,
@@ -411,6 +433,95 @@ async function clearNationalRole({ memberId, role }) {
     set ended_at = now()
     where member_id = ${memberId} and role = ${role} and ended_at is null
   `;
+}
+
+// ---- Équipe Plénière Locale (EPL) ---------------------------------------
+// Seats a member onto a club's local plenary team for ALOE/ALOFM/ALE
+// assemblies. The one hard rule: the member being seated can never
+// belong to the club they'd be presiding over — the whole point of the
+// EPL is that the team running a club's local assembly comes from
+// outside that club, the same way a court doesn't judge its own case.
+async function setEplMember({ memberId, schoolId, role, grantedBy }) {
+  assertValidEplRole(role);
+  const db = sql();
+  const target = await db`select school_id from portal_members where id = ${memberId} limit 1`;
+  if (!target.length) throw new Error("Membre introuvable.");
+  if (target[0].school_id === schoolId) {
+    throw new Error("Un membre ne peut pas siéger à l'Équipe Plénière Locale de son propre club.");
+  }
+  return db.transaction((tx) => [
+    tx`
+      update portal_epl_roles
+      set ended_at = now()
+      where member_id = ${memberId} and school_id = ${schoolId} and role = ${role} and ended_at is null
+    `,
+    tx`
+      insert into portal_epl_roles (member_id, school_id, role, granted_by)
+      values (${memberId}, ${schoolId}, ${role}, ${grantedBy})
+      returning *
+    `,
+  ]);
+}
+
+async function clearEplMember({ memberId, schoolId, role }) {
+  assertValidEplRole(role);
+  const db = sql();
+  await db`
+    update portal_epl_roles
+    set ended_at = now()
+    where member_id = ${memberId} and school_id = ${schoolId} and role = ${role} and ended_at is null
+  `;
+}
+
+// Everyone currently seated on a given club's EPL — auto-listed as
+// attendees/organizers whenever that club's local assembly is opened,
+// mirroring getEpnMembers for national AGs.
+async function getEplMembers(schoolId) {
+  const db = sql();
+  return db`
+    select distinct on (m.id) m.*, r.role as epl_role, r.started_at as role_started_at
+    from portal_epl_roles r
+    join portal_members m on m.id = r.member_id
+    where r.school_id = ${schoolId} and r.ended_at is null and m.status = 'active'
+    order by m.id, r.started_at asc
+  `;
+}
+
+// Every EPL role (current + past, across every club) a member currently
+// or ever held — feeds their "list" panel in the admin roles UI.
+async function getMemberEplRoles(memberId) {
+  const db = sql();
+  return db`
+    select r.*, s.name as school_name, s.slug as school_slug
+    from portal_epl_roles r
+    join portal_schools s on s.id = r.school_id
+    where r.member_id = ${memberId}
+    order by r.started_at desc
+  `;
+}
+
+async function isEplMember(memberId, schoolId) {
+  const db = sql();
+  const rows = await db`
+    select 1 from portal_epl_roles
+    where member_id = ${memberId} and school_id = ${schoolId} and ended_at is null
+    limit 1
+  `;
+  return rows.length > 0;
+}
+
+// Whether a member currently holds a SPECIFIC EPL post for a given
+// club — the local-assembly counterpart of hasNationalRole, used e.g.
+// to decide who can write that club's local-assembly PV (epl_secretaire).
+async function hasEplRole(memberId, schoolId, role) {
+  assertValidEplRole(role);
+  const db = sql();
+  const rows = await db`
+    select 1 from portal_epl_roles
+    where member_id = ${memberId} and school_id = ${schoolId} and role = ${role} and ended_at is null
+    limit 1
+  `;
+  return rows.length > 0;
 }
 
 async function getMemberStatusHistory(memberId) {
@@ -542,7 +653,7 @@ async function getMemberRoleLabel(memberId) {
     db`select display_name, membership_status from portal_members where id = ${memberId} limit 1`,
   ]);
   const clubRoleLabels = { president: "Président(e)", tresorier: "Trésorier(e)", secretaire: "Secrétaire", vpi: "VPI", vpe: "VPE", vpc: "VPC", supco_regional: "SupCo Régional" };
-  if (nationalRows[0]) return BEN_ROLE_LABELS[nationalRows[0].role] || EPN_ROLE_LABELS[nationalRows[0].role] || nationalRows[0].role;
+  if (nationalRows[0]) return BEN_ROLE_LABELS[nationalRows[0].role] || EPN_ROLE_LABELS[nationalRows[0].role] || EPL_ROLE_LABELS[nationalRows[0].role] || nationalRows[0].role;
   if (clubRows[0]) return `${clubRoleLabels[clubRows[0].role] || clubRows[0].role} · ${clubRows[0].school_name}`;
   if (memberRows[0]?.membership_status === "senior") return "Conseil National des Seniors";
   if (memberRows[0]?.membership_status === "membre_national") return "Entité des membres nationaux";
@@ -599,6 +710,8 @@ module.exports = {
   NATIONAL_ROLES,
   EPN_ROLES,
   EPN_ROLE_LABELS,
+  EPL_ROLES,
+  EPL_ROLE_LABELS,
   MEMBERSHIP_STATUSES,
   assertValidMembershipStatus,
   setClubDisplayRole,
@@ -624,6 +737,12 @@ module.exports = {
   getMemberNationalRoles,
   hasNationalRole,
   getEpnMembers,
+  setEplMember,
+  clearEplMember,
+  getEplMembers,
+  getMemberEplRoles,
+  isEplMember,
+  hasEplRole,
   listNationalRoleHolders,
   getMemberStatusHistory,
   setMembershipStatus,
