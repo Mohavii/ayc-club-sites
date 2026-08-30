@@ -54,7 +54,7 @@
           </a>
           <nav class="public-nav" aria-label="Navigation principale">
             <a href="../index">Actualité</a>
-            <a href="../gouvernance">Gouvernance</a>
+            <a href="https://associationyouthclubs.org/strategie">Stratégie</a>
             <a href="../contact">Contact</a>
           </nav>
           <div class="account-slot">
