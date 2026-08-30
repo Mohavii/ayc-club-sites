@@ -366,6 +366,13 @@ alter table portal_projects add constraint portal_projects_scope_check check (sc
 create index if not exists idx_portal_projects_scope on portal_projects(scope, starts_at);
 create index if not exists idx_portal_projects_president on portal_projects(president_id);
 
+-- Local projects can be run jointly by a second club. When set, the
+-- collaborating club's current president gets the same authority over
+-- the project as the project's own (fixed-at-creation) president, and
+-- the collaborating club's members can see the project.
+alter table portal_projects add column if not exists collaborating_school_id integer references portal_schools(id) on delete set null;
+create index if not exists idx_portal_projects_collab_school on portal_projects(collaborating_school_id);
+
 create table if not exists portal_project_teams (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references portal_projects(id) on delete cascade,

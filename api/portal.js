@@ -462,22 +462,27 @@ async function reportTemplates(req, res) {
 }
 
 async function projectRoster(db, project) {
-  const memberScope = project.scope === 'national'
-    ? db`select id, display_name, username, school_id from portal_members where status = 'active' order by display_name`
-    : db`select id, display_name, username, school_id from portal_members where status = 'active' and school_id = ${project.school_id} order by display_name`;
-  return memberScope;
+  if (project.scope === 'national') {
+    return db`select id, display_name, username, school_id from portal_members where status = 'active' order by display_name`;
+  }
+  if (project.collaborating_school_id) {
+    return db`select id, display_name, username, school_id from portal_members where status = 'active' and school_id in (${project.school_id}, ${project.collaborating_school_id}) order by display_name`;
+  }
+  return db`select id, display_name, username, school_id from portal_members where status = 'active' and school_id = ${project.school_id} order by display_name`;
 }
 
 async function getProjectForMember(db, member, projectId) {
   const rows = await db`select p.*, s.name as school_name,
+    cs.name as collaborating_school_name,
     president.display_name as president_name,
     creator.display_name as creator_name
     from portal_projects p
     left join portal_schools s on s.id = p.school_id
+    left join portal_schools cs on cs.id = p.collaborating_school_id
     left join portal_members president on president.id = p.president_id
     left join portal_members creator on creator.id = p.created_by
     where p.id = ${projectId} and p.status <> 'cancelled'
-      and (p.scope = 'national' or p.school_id = ${member.school_id} or p.created_by = ${member.id})`;
+      and (p.scope = 'national' or p.school_id = ${member.school_id} or p.collaborating_school_id = ${member.school_id} or p.created_by = ${member.id})`;
   return rows[0] || null;
 }
 
@@ -502,9 +507,18 @@ async function projectTeams(db, projectId) {
   return teams;
 }
 
+async function isProjectPresident(db, member, project) {
+  if (!project || project.scope === 'national') return false; // national projects have no president
+  if (project.president_id === member.id) return true;
+  if (!project.collaborating_school_id || member.school_id !== project.collaborating_school_id) return false;
+  const rows = await db`select 1 from portal_club_display_roles where member_id = ${member.id} and school_id = ${project.collaborating_school_id} and role = 'president' and ended_at is null`;
+  return rows.length > 0;
+}
+
 async function canManageProject(db, member, project) {
   if (!project) return false;
-  if (member.is_national_admin || project.president_id === member.id) return true;
+  if (member.is_national_admin) return true;
+  if (await isProjectPresident(db, member, project)) return true;
   if (project.scope === 'national') return hasNationalCapability(member.id, 'national_projects');
   return hasCapability(member.id, project.school_id, 'project_manager');
 }
@@ -517,27 +531,33 @@ async function projects(req, res, member, body) {
       const project = await getProjectForMember(db, member, requestedProjectId);
       if (!project) return json(res, 404, { error: 'Projet introuvable.' });
       const teams = await projectTeams(db, project.id);
+      const otherClubs = project.scope === 'local'
+        ? await db`select id, name from portal_schools where is_active = true and id <> ${project.school_id} order by name`
+        : [];
       return json(res, 200, {
         project,
         teams,
         roster: await projectRoster(db, project),
         canManage: await canManageProject(db, member, project),
-        isPresident: project.president_id === member.id || Boolean(member.is_national_admin),
+        isPresident: await isProjectPresident(db, member, project) || Boolean(member.is_national_admin),
+        otherClubs,
       });
     }
     const rows = await db`
       select p.*, a.name as axis_name, sa.name as sub_axis_name,
         s.name as school_name, president.display_name as president_name,
+        cs.name as collaborating_school_name,
         (select count(*)::int from portal_project_teams t where t.project_id = p.id) as team_count,
         (select count(*)::int from portal_project_team_members tm join portal_project_teams t on t.id = tm.team_id where t.project_id = p.id) as member_count,
         (select count(*)::int from portal_reports r where r.project_id = p.id) as report_count
       from portal_projects p
       left join portal_schools s on s.id = p.school_id
+      left join portal_schools cs on cs.id = p.collaborating_school_id
       left join portal_members president on president.id = p.president_id
       left join portal_strategic_axes a on a.slug = p.axis_slug
       left join portal_strategic_sub_axes sa on sa.slug = p.sub_axis_slug
       where p.status <> 'cancelled'
-        and (p.scope = 'national' or p.school_id = ${member.school_id})
+        and (p.scope = 'national' or p.school_id = ${member.school_id} or p.collaborating_school_id = ${member.school_id})
       order by case when p.scope = 'national' then 0 else 1 end, coalesce(p.starts_at, p.created_at) desc
     `;
     return json(res, 200, { projects: rows });
@@ -583,8 +603,37 @@ async function projects(req, res, member, body) {
   const project = await getProjectForMember(db, member, body.projectId);
   if (!project) return json(res, 404, { error: 'Projet introuvable.' });
 
+  if (action === 'add_collaboration') {
+    if (project.scope !== 'local') return json(res, 400, { error: 'Seuls les projets locaux peuvent être partagés entre clubs.' });
+    // Only the project's own club president(s) can invite a collaborating
+    // club — not the collaborating club's own president, and not a
+    // national admin bypass, per how the club-to-club relationship works.
+    const ownPresidentRows = await db`select 1 from portal_club_display_roles where member_id = ${member.id} and school_id = ${project.school_id} and role = 'president' and ended_at is null`;
+    if (project.president_id !== member.id && !ownPresidentRows.length) {
+      return json(res, 403, { error: 'Seul le Président du club porteur peut proposer une collaboration.' });
+    }
+    const collaboratingSchoolId = Number(body.schoolId);
+    if (!collaboratingSchoolId || collaboratingSchoolId === project.school_id) {
+      return json(res, 400, { error: 'Club collaborateur invalide.' });
+    }
+    const schoolRows = await db`select id, name from portal_schools where id = ${collaboratingSchoolId} and is_active = true`;
+    if (!schoolRows[0]) return json(res, 400, { error: 'Club introuvable.' });
+    const rows = await db`update portal_projects set collaborating_school_id = ${collaboratingSchoolId}, updated_at = now() where id = ${project.id} returning *`;
+    await recordAudit(db, { actorId: member.id, action: 'project.collaboration_added', entityType: 'project', entityId: project.id, afterData: rows[0] });
+    return json(res, 200, { project: rows[0] });
+  }
+
+  if (action === 'remove_collaboration') {
+    const ownPresidentRows = await db`select 1 from portal_club_display_roles where member_id = ${member.id} and school_id = ${project.school_id} and role = 'president' and ended_at is null`;
+    if (project.president_id !== member.id && !ownPresidentRows.length && !member.is_national_admin) {
+      return json(res, 403, { error: 'Seul le Président du club porteur peut retirer une collaboration.' });
+    }
+    const rows = await db`update portal_projects set collaborating_school_id = null, updated_at = now() where id = ${project.id} returning *`;
+    return json(res, 200, { project: rows[0] });
+  }
+
   if (action === 'create_team') {
-    if (!(await canManageProject(db, member, project)) || (project.president_id !== member.id && !member.is_national_admin)) {
+    if (!(await isProjectPresident(db, member, project)) && !member.is_national_admin) {
       return json(res, 403, { error: 'Seul le Président du projet peut créer et gérer les équipes.' });
     }
     const name = String(body.name || '').trim().slice(0, 150);
@@ -594,8 +643,8 @@ async function projects(req, res, member, body) {
     if (supervisorId) {
       const supervisors = await db`select id from portal_members where id = ${supervisorId} and status = 'active'`;
       if (!supervisors[0]) return json(res, 400, { error: 'Superviseur invalide.' });
-      if (project.scope === 'local' && !await db`select 1 from portal_members where id=${supervisorId} and school_id=${project.school_id}`.then(r => r.length)) {
-        return json(res, 400, { error: 'Le superviseur doit appartenir au club du projet local.' });
+      if (project.scope === 'local' && !await db`select 1 from portal_members where id=${supervisorId} and school_id = any(${project.collaborating_school_id ? [project.school_id, project.collaborating_school_id] : [project.school_id]})`.then(r => r.length)) {
+        return json(res, 400, { error: 'Le superviseur doit appartenir à un club porteur de ce projet local.' });
       }
     }
     const rows = await db`insert into portal_project_teams (project_id, name, supervisor_id, created_by) values (${project.id}, ${name}, ${supervisorId}, ${member.id}) returning *`;
@@ -608,14 +657,15 @@ async function projects(req, res, member, body) {
   if (!team) return json(res, 404, { error: 'Équipe introuvable.' });
 
   if (action === 'assign_supervisor') {
-    if (!(project.president_id === member.id || member.is_national_admin)) return json(res, 403, { error: 'Seul le Président du projet peut désigner un superviseur.' });
+    if (!(await isProjectPresident(db, member, project)) && !member.is_national_admin) return json(res, 403, { error: 'Seul le Président du projet peut désigner un superviseur.' });
     const supervisorId = body.supervisorId ? String(body.supervisorId) : null;
     if (supervisorId) {
       const rows = await db`select id from portal_members where id=${supervisorId} and status='active'`;
       if (!rows[0]) return json(res, 400, { error: 'Superviseur invalide.' });
       if (project.scope === 'local') {
-        const localRows = await db`select id from portal_members where id=${supervisorId} and status='active' and school_id=${project.school_id}`;
-        if (!localRows[0]) return json(res, 400, { error: 'Le superviseur doit appartenir au club du projet local.' });
+        const schoolIds = project.collaborating_school_id ? [project.school_id, project.collaborating_school_id] : [project.school_id];
+        const localRows = await db`select id from portal_members where id=${supervisorId} and status='active' and school_id = any(${schoolIds})`;
+        if (!localRows[0]) return json(res, 400, { error: 'Le superviseur doit appartenir à un club porteur de ce projet local.' });
       }
     }
     const rows = await db`update portal_project_teams set supervisor_id=${supervisorId}, updated_at=now() where id=${team.id} returning *`;
@@ -623,7 +673,7 @@ async function projects(req, res, member, body) {
   }
 
   if (action === 'assign_member' || action === 'remove_member') {
-    if (team.supervisor_id !== member.id && project.president_id !== member.id && !member.is_national_admin) {
+    if (team.supervisor_id !== member.id && !(await isProjectPresident(db, member, project)) && !member.is_national_admin) {
       return json(res, 403, { error: 'Cette équipe est gérée par son superviseur.' });
     }
     const memberId = String(body.memberId || '');
@@ -632,8 +682,9 @@ async function projects(req, res, member, body) {
       const rows = await db`select id from portal_members where id=${memberId} and status='active'`;
       if (!rows[0]) return json(res, 400, { error: 'Membre invalide.' });
       if (project.scope === 'local') {
-        const localRows = await db`select id from portal_members where id=${memberId} and status='active' and school_id=${project.school_id}`;
-        if (!localRows[0]) return json(res, 400, { error: 'Le membre doit appartenir au club du projet local.' });
+        const schoolIds = project.collaborating_school_id ? [project.school_id, project.collaborating_school_id] : [project.school_id];
+        const localRows = await db`select id from portal_members where id=${memberId} and status='active' and school_id = any(${schoolIds})`;
+        if (!localRows[0]) return json(res, 400, { error: 'Le membre doit appartenir à un club porteur de ce projet local.' });
       }
       await db`insert into portal_project_team_members (team_id, member_id, assigned_by) values (${team.id}, ${memberId}, ${member.id}) on conflict (team_id, member_id) do nothing`;
       return json(res, 200, { ok: true });
@@ -1279,13 +1330,14 @@ async function tasks(req, res, member, body) {
     join portal_project_team_members tm on tm.team_id=t.id
     where t.project_id=${project.id} and tm.member_id=${assignedTo}`;
   if (!teamRows.length) return json(res, 400, { error: 'Le membre assigné doit appartenir à une équipe de ce projet.' });
-  if (member.is_national_admin || project.president_id === member.id) {
+  if (member.is_national_admin || await isProjectPresident(db, member, project)) {
     // allowed
   } else if (!teamRows.some(team => team.supervisor_id === member.id)) {
     return json(res, 403, { error: 'Seul le superviseur de l’équipe peut assigner une tâche à ce membre.' });
   }
   if (project.scope === 'local') {
-    const assigneeRows = await db`select id from portal_members where id=${assignedTo} and status='active' and school_id=${project.school_id}`;
+    const schoolIds = project.collaborating_school_id ? [project.school_id, project.collaborating_school_id] : [project.school_id];
+    const assigneeRows = await db`select id from portal_members where id=${assignedTo} and status='active' and school_id = any(${schoolIds})`;
     if (!assigneeRows[0]) return json(res, 400, { error: 'Membre assigné invalide pour ce projet local.' });
   } else {
     const assigneeRows = await db`select id from portal_members where id=${assignedTo} and status='active'`;
