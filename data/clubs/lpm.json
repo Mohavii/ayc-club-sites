@@ -1,0 +1,47 @@
+{
+  "slug": "lpm",
+  "status": "live",
+  "name": "Lycée Pilote Mannouba",
+  "city": "Mannouba",
+  "founded": 2021,
+  "memberCount": 0,
+  "about": "",
+  "heroImage": null,
+  "logo": null,
+  "officers": [
+    "746843897350848514"
+  ],
+  "events": [],
+  "bel": [],
+  "partners": [],
+  "forms": {
+    "join": {
+      "enabled": false,
+      "title": "Rejoindre le club",
+      "fields": []
+    },
+    "team_communication": {
+      "enabled": false,
+      "title": "Équipe Communication",
+      "fields": []
+    },
+    "team_logistique": {
+      "enabled": false,
+      "title": "Équipe Logistique",
+      "fields": []
+    },
+    "team_sponsoring": {
+      "enabled": false,
+      "title": "Équipe Sponsoring",
+      "fields": []
+    }
+  },
+  "vpcRoleId": "1544142520601026670",
+  "formWebhooks": {
+    "join": "https://discord.com/api/webhooks/1544142529430163676/JOjhwkdv8SlJ6Ufjdk3T3unEJdJwJw9nTR8i6ft8juxKRkivtEPHQ5DHbu6y0LHb7bST",
+    "team_communication": "https://discord.com/api/webhooks/1544142531204223008/6gdYUcWtDE-CVQ3nIExP5H1cT1a0TxM5efVxzc7Djg_mwVXuXukl2_ZaF3HNTyNNow25",
+    "team_logistique": "https://discord.com/api/webhooks/1544142537546276955/5imeEUMKvFj9DgTylfVnQVpfU56TosuEkaoTYUbkKqLJNd2Fmvlhca8QRuKKcHMYJlj_",
+    "team_sponsoring": "https://discord.com/api/webhooks/1544142540142411837/MyN0aHTR1w0dPwG0dDn4o0lqOVcxyBrE9o5ZUaV7sjgSYdtp6_TzEVxrB5JSxjwdTfCJ"
+  },
+  "controlRoomChannelId": "1544142525558956084"
+}
