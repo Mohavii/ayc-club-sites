@@ -1,32 +1,33 @@
 (() => {
   const NAV_GROUPS = (member) => {
     const access = member?.access || {};
-    const groups = [
-      {
-        label: "Mon espace",
-        items: [
-          ["home", "⌂", "Accueil"],
-          ["profile", "◉", "Mon profil"],
-          ["meetings", "▣", "Réunions"],
-          ["projects", "◆", "Projets"],
-          ["training", "↗", "Cursus"],
-          ["tasks", "☷", "Mes tâches"],
-        ],
-      },
-    ];
-    if (access.canViewClubWork || access.canAccessSecretariat || member?.isNationalAdmin) {
-      const clubItems = [["reports", "✓", "Rapports & projets"]];
-      if (access.canAccessSecretariat || access.canViewClubWork || member?.isNationalAdmin) {
-        clubItems.push(["secretariat", "📋", "Secrétariat"]);
-      }
-      if (access.canAccessTreasury || access.canViewClubWork || member?.isNationalAdmin) {
-        clubItems.push(["tresorerie", "💰", "Trésorerie"]);
-      }
-      groups.push({
-        label: "Vie du club",
-        items: clubItems,
-      });
-    }
+        const groups = [
+          {
+            label: "Mon espace",
+            items: [
+              ["home", "", "Accueil"],
+              ["profile", "", "Mon profil"],
+              ["meetings", "", "Réunions"],
+              ["projects", "", "Projets"],
+              ["training", "", "Cursus"],
+              ["tasks", "", "Mes tâches"],
+            ],
+          },
+        ];
+        if (access.canViewClubWork || access.canAccessSecretariat || member?.isNationalAdmin) {
+          const clubItems = [["reports", "", "Rapports & projets"]];
+          if (access.canAccessSecretariat || access.canViewClubWork || member?.isNationalAdmin) {
+            clubItems.push(["secretariat", "", "Secrétariat"]);
+          }
+          if (access.canAccessTreasury || access.canViewClubWork || member?.isNationalAdmin) {
+            clubItems.push(["tresorerie", "", "Trésorerie"]);
+          }
+          groups.push({
+            label: "Vie du club",
+            items: clubItems,
+          });
+        }
+
     if (access.canReviewSupervision || member?.isNationalAdmin) {
       groups.push({ label: "Gouvernance", items: [["supervision", "⚖", "Supervision"]] });
     }
