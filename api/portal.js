@@ -2269,7 +2269,7 @@ async function announceMeeting(req, res, member, body) {
 
   let warning = null;
   if (!isCompliant) {
-    warning = `Attention : Le délai de préavis statutaire est de 72 heures minimum (Art. 1.4.1.1). La réunion a été annoncée ${diffHours}h avant le début.`;
+    warning = `Attention : Le délai de préavis fixé par l'association est de 72 heures minimum. La réunion a été annoncée ${diffHours}h avant le début.`;
   }
 
   const updated = await db`
