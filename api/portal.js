@@ -1378,11 +1378,152 @@ function majorityOutcome(forVotes, againstVotes, abstentions, majorityType) {
   return yes > no ? "adopted" : "rejected";
 }
 
-async function recordAudit(db, { actorId, action, entityType, entityId, beforeData, afterData }) {
-  await db`
-    insert into portal_audit_events (actor_id, action, entity_type, entity_id, before_data, after_data)
-    values (${actorId || null}, ${action}, ${entityType}, ${entityId || null}, ${beforeData ? JSON.stringify(beforeData) : null}::jsonb, ${afterData ? JSON.stringify(afterData) : null}::jsonb)
-  `;
+async function treasuryTransactions(req, res, member, body) {
+  const schoolId = schoolScope(member, req.method === 'GET' ? req.query?.schoolId : body.schoolId);
+  if (!schoolId) return json(res, 400, { error: "Club non spécifié." });
+  if (!(member.is_national_admin || member.access?.canAccessTreasury)) {
+    return json(res, 403, { error: "Accès réservé au trésorier du club ou aux administrateurs nationaux." });
+  }
+  const db = sql();
+
+  if (req.method === "GET") {
+    const rows = await db`
+      select t.*, m.display_name as recorded_by_name
+      from portal_treasury_transactions t
+      join portal_members m on m.id = t.recorded_by
+      where t.school_id = ${schoolId}
+      order by t.transaction_date desc, t.created_at desc`;
+    return json(res, 200, { transactions: rows });
+  }
+
+  if (body.action === "create") {
+    const { transactionDate, type, amount, description, category, receiptUrl } = body;
+    if (!transactionDate || !type || !amount || !description || !category) {
+      return json(res, 400, { error: "Date, type, montant, description et catégorie sont requis." });
+    }
+    if (amount <= 0) return json(res, 400, { error: "Le montant doit être supérieur à zéro." });
+    const rows = await db`
+      insert into portal_treasury_transactions (school_id, transaction_date, type, amount, description, category, receipt_url, recorded_by)
+      values (${schoolId}, ${transactionDate}, ${type}, ${Number(amount)}, ${String(description).trim()}, ${String(category).trim()}, ${receiptUrl || null}, ${member.id})
+      returning *`;
+    return json(res, 201, { transaction: rows[0] });
+  }
+
+  if (body.action === "update") {
+    const { transactionId, transactionDate, type, amount, description, category, receiptUrl } = body;
+    if (!transactionId) return json(res, 400, { error: "transactionId requis." });
+    const existing = await db`select recorded_by from portal_treasury_transactions where id = ${transactionId} and school_id = ${schoolId}`;
+    if (!existing.length) return json(res, 404, { error: "Transaction introuvable." });
+    if (existing[0].recorded_by !== member.id && !member.is_national_admin) {
+      return json(res, 403, { error: "Seul l'auteur de la transaction ou un administrateur national peut la modifier." });
+    }
+    const rows = await db`
+      update portal_treasury_transactions
+      set transaction_date = ${transactionDate || null}, type = ${type || null}, amount = ${amount ? Number(amount) : null}, 
+          description = ${description ? String(description).trim() : null}, category = ${category ? String(category).trim() : null}, 
+          receipt_url = ${receiptUrl || null}, updated_at = now()
+      where id = ${transactionId} and school_id = ${schoolId}
+      returning *`;
+    return json(res, 200, { transaction: rows[0] });
+  }
+
+  if (body.action === "delete") {
+    const { transactionId } = body;
+    if (!transactionId) return json(res, 400, { error: "transactionId requis." });
+    const existing = await db`select recorded_by from portal_treasury_transactions where id = ${transactionId} and school_id = ${schoolId}`;
+    if (!existing.length) return json(res, 404, { error: "Transaction introuvable." });
+    if (existing[0].recorded_by !== member.id && !member.is_national_admin) {
+      return json(res, 403, { error: "Seul l'auteur de la transaction ou un administrateur national peut la supprimer." });
+    }
+    await db`delete from portal_treasury_transactions where id = ${transactionId} and school_id = ${schoolId}`;
+    return json(res, 200, { success: true });
+  }
+
+  return json(res, 400, { error: "Action trésorerie inconnue." });
+}
+
+async function treasuryDues(req, res, member, body) {
+  const schoolId = schoolScope(member, req.method === 'GET' ? req.query?.schoolId : body.schoolId);
+  if (!schoolId) return json(res, 400, { error: "Club non spécifié." });
+  if (!(member.is_national_admin || member.access?.canAccessTreasury)) {
+    return json(res, 403, { error: "Accès réservé au trésorier du club ou aux administrateurs nationaux." });
+  }
+  const db = sql();
+
+  if (req.method === "GET") {
+    const currentYear = new Date().getFullYear();
+    const season = `${currentYear}-${currentYear + 1}`;
+    const rows = await db`
+      select m.id, m.display_name, m.username, d.amount, d.payment_date, d.receipt_serial
+      from portal_members m
+      left join portal_club_dues d on d.member_id = m.id and d.season = ${season}
+      where m.school_id = ${schoolId} and m.status = 'active'
+      order by m.display_name`;
+    return json(res, 200, { members: rows, season });
+  }
+
+  if (body.action === "record") {
+    const { memberId, amount, paymentDate, receiptSerial } = body;
+    if (!memberId || !amount) return json(res, 400, { error: "L'ID du membre et le montant sont requis." });
+    const currentYear = new Date().getFullYear();
+    const season = `${currentYear}-${currentYear + 1}`;
+    const rows = await db`
+      insert into portal_club_dues (school_id, member_id, season, amount, payment_date, receipt_serial, recorded_by)
+      values (${schoolId}, ${memberId}, ${season}, ${Number(amount)}, ${paymentDate || null}, ${receiptSerial || null}, ${member.id})
+      on conflict (member_id, season) do update set
+        amount = excluded.amount, payment_date = excluded.payment_date, receipt_serial = excluded.receipt_serial, recorded_by = excluded.recorded_by, updated_at = now()
+      returning *`;
+    return json(res, 201, { due: rows[0] });
+  }
+
+  return json(res, 400, { error: "Action cotisations inconnue." });
+}
+
+async function treasuryTransfers(req, res, member, body) {
+  const schoolId = schoolScope(member, req.method === 'GET' ? req.query?.schoolId : body.schoolId);
+  if (!schoolId) return json(res, 400, { error: "Club non spécifié." });
+  if (!(member.is_national_admin || member.access?.canAccessTreasury)) {
+    return json(res, 403, { error: "Accès réservé au trésorier du club ou aux administrateurs nationaux." });
+  }
+  const db = sql();
+
+  if (req.method === "GET") {
+    const rows = await db`
+      select tr.*, m.display_name as recorded_by_name, v.display_name as verified_by_name
+      from portal_treasury_transfers tr
+      join portal_members m on m.id = tr.recorded_by
+      left join portal_members v on v.id = tr.verified_by
+      where tr.school_id = ${schoolId}
+      order by tr.transfer_date desc, tr.created_at desc`;
+    return json(res, 200, { transfers: rows });
+  }
+
+  if (body.action === "create") {
+    const { transferDate, amount, destination, receiptUrl } = body;
+    if (!transferDate || !amount || !destination || !receiptUrl) {
+      return json(res, 400, { error: "Date, montant, destination et justificatif sont requis." });
+    }
+    const rows = await db`
+      insert into portal_treasury_transfers (school_id, transfer_date, amount, destination, receipt_url, recorded_by)
+      values (${schoolId}, ${transferDate}, ${Number(amount)}, ${destination}, ${receiptUrl}, ${member.id})
+      returning *`;
+    return json(res, 201, { transfer: rows[0] });
+  }
+
+  if (body.action === "verify") {
+    if (!member.is_national_admin) return json(res, 403, { error: "Seul un administrateur national peut vérifier un virement." });
+    const { transferId, status, comment } = body;
+    if (!transferId || !status) return json(res, 400, { error: "transferId et statut sont requis." });
+    if (!['verified', 'rejected'].includes(status)) return json(res, 400, { error: "Statut invalide." });
+    const rows = await db`
+      update portal_treasury_transfers
+      set status = ${status}, verified_by = ${member.id}, updated_at = now()
+      where id = ${transferId} and school_id = ${schoolId}
+      returning *`;
+    return json(res, 200, { transfer: rows[0] });
+  }
+
+  return json(res, 400, { error: "Action virements inconnue." });
 }
 
 function assemblyMotionSeed(assemblyType) {
@@ -2033,6 +2174,294 @@ async function investigationDetail(req, res, member, body) {
   return json(res, 400, { error: "Action d’investigation inconnue." });
 }
 
+async function secretaryDashboard(req, res, member) {
+  const schoolId = schoolScope(member, req.query?.schoolId);
+  if (!schoolId) return json(res, 400, { error: "Club non spécifié." });
+  const db = sql();
+
+  const [clubRows, meetings, reports, roster, archives] = await Promise.all([
+    db`select * from portal_schools where id = ${schoolId}`,
+    db`
+      select m.id, m.title, m.meeting_type, m.starts_at, m.format, m.location,
+             m.announced_at, m.announcement_status, m.is_extraordinary,
+             min.id as minutes_id, min.status as minutes_status, min.adopted_at,
+             (select count(*)::int from portal_meeting_attendees a where a.meeting_id = m.id) as attendee_count
+      from portal_meetings m
+      left join portal_minutes min on min.meeting_id = m.id
+      where m.school_id = ${schoolId}
+      order by m.starts_at desc limit 20
+    `,
+    db`
+      select id, report_type, title, status, submitted_at, event_date, created_at
+      from portal_reports
+      where school_id = ${schoolId}
+      order by created_at desc limit 20
+    `,
+    db`
+      select id, display_name, username, membership_status, created_at, profile_picture_url
+      from portal_members
+      where school_id = ${schoolId} and status = 'active'
+      order by display_name asc
+    `,
+    db`
+      select a.*, m.display_name as archived_by_name
+      from portal_club_archives a
+      left join portal_members m on m.id = a.archived_by
+      where a.school_id = ${schoolId}
+      order by a.created_at desc limit 20
+    `,
+  ]);
+
+  const club = clubRows[0];
+  if (!club) return json(res, 404, { error: "Club introuvable." });
+
+  const totalMeetings = meetings.length;
+  const pvsPendingAdoption = meetings.filter(m => m.minutes_id && m.minutes_status !== 'validated');
+
+  const meetingCompliance = meetings.map(m => {
+    let noticeHours = null;
+    let compliantNotice = true;
+    if (m.announced_at) {
+      noticeHours = Math.round((new Date(m.starts_at) - new Date(m.announced_at)) / (1000 * 60 * 60));
+      compliantNotice = m.is_extraordinary || noticeHours >= 72;
+    }
+    return {
+      ...m,
+      noticeHours,
+      compliantNotice,
+    };
+  });
+
+  return json(res, 200, {
+    club,
+    kpis: {
+      totalMeetings,
+      activeMembersCount: roster.length,
+      pvsPendingAdoptionCount: pvsPendingAdoption.length,
+      archivesCount: archives.length,
+    },
+    meetings: meetingCompliance,
+    reports,
+    roster,
+    archives,
+  });
+}
+
+async function announceMeeting(req, res, member, body) {
+  const schoolId = schoolScope(member, body.schoolId);
+  if (!schoolId) return json(res, 400, { error: "Club non spécifié." });
+  if (!(await requireClubCapability(req, res, member, "meeting_organizer", schoolId)) &&
+      !(await requireClubCapability(req, res, member, "pv_editor", schoolId))) {
+    return;
+  }
+  const meetingId = body.meetingId;
+  if (!meetingId) return json(res, 400, { error: "meetingId requis." });
+  const db = sql();
+  const meetingRows = await db`select * from portal_meetings where id = ${meetingId} and school_id = ${schoolId}`;
+  const meeting = meetingRows[0];
+  if (!meeting) return json(res, 404, { error: "Réunion introuvable." });
+
+  const now = new Date();
+  const startsAt = new Date(meeting.starts_at);
+  const diffHours = Math.round((startsAt - now) / (1000 * 60 * 60));
+  const isExtraordinary = Boolean(body.isExtraordinary);
+  const isCompliant = isExtraordinary || diffHours >= 72;
+
+  let warning = null;
+  if (!isCompliant) {
+    warning = `Attention : Le délai de préavis statutaire est de 72 heures minimum (Art. 1.4.1.1). La réunion a été annoncée ${diffHours}h avant le début.`;
+  }
+
+  const updated = await db`
+    update portal_meetings
+    set announced_at = now(),
+        announcement_status = 'broadcasted',
+        is_extraordinary = ${isExtraordinary},
+        updated_at = now()
+    where id = ${meetingId}
+    returning *
+  `;
+
+  return json(res, 200, {
+    meeting: updated[0],
+    diffHours,
+    isCompliant,
+    warning,
+    message: isCompliant
+      ? "Réunion officiellement annoncée (délai de préavis de 72h respecté)."
+      : "Réunion annoncée avec avertissement de dérogation de délai.",
+  });
+}
+
+async function adoptMinutes(req, res, member, body) {
+  const minutesId = body.minutesId;
+  const adoptionMeetingId = body.adoptionMeetingId;
+  if (!minutesId) return json(res, 400, { error: "minutesId requis." });
+  const db = sql();
+  const minRows = await db`
+    select m.*, p.school_id, p.title as meeting_title, p.starts_at as meeting_date
+    from portal_minutes m
+    join portal_meetings p on p.id = m.meeting_id
+    where m.id = ${minutesId}
+  `;
+  const minutes = minRows[0];
+  if (!minutes) return json(res, 404, { error: "PV introuvable." });
+
+  if (!(await requireClubCapability(req, res, member, "pv_editor", minutes.school_id))) {
+    return;
+  }
+
+  const updated = await db`
+    update portal_minutes
+    set status = 'validated',
+        adoption_meeting_id = ${adoptionMeetingId || null},
+        adopted_at = now(),
+        validated_at = now(),
+        validated_by = ${member.id},
+        updated_at = now()
+    where id = ${minutesId}
+    returning *
+  `;
+
+  // Auto-archive in club archives
+  try {
+    const year = new Date(minutes.meeting_date).getFullYear();
+    const mandate = `${year}-${year + 1}`;
+    await db`
+      insert into portal_club_archives (school_id, category, title, mandate, content_summary, archived_by)
+      values (
+        ${minutes.school_id},
+        'pv',
+        ${`PV Officiel - ${minutes.meeting_title} (${new Date(minutes.meeting_date).toLocaleDateString('fr-FR')})`},
+        ${mandate},
+        ${`PV adopté en réunion le ${new Date().toLocaleDateString('fr-FR')}`},
+        ${member.id}
+      )
+    `;
+  } catch (err) {
+    console.warn("Auto-archive error:", err);
+  }
+
+  return json(res, 200, { success: true, minutes: updated[0] });
+}
+
+async function clubRosterPresence(req, res, member) {
+  const schoolId = schoolScope(member, req.query?.schoolId);
+  if (!schoolId) return json(res, 400, { error: "Club non spécifié." });
+  const db = sql();
+
+  const members = await db`
+    select id, display_name, username, membership_status, created_at, profile_picture_url
+    from portal_members
+    where school_id = ${schoolId} and status = 'active'
+    order by display_name asc
+  `;
+
+  const meetings = await db`
+    select id from portal_meetings where school_id = ${schoolId}
+  `;
+  const totalMeetings = meetings.length;
+
+  const attendanceRows = await db`
+    select a.member_id,
+           count(*) filter (where a.attendance_status in ('present', 'late'))::int as present_count,
+           count(*) filter (where a.attendance_status = 'absent')::int as absent_count,
+           count(*) filter (where a.attendance_status = 'excused')::int as excused_count,
+           count(*)::int as total_recorded
+    from portal_minutes_attendance a
+    join portal_minutes min on min.id = a.minutes_id
+    join portal_meetings m on m.id = min.meeting_id
+    where m.school_id = ${schoolId}
+    group by a.member_id
+  `;
+
+  const attMap = new Map();
+  attendanceRows.forEach(r => attMap.set(String(r.member_id), r));
+
+  const stats = members.map(m => {
+    const rec = attMap.get(String(m.id)) || { present_count: 0, absent_count: 0, excused_count: 0, total_recorded: 0 };
+    const rate = totalMeetings > 0 ? Math.round((rec.present_count / totalMeetings) * 100) : 0;
+    return {
+      ...m,
+      presentCount: rec.present_count,
+      absentCount: rec.absent_count,
+      excusedCount: rec.excused_count,
+      totalMeetings,
+      presenceRate: rate,
+    };
+  });
+
+  return json(res, 200, { totalMeetings, members: stats });
+}
+
+async function clubArchives(req, res, member, body) {
+  const schoolId = schoolScope(member, req.method === 'GET' ? req.query?.schoolId : body.schoolId);
+  if (!schoolId) return json(res, 400, { error: "Club non spécifié." });
+  const db = sql();
+
+  if (req.method === "GET") {
+    const category = req.query?.category;
+    let query = db`
+      select a.*, m.display_name as archived_by_name
+      from portal_club_archives a
+      left join portal_members m on m.id = a.archived_by
+      where a.school_id = ${schoolId}
+    `;
+    if (category) {
+      query = db`
+        select a.*, m.display_name as archived_by_name
+        from portal_club_archives a
+        left join portal_members m on m.id = a.archived_by
+        where a.school_id = ${schoolId} and a.category = ${category}
+        order by a.created_at desc
+      `;
+    } else {
+      query = db`
+        select a.*, m.display_name as archived_by_name
+        from portal_club_archives a
+        left join portal_members m on m.id = a.archived_by
+        where a.school_id = ${schoolId}
+        order by a.created_at desc
+      `;
+    }
+    const rows = await query;
+    return json(res, 200, { archives: rows });
+  }
+
+  if (body.action === "create" || body.action === "upload") {
+    if (!(await requireClubCapability(req, res, member, "pv_editor", schoolId)) &&
+        !member.is_national_admin) {
+      return;
+    }
+    const title = String(body.title || "").trim();
+    const category = ["pv", "plan_action", "rapport", "decision", "convention", "autre"].includes(body.category)
+      ? body.category
+      : "autre";
+    const year = new Date().getFullYear();
+    const mandate = String(body.mandate || `${year}-${year + 1}`).trim();
+    if (!title) return json(res, 400, { error: "Titre du document requis." });
+
+    const rows = await db`
+      insert into portal_club_archives (school_id, category, title, mandate, document_url, content_summary, file_name, file_size, archived_by)
+      values (${schoolId}, ${category}, ${title}, ${mandate}, ${body.documentUrl || null}, ${body.contentSummary || null}, ${body.fileName || null}, ${body.fileSize || null}, ${member.id})
+      returning *
+    `;
+    return json(res, 201, { archive: rows[0] });
+  }
+
+  if (body.action === "delete") {
+    const archiveId = body.archiveId;
+    if (!archiveId) return json(res, 400, { error: "archiveId requis." });
+    if (!(await requireClubCapability(req, res, member, "pv_editor", schoolId)) && !member.is_national_admin) {
+      return;
+    }
+    await db`delete from portal_club_archives where id = ${archiveId} and school_id = ${schoolId}`;
+    return json(res, 200, { success: true });
+  }
+
+  return json(res, 400, { error: "Action archives inconnue." });
+}
+
 module.exports = async (req, res) => {
   const member = await requireActiveMember(req, res);
   if (!member) return;
@@ -2043,6 +2472,11 @@ module.exports = async (req, res) => {
     if (action === "profile") return json(res, 200, await profile(member));
     if (action === "update_profile") return updateProfile(req, res, member, body);
     if (action === "dashboard") return json(res, 200, await dashboard(member));
+    if (action === "secretary_dashboard") return secretaryDashboard(req, res, member);
+    if (action === "announce_meeting") return announceMeeting(req, res, member, body);
+    if (action === "adopt_minutes") return adoptMinutes(req, res, member, body);
+    if (action === "club_roster_presence") return clubRosterPresence(req, res, member);
+    if (action === "club_archives") return clubArchives(req, res, member, body);
     if (action === "roster") {
       const schoolId = schoolScope(member, req.query?.schoolId);
       if (!schoolId) return json(res, 200, { members: [] });
@@ -2067,6 +2501,9 @@ module.exports = async (req, res) => {
     if (action === "formation_sessions") return formationSessions(req, res, member, body);
     if (action === "tasks") return tasks(req, res, member, body);
     if (action === "responsibilities") return responsibilities(req, res, member, body);
+    if (action === "treasury_transactions") return treasuryTransactions(req, res, member, body);
+    if (action === "treasury_dues") return treasuryDues(req, res, member, body);
+    if (action === "treasury_transfers") return treasuryTransfers(req, res, member, body);
     return json(res, 404, { error: "Action portail inconnue." });
   } catch (err) {
     console.error("portal API error", action, err);

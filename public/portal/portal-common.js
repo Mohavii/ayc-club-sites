@@ -14,10 +14,17 @@
         ],
       },
     ];
-    if (access.canViewClubWork || member?.isNationalAdmin) {
+    if (access.canViewClubWork || access.canAccessSecretariat || member?.isNationalAdmin) {
+      const clubItems = [["reports", "✓", "Rapports & projets"]];
+      if (access.canAccessSecretariat || access.canViewClubWork || member?.isNationalAdmin) {
+        clubItems.push(["secretariat", "📋", "Secrétariat"]);
+      }
+      if (access.canAccessTreasury || access.canViewClubWork || member?.isNationalAdmin) {
+        clubItems.push(["tresorerie", "💰", "Trésorerie"]);
+      }
       groups.push({
         label: "Vie du club",
-        items: [["reports", "✓", "Rapports & projets"]],
+        items: clubItems,
       });
     }
     if (access.canReviewSupervision || member?.isNationalAdmin) {

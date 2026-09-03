@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Trésorerie du club · Portail YOUTHCLUBber</title>
+  <link rel="icon" href="../assets/favicon-32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="portal.css">
+  <style>
+    .treasury-tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
+    .treasury-tab{border:1px solid var(--portal-line,#e2e7f0);background:#fff;color:#6a748b;border-radius:999px;padding:9px 18px;font-weight:800;font-size:.82rem;cursor:pointer;transition:all .18s ease}
+    .treasury-tab:hover{border-color:#b4c3de;color:#1f2a5a}
+    .treasury-tab.active{background:var(--portal-navy,#1f2a5a);border-color:var(--portal-navy,#1f2a5a);color:#fff}
+    .treasury-panel{display:none}
+    .treasury-panel.active{display:block}
+    .stat-badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;font-size:.74rem;font-weight:800}
+    .badge-ok{background:#e7f7ed;color:#1e7e34;border:1px solid #c2e9cd}
+    .badge-warn{background:#fff8e6;color:#b27b00;border:1px solid #ffe69c}
+    .badge-danger{background:#fdf0f0;color:#c02b2b;border:1px solid #f8c8c8}
+    .badge-neutral{background:#f1f4f9;color:#536387;border:1px solid #dbe2ef}
+  </style>
+</head>
+<body>
+  <div id="topbar-root"></div>
+  <div class="workspace">
+    <div id="sidebar-root"></div>
+    <main class="portal-content">
+      <div class="portal-heading">
+        <div>
+          <p class="eyebrow">Vie du club · Gestion financière</p>
+          <h1>Trésorerie du club</h1>
+          <p>Suivi des flux financiers, gestion des cotisations des membres et enregistrement des virements officiels vers le niveau national.</p>
+        </div>
+        <div class="heading-actions" id="treasury-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-refresh">Actualiser</button>
+        </div>
+      </div>
+      <div id="notice"></div>
+      <section id="treasury-restricted" class="portal-card restricted-state" hidden>
+        <h2>Espace réservé au trésorier</h2>
+        <p>La gestion financière du club est confiée au Trésorier Local et aux administrateurs nationaux.</p>
+      </section>
+      <div id="treasury-workspace">
+        <section class="stats-grid" id="treasury-kpis" style="margin-bottom:20px">
+          <div class="stat-card">
+            <span class="stat-number" id="kpi-credits">0</span>
+            <span class="stat-label">Total Crédits</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="kpi-debits">0</span>
+            <span class="stat-label">Total Débits</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="kpi-balance">0</span>
+            <span class="stat-label">Solde Actuel</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="kpi-transfers">0</span>
+            <span class="stat-label">Virements en attente</span>
+          </div>
+        </section>
+        <nav class="treasury-tabs">
+          <button type="button" class="treasury-tab active" data-tab="transactions">Transactions</button>
+          <button type="button" class="treasury-tab" data-tab="dues">Cotisations</button>
+          <button type="button" class="treasury-tab" data-tab="transfers">Virements</button>
+        </nav>
+        <section class="treasury-panel active" id="panel-transactions">
+          <div class="portal-grid">
+            <div class="portal-card card-span-8">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Journal</p>
+                  <h2>Historique des mouvements</h2>
+                </div>
+                <div class="filter-tabs">
+                  <button class="active" data-filter="all">Tous</button>
+                  <button data-filter="credit">Crédits</button>
+                  <button data-filter="debit">Débits</button>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="portal-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Description</th>
+                      <th>Catégorie</th>
+                      <th>Montant</th>
+                      <th>Enregistré par</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transactions-rows"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="portal-card card-span-4">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Saisie</p>
+                  <h2>Nouvelle transaction</h2>
+                </div>
+              </div>
+              <form id="transaction-form">
+                <div class="form-field">
+                  <label for="tx-date">Date</label>
+                  <input id="tx-date" type="date" required>
+                </div>
+                <div class="form-field">
+                  <label for="tx-type">Type</label>
+                  <select id="tx-type" required>
+                    <option value="credit">Crédit (+)</option>
+                    <option value="debit">Débit (-)</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="tx-amount">Montant (TND)</label>
+                  <input id="tx-amount" type="number" step="0.001" required placeholder="0.000">
+                </div>
+                <div class="form-field">
+                  <label for="tx-category">Catégorie</label>
+                  <select id="tx-category" required>
+                    <option value="cotisations">Cotisations</option>
+                    <option value="partenariats">Partenariats</option>
+                    <option value="evenements">Événements</option>
+                    <option value="subventions">Subventions</option>
+                    <option value="fournitures">Fournitures</option>
+                    <option value="logistique">Logistique</option>
+                    <option value="communication">Communication</option>
+                    <option value="autre">Autre</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="tx-desc">Description</label>
+                  <textarea id="tx-desc" required placeholder="Détails de l'opération..."></textarea>
+                </div>
+                <div class="form-field">
+                  <label for="tx-receipt">Justificatif (URL)</label>
+                  <input id="tx-receipt" type="url" placeholder="https://...">
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" type="submit">Enregistrer</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+        <section class="treasury-panel" id="panel-dues">
+          <div class="portal-grid">
+            <div class="portal-card card-span-8">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Adhérents</p>
+                  <h2>Suivi des cotisations</h2>
+                </div>
+                <span class="section-note" id="season-label">Saison : —</span>
+              </div>
+              <div class="table-wrap">
+                <table class="portal-table">
+                  <thead>
+                    <tr>
+                      <th>Membre</th>
+                      <th>Statut paiement</th>
+                      <th>Montant</th>
+                      <th>Date</th>
+                      <th>Récépissé</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dues-rows"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="portal-card card-span-4">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Saisie</p>
+                  <h2>Enregistrer paiement</h2>
+                </div>
+              </div>
+              <form id="dues-form">
+                <div class="form-field">
+                  <label for="due-member">Membre</label>
+                  <select id="due-member" required></select>
+                </div>
+                <div class="form-field">
+                  <label for="due-amount">Montant (TND)</label>
+                  <input id="due-amount" type="number" step="0.001" required placeholder="0.000">
+                </div>
+                <div class="form-field">
+                  <label for="due-date">Date de paiement</label>
+                  <input id="due-date" type="date">
+                </div>
+                <div class="form-field">
+                  <label for="due-receipt">N° Récépissé</label>
+                  <input id="due-receipt" type="text" placeholder="Ex: 2026-001">
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" type="submit">Valider le paiement</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+        <section class="treasury-panel" id="panel-transfers">
+          <div class="portal-grid">
+            <div class="portal-card card-span-8">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Flux National</p>
+                  <h2>Virements vers le BEN</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="portal-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Destination</th>
+                      <th>Montant</th>
+                      <th>Justificatif</th>
+                      <th>Statut</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transfers-rows"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="portal-card card-span-4">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Saisie</p>
+                  <h2>Nouveau virement</h2>
+                </div>
+              </div>
+              <form id="transfer-form">
+                <div class="form-field">
+                  <label for="tr-date">Date du virement</label>
+                  <input id="tr-date" type="date" required>
+                </div>
+                <div class="form-field">
+                  <label for="tr-amount">Montant (TND)</label>
+                  <input id="tr-amount" type="number" step="0.001" required placeholder="0.000">
+                </div>
+                <div class="form-field">
+                  <label for="tr-dest">Destination</label>
+                  <select id="tr-dest" required>
+                    <option value="national_bank">Banque Nationale</option>
+                    <option value="post_office">Poste</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="tr-receipt">Lien justificatif (URL)</label>
+                  <input id="tr-receipt" type="url" required placeholder="https://...">
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" type="submit">Soumettre pour vérification</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="portal-common.js"></script>
+  <script>
+    (async () => {
+      const notice = document.getElementById('notice'),
+            txRows = document.getElementById('transactions-rows'),
+            duesRows = document.getElementById('dues-rows'),
+            trRows = document.getElementById('transfers-rows');
+      const byId = id => document.getElementById(id), esc = AYCPortal.escapeHtml;
+      const fmt = (v) => new Intl.NumberFormat('fr-TN', { style: 'currency', currency: 'TND' }).format(v || 0);
+      let member, txs = [], dues = [], transfers = [];
+      let activeFilter = 'all';
+
+      function renderKpis() {
+        const credits = txs.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0);
+        const debits = txs.filter(t => t.type === 'debit').reduce((s, t) => s + Number(t.amount), 0);
+        const pendingTr = transfers.filter(t => t.status === 'pending').length;
+        byId('kpi-credits').textContent = fmt(credits);
+        byId('kpi-debits').textContent = fmt(debits);
+        byId('kpi-balance').textContent = fmt(credits - debits);
+        byId('kpi-transfers').textContent = pendingTr;
+      }
+
+      function renderTransactions() {
+        const filtered = activeFilter === 'all' ? txs : txs.filter(t => t.type === activeFilter);
+        txRows.innerHTML = filtered.length ? filtered.map(t => \`
+          <tr>
+            <td>\${AYCPortal.formatDate(t.transaction_date)}</td>
+            <td>\${esc(t.description)}</td>
+            <td>\${esc(t.category)}</td>
+            <td style="color:\${t.type === 'credit' ? 'var(--portal-green)' : 'var(--portal-red)'}; font-weight:800">
+              \${t.type === 'credit' ? '+' : '-'}\${fmt(t.amount)}
+            </td>
+            <td>\${esc(t.recorded_by_name)}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm" data-edit="\${t.id}">Modifier</button>
+              <button class="btn btn-danger btn-sm" data-delete="\${t.id}">Supprimer</button>
+            </td>
+          </tr>\`).join('') : \`<tr><td colspan="6">\${AYCPortal.renderEmpty('Aucune transaction enregistrée')}</td></tr>\`;
+      }
+
+      function renderDues() {
+        duesRows.innerHTML = dues.length ? dues.map(m => \`
+          <tr>
+            <td>\${esc(m.display_name || m.username)}</td>
+            <td>\${m.amount ? '<span class="stat-badge badge-ok">Payé</span>' : '<span class="stat-badge badge-danger">Impayé</span>'}</td>
+            <td>\${fmt(m.amount || 0)}</td>
+            <td>\${m.payment_date ? AYCPortal.formatDate(m.payment_date) : '—'}</td>
+            <td>\${esc(m.receipt_serial || '—')}</td>
+            <td><button class="btn btn-secondary btn-sm" data-record="\${m.id}">Saisir</button></td>
+          </tr>\`).join('') : \`<tr><td colspan="6">\${AYCPortal.renderEmpty('Aucun membre trouvé')}</td></tr>\`;
+      }
+
+      function renderTransfers() {
+        trRows.innerHTML = transfers.length ? transfers.map(t => \`
+          <tr>
+            <td>\${AYCPortal.formatDate(t.transfer_date)}</td>
+            <td>\${t.destination === 'national_bank' ? 'Banque Nationale' : 'Poste'}</td>
+            <td>\${fmt(t.amount)}</td>
+            <td><a href="\${esc(t.receipt_url)}" target="_blank" class="btn btn-secondary btn-sm">Voir</a></td>
+            <td><span class="stat-badge \${t.status === 'verified' ? 'badge-ok' : t.status === 'rejected' ? 'badge-danger' : 'badge-warn'}">\${t.status}</span></td>
+            <td>
+              \${member?.isNationalAdmin ? \`
+                <button class="btn btn-secondary btn-sm" data-verify-ok="\${t.id}">Valider</button>
+                <button class="btn btn-danger btn-sm" data-verify-no="\${t.id}">Refuser</button>
+              \` : '—'}
+            </td>
+          </tr>\`).join('') : \`<tr><td colspan="6">\${AYCPortal.renderEmpty('Aucun virement enregistré')}</td></tr>\`;
+      }
+
+      async function loadAll() {
+        try {
+          const [txRes, dueRes, trRes] = await Promise.all([
+            AYCPortal.api('treasury_transactions'),
+            AYCPortal.api('treasury_dues'),
+            AYCPortal.api('treasury_transfers')
+          ]);
+          txs = txRes.transactions || [];
+          const duesData = dueRes || {};
+          dues = duesData.members || [];
+          transfers = trRes.transfers || [];
+          byId('season-label').textContent = "Saison : " + (duesData.season || '—');
+          renderKpis();
+          renderTransactions();
+          renderDues();
+          renderTransfers();
+        } catch (err) { showError(err); }
+      }
+
+      function showError(err) { notice.innerHTML = \`<div class="alert alert-error">\${esc(err.message || err)}</div>\`; }
+
+      // Event Listeners
+      document.querySelectorAll('.treasury-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.treasury-tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.treasury-panel').forEach(p => p.classList.remove('active'));
+          tab.classList.add('active');
+          byId('panel-' + tab.dataset.tab).classList.add('active');
+        });
+      });
+
+      document.querySelectorAll('.filter-tabs button').forEach(b => {
+        b.addEventListener('click', () => {
+          document.querySelectorAll('.filter-tabs button').forEach(x => x.classList.remove('active'));
+          b.classList.add('active');
+          activeFilter = b.dataset.filter;
+          renderTransactions();
+        });
+      });
+
+      byId('transaction-form').onsubmit = async e => {
+        e.preventDefault();
+        try {
+          await AYCPortal.api('treasury_transactions', { 
+            method: 'POST', 
+            body: { 
+              action: 'create', 
+              transactionDate: byId('tx-date').value, 
+              type: byId('tx-type').value, 
+              amount: byId('tx-amount').value, 
+              description: byId('tx-desc').value, 
+              category: byId('tx-category').value, 
+              receiptUrl: byId('tx-receipt').value 
+            } 
+          });
+          notice.innerHTML = '<div class="alert alert-success">Transaction enregistrée.</div>';
+          e.target.reset();
+          await loadAll();
+        } catch (err) { showError(err); }
+      };
+
+      byId('dues-form').onsubmit = async e => {
+        e.preventDefault();
+        try {
+          await AYCPortal.api('treasury_dues', { 
+            method: 'POST', 
+            body: { 
+              action: 'record', 
+              memberId: byId('due-member').value, 
+              amount: byId('due-amount').value, 
+              paymentDate: byId('due-date').value, 
+              receiptSerial: byId('due-receipt').value 
+            } 
+          });
+          notice.innerHTML = '<div class="alert alert-success">Paiement enregistré.</div>';
+          e.target.reset();
+          await loadAll();
+        } catch (err) { showError(err); }
+      };
+
+      byId('transfer-form').onsubmit = async e => {
+        e.preventDefault();
+        try {
+          await AYCPortal.api('treasury_transfers', { 
+            method: 'POST', 
+            body: { 
+              action: 'create', 
+              transferDate: byId('tr-date').value, 
+              amount: byId('tr-amount').value, 
+              destination: byId('tr-dest').value, 
+              receiptUrl: byId('tr-receipt').value 
+} 
+          });
+          notice.innerHTML = '<div class="alert alert-success">Virement soumis pour vérification.</div>';
+          e.target.reset();
+          await loadAll();
+        } catch (err) { showError(err); }
+      };
+
+      // Modal/Inline for Dues recording
+      document.addEventListener('click', async e => {
+        const btn = e.target.closest('[data-record]');
+        if (btn) {
+          const memberId = btn.dataset.record;
+          // In a real app, we'd open a modal. Here we'll just populate the form and scroll.
+          byId('due-member').value = memberId;
+          byId('due-amount').focus();
+          document.getElementById('panel-dues').scrollIntoView({ behavior: 'smooth' });
+        }
+        const delBtn = e.target.closest('[data-delete]');
+        if (delBtn) {
+          if (!confirm('Supprimer cette transaction ?')) return;
+          try {
+            await AYCPortal.api('treasury_transactions', { method: 'POST', body: { action: 'delete', transactionId: delBtn.dataset.delete } });
+            notice.innerHTML = '<div class="alert alert-success">Transaction supprimée.</div>';
+            await loadAll();
+          } catch (err) { showError(err); }
+        }
+        const editBtn = e.target.closest('[data-edit]');
+        if (editBtn) {
+          const id = editBtn.dataset.edit;
+          const tx = txs.find(t => t.id === id);
+          if (tx) {
+            byId('tx-date').value = tx.transaction_date;
+            byId('tx-type').value = tx.type;
+            byId('tx-amount').value = tx.amount;
+            byId('tx-category').value = tx.category;
+            byId('tx-desc').value = tx.description;
+            byId('tx-receipt').value = tx.receipt_url || '';
+            byId('tx-type').dispatchEvent(new Event('change')); // Trigger filter logic if any
+            document.getElementById('panel-transactions').scrollIntoView({ behavior: 'smooth' });
+          }
+        }
+        const verifyOk = e.target.closest('[data-verify-ok]');
+        if (verifyOk) {
+          try {
+            await AYCPortal.api('treasury_transfers', { method: 'POST', body: { action: 'verify', transferId: verifyOk.dataset.verify_ok, status: 'verified' } });
+            notice.innerHTML = '<div class="alert alert-success">Virement validé.</div>';
+            await loadAll();
+          } catch (err) { showError(err); }
+        }
+        const verifyNo = e.target.closest('[data-verify-no]');
+        if (verifyNo) {
+          try {
+            await AYCPortal.api('treasury_transfers', { method: 'POST', body: { action: 'verify', transferId: verifyNo.dataset.verify_no, status: 'rejected' } });
+            notice.innerHTML = '<div class="alert alert-error">Virement refusé.</div>';
+            await loadAll();
+          } catch (err) { showError(err); }
+        }
+      });
+
+      try {
+        member = await AYCPortal.initPortalShell({ requireActive: true });
+        if (!member) return;
+        const canAccess = Boolean(member.access?.canAccessTreasury || member.isNationalAdmin);
+        if (!canAccess) {
+          byId('treasury-workspace').hidden = true;
+          byId('treasury-restricted').hidden = false;
+          return;
+        }
+        await loadAll();
+        // Populate member select for dues
+        const roster = await AYCPortal.api('roster');
+        byId('due-member').innerHTML = roster.members.map(m => \`<option value="\${m.id}">\${esc(m.display_name || m.username)}</option>\`).join('');
+      } catch (e) { showError(e); }
+      byId('btn-refresh').onclick = loadAll;
+    })();
+  </script>
+</body>
+</html>

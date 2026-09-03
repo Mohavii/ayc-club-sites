@@ -772,7 +772,8 @@ values
   ('post_projet', 'Rapport post-projet', 'post_projet', 'Bilan à transmettre après la fin du projet.', 'Bureau exécutif local', '10 jours après la fin du projet', 10, '["realisation", "participants", "resultats", "budget", "evaluation", "pieces_jointes"]'::jsonb, '["coordination_strategique", "tresorerie"]'::jsonb),
   ('proces_verbal', 'Procès-verbal', 'proces_verbal', 'Procès-verbal structuré de réunion ou d’assemblée.', 'Instance concernée', 'Après la clôture de la séance', 0, '["mandat", "ordre_du_jour", "presence", "decisions", "cloture"]'::jsonb, '["secretariat", "supervision"]'::jsonb),
   ('collaboration', 'Rapport collaboration / partenariat', 'collaboration', 'Suivi d’un partenariat ou d’une collaboration.', 'Bureau exécutif local', 'Selon la convention', 0, '["partenaire", "objectifs", "engagements", "resultats", "suite"]'::jsonb, '["relations_exterieures", "coordination_strategique"]'::jsonb),
-  ('mise_a_jour', 'Rapport de mise à jour', 'mise_a_jour', 'Mise à jour périodique de la vie du club.', 'Bureau exécutif national', 'Selon le calendrier annuel', 0, '["activite", "membres", "responsabilites", "projets", "besoins"]'::jsonb, '["coordination_strategique", "secretariat"]'::jsonb),
+  ('mise_a_jour', 'Rapport de mise à jour', 'mise_a_jour', 'Mise à jour périodique de la vie du club.', 'Bureau exécutif national', 'Selon le calendrier annuel', 0, '["instruction", "prise_de_fonction", "passation", "encadrement", "attente_des_objectifs", "chronologie_des_methodologies", "implementation", "evaluation", "auto_evaluation", "recommandations"]'::jsonb, '["coordination_strategique", "secretariat"]'::jsonb),
+  ('plan_action_annuel', 'Rapport du Plan d’action annuel du Club', 'mise_a_jour', 'Planification annuelle détaillée des tâches par département.', 'Bureau exécutif national', 'J+7 après élection du BEL', 7, '["contextualisation", "plan_action_tableau"]'::jsonb, '["coordination_strategique"]'::jsonb),
   ('supervision', 'Rapport de supervision', 'supervision', 'Dossier adressé à une instance de supervision.', 'Conseil de supervision compétent', 'À la demande de l’instance', 0, '["faits", "pieces", "mesures", "suivi"]'::jsonb, '["supervision"]'::jsonb),
   ('investigation', 'Rapport d’investigation', 'investigation', 'Dossier d’examen et de décision disciplinaire.', 'Conseil de supervision compétent', 'À la demande de l’instance', 0, '["saisine", "faits", "auditions", "constats", "decision"]'::jsonb, '["supervision", "cscy"]'::jsonb)
 on conflict (slug) do nothing;
@@ -1247,3 +1248,78 @@ create index if not exists idx_portal_assembly_roster_presence_assembly on porta
 alter table portal_minutes_agenda_blocks add column if not exists actual_duration_minutes integer;
 alter table portal_minutes_agenda_blocks add column if not exists next_steps text;
 alter table portal_minutes_agenda_blocks add column if not exists attachments jsonb not null default '[]'::jsonb;
+
+-- =======================================================================
+-- SECRÉTAIRE LOCAL — ANNONCES, ADOPTION DES PV, ARCHIVES DU CLUB (PHASE 9)
+-- =======================================================================
+alter table portal_meetings add column if not exists announced_at timestamptz;
+alter table portal_meetings add column if not exists announcement_status text not null default 'draft';
+alter table portal_meetings add column if not exists is_extraordinary boolean not null default false;
+
+alter table portal_minutes add column if not exists adoption_meeting_id uuid references portal_meetings(id) on delete set null;
+alter table portal_minutes add column if not exists adopted_at timestamptz;
+
+create table if not exists portal_club_archives (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  category text not null check (category in ('pv', 'plan_action', 'rapport', 'decision', 'convention', 'autre')),
+  title text not null,
+  mandate text not null,
+  document_url text,
+  content_summary text,
+  file_name text,
+  file_size integer,
+  archived_by uuid not null references portal_members(id),
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_portal_club_archives_school on portal_club_archives(school_id, mandate);
+create index if not exists idx_portal_club_archives_category on portal_club_archives(school_id, category);
+
+-- =======================================================================
+-- TRÉSORIER LOCAL — GRAND LIVRE, COTISATIONS, VIREMENTS (PHASE 10)
+-- =======================================================================
+
+create table if not exists portal_treasury_transactions (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  transaction_date date not null,
+  type text not null check (type in ('credit', 'debit')),
+  amount numeric(12, 3) not null,
+  description text not null,
+  category text not null,
+  receipt_url text,
+  recorded_by uuid not null references portal_members(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_treasury_transactions_school on portal_treasury_transactions(school_id, transaction_date desc);
+
+create table if not exists portal_club_dues (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  member_id uuid not null references portal_members(id) on delete cascade,
+  season text not null,
+  amount numeric(12, 3) not null,
+  payment_date date,
+  receipt_serial text unique,
+  recorded_by uuid references portal_members(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(member_id, season)
+);
+create index if not exists idx_portal_club_dues_school on portal_club_dues(school_id, season);
+
+create table if not exists portal_treasury_transfers (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  transfer_date date not null,
+  amount numeric(12, 3) not null,
+  destination text not null check (destination in ('national_bank', 'post_office')),
+  receipt_url text not null,
+  status text not null default 'pending' check (status in ('pending', 'verified', 'rejected')),
+  recorded_by uuid not null references portal_members(id),
+  verified_by uuid references portal_members(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_treasury_transfers_school on portal_treasury_transfers(school_id, transfer_date desc);
