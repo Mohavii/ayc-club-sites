@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Espace Président Local · Portail YOUTHCLUBber</title>
+  <link rel="icon" href="../assets/favicon-32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="portal.css">
+  <style>
+    .pres-tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
+    .pres-tab{border:1px solid var(--portal-line,#e2e7f0);background:#fff;color:#6a748b;border-radius:999px;padding:9px 18px;font-weight:800;font-size:.82rem;cursor:pointer;transition:all .18s ease}
+    .pres-tab:hover{border-color:#b4c3de;color:#1f2a5a}
+    .pres-tab.active{background:var(--portal-navy,#1f2a5a);border-color:var(--portal-navy,#1f2a5a);color:#fff}
+    .pres-panel{display:none}
+    .pres-panel.active{display:block}
+    .duty-card{border:1px solid #e2e8f1;border-radius:12px;padding:16px;margin-bottom:12px;background:#fff}
+    .duty-card h3{font-size:.95rem;color:#1f2a5a;margin:0 0 8px 0;display:flex;align-items:center;gap:8px}
+    .duty-card p{font-size:.85rem;color:#536387;margin:0;line-height:1.5}
+    .duty-card .duty-meta{font-size:.75rem;color:#78849e;margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f1}
+    .status-badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;font-size:.74rem;font-weight:800}
+    .badge-done{background:#e7f7ed;color:#1e7e34}
+    .badge-pending{background:#fff8e6;color:#b27b00}
+    .badge-action{background:#f0f4ff;color:#3b5bdb}
+  </style>
+</head>
+<body>
+  <div id="topbar-root"></div>
+  <div class="workspace">
+    <div id="sidebar-root"></div>
+    <main class="portal-content">
+      
+      <div class="portal-heading">
+        <div>
+          <p class="eyebrow">Coordination Stratégique · Bureau Exécutif Local</p>
+          <h1>Espace Président Local</h1>
+          <p>Gestion stratégique du club, planification des opérations et rapports d'avancement.</p>
+        </div>
+        <div class="heading-actions" id="pres-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-refresh">Actualiser</button>
+        </div>
+      </div>
+
+      <div id="notice"></div>
+
+      <section id="pres-restricted" class="portal-card restricted-state" hidden>
+        <h2>Espace réservé au Président Local</h2>
+        <p>Cet espace est réservé au Président Local du club, au BEL et aux administrateurs nationaux.</p>
+      </section>
+
+      <div id="pres-workspace">
+        
+        <!-- KPI Row -->
+        <section class="stats-grid" id="pres-kpis" style="margin-bottom:20px">
+          <div class="stat-card">
+            <span class="stat-number" id="kpi-projects">0</span>
+            <span class="stat-label">Projets actifs</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="kpi-reunions">0</span>
+            <span class="stat-label">Réunions à présider</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="kpi-rapports">0</span>
+            <span class="stat-label">Rapports en attente</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="kpi-taches">0</span>
+            <span class="stat-label">Tâches assignées</span>
+          </div>
+        </section>
+
+        <!-- Navigation Tabs -->
+        <nav class="pres-tabs">
+          <button type="button" class="pres-tab active" data-tab="dashboard">Tableau de bord</button>
+          <button type="button" class="pres-tab" data-tab="action-plan">Plan d'action annuel</button>
+          <button type="button" class="pres-tab" data-tab="projets">Projets & Évaluation</button>
+          <button type="button" class="pres-tab" data-tab="rapports">Rapports stratégiques</button>
+          <button type="button" class="pres-tab" data-tab="reunions">Gestion des réunions</button>
+        </nav>
+
+        <!-- TAB 1: DASHBOARD -->
+        <section class="pres-panel active" id="panel-dashboard">
+          <div class="portal-grid">
+            <div class="portal-card card-span-7">
+              <div class="toolbar">
+                <h2>Responsabilités principales</h2>
+              </div>
+              <div id="duties-list"></div>
+            </div>
+            <div class="portal-card card-span-5">
+              <div class="toolbar">
+                <h2>Échéances à venir</h2>
+              </div>
+              <div id="deadlines-list" class="list-stack"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: PLAN D'ACTION ANNUEL -->
+        <section class="pres-panel" id="panel-action-plan">
+          <div class="portal-card">
+            <div class="toolbar">
+              <h2>Plan d'action annuel du club</h2>
+              <button class="btn btn-primary btn-sm" id="btn-edit-plan">Modifier le plan</button>
+            </div>
+            <div id="action-plan-content">
+              <p class="empty-state">Aucun plan d'action annuel défini.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: PROJETS -->
+        <section class="pres-panel" id="panel-projets">
+          <div class="portal-card">
+            <div class="toolbar">
+              <h2>Projets du club</h2>
+              <button class="btn btn-primary btn-sm" id="btn-new-project">Nouveau projet</button>
+            </div>
+            <div id="projets-list" class="list-stack"></div>
+          </div>
+        </section>
+
+        <!-- TAB 4: RAPPORTS STRATÉGIQUES -->
+        <section class="pres-panel" id="panel-rapports">
+          <div class="portal-grid">
+            <div class="portal-card card-span-6">
+              <div class="toolbar">
+                <h2>Rapport pré-projet</h2>
+                <span class="badge badge-action">7 jours avant engagement</span>
+              </div>
+              <p style="font-size:.85rem;color:#536387;margin-bottom:12px;">À envoyer au Président National avant tout engagement externe.</p>
+              <div id="rapport-pre"></div>
+            </div>
+            <div class="portal-card card-span-6">
+              <div class="toolbar">
+                <h2>Rapport post-projet</h2>
+                <span class="badge badge-pending">10 jours après fin du projet</span>
+              </div>
+              <p style="font-size:.85rem;color:#536387;margin-bottom:12px;">À envoyer au Président National après la fin du projet.</p>
+              <div id="rapport-post"></div>
+            </div>
+            <div class="portal-card card-span-6">
+              <div class="toolbar">
+                <h2>Rapport plan d'action annuel</h2>
+                <span class="badge badge-action">7 jours après election</span>
+              </div>
+              <p style="font-size:.85rem;color:#536387;margin-bottom:12px;">À coordonner avec le BEL et envoyer au BEN.</p>
+              <div id="rapport-annuel"></div>
+            </div>
+            <div class="portal-card card-span-6">
+              <div class="toolbar">
+                <h2>Rapport d'avancement stratégique</h2>
+                <span class="badge badge-pending">5 jours avant plénière</span>
+              </div>
+              <p style="font-size:.85rem;color:#536387;margin-bottom:12px;">À envoyer au CSCY pour l'ALOFM.</p>
+              <div id="rapport-avancement"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 5: RÉUNIONS -->
+        <section class="pres-panel" id="panel-reunions">
+          <div class="portal-card">
+            <div class="toolbar">
+              <h2>Réunions à présider</h2>
+              <a href="meetings" class="btn btn-secondary btn-sm">Voir toutes les réunions</a>
+            </div>
+            <div id="reunions-list" class="list-stack"></div>
+          </div>
+        </section>
+
+      </div>
+
+    </main>
+  </div>
+
+  <script type="module">
+    import * as AYCPortal from './portal-common.js';
+
+    const esc = AYCPortal.escapeHtml;
+    const api = AYCPortal.api;
+
+    const DUTIES = [
+      { id: 'plan', title: 'Plan d\'action annuel', desc: 'Assurer l\'application du plan d\'action annuel et sa continuité', article: '4.2.1' },
+      { id: 'operations', title: 'Opérations locales', desc: 'Planifier les opérations et projets locaux du club', article: '4.2.2' },
+      { id: 'taches', title: 'Répartition des tâches', desc: 'S\'assurer de la répartition des tâches au sein du club', article: '4.2.3' },
+      { id: 'suivi', title: 'Suivi et mise à jour', desc: 'Mettre à jour les acteurs principaux sur l\'avancée du travail', article: '4.2.4' },
+      { id: 'evaluation', title: 'Évaluation des projets', desc: 'Évaluer les projets entrepris par le club', article: '4.2.5' },
+      { id: 'rapports', title: 'Rapports stratégiques', desc: 'Rédiger et présenter les parties d\'avancement stratégique', article: '4.2.6' },
+      { id: 'presider', title: 'Présider les réunions', desc: 'Demander et présider les réunions du club et du BEL', article: '4.2.7' },
+      { id: 'representer', title: 'Représenter le club', desc: 'Représenter le club envers le CLS, le Coordinateur Régional et le Président National', article: '4.2.8-9' },
+      { id: 'position', title: 'Position commune', desc: 'S\'assurer que le club maintient une seule position partagée', article: '4.2.10' },
+    ];
+
+    async function load() {
+      const member = await AYCPortal.initPortalShell({ requireActive: true });
+      if (!member) return;
+
+      const canAccess = member.isNationalAdmin || member.access?.isPresident;
+      document.getElementById('pres-restricted').hidden = canAccess;
+      document.getElementById('pres-workspace').hidden = !canAccess;
+
+      if (!canAccess) return;
+
+      document.getElementById('btn-refresh').onclick = load;
+
+      // Tab switching
+      document.querySelectorAll('.pres-tab').forEach(tab => {
+        tab.onclick = () => {
+          document.querySelectorAll('.pres-tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.pres-panel').forEach(p => p.classList.remove('active'));
+          tab.classList.add('active');
+          document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+        };
+      });
+
+      // Load data
+      await Promise.all([
+        loadKPIs(),
+        loadDuties(),
+        loadDeadlines(),
+        loadMeetings()
+      ]);
+    }
+
+    async function loadKPIs() {
+      try {
+        const [projects, meetings, tasks] = await Promise.all([
+          api('listProjects'),
+          api('listMeetings', { query: { future: true } }),
+          api('listTasks')
+        ]);
+        document.getElementById('kpi-projects').textContent = (projects.projects || []).length;
+        document.getElementById('kpi-reunions').textContent = (meetings.meetings || []).length;
+        document.getElementById('kpi-rapports').textContent = '0';
+        document.getElementById('kpi-taches').textContent = (tasks.tasks || []).filter(t => t.status !== 'completed').length;
+      } catch (e) {
+        console.error('Failed to load KPIs:', e);
+      }
+    }
+
+    function loadDuties() {
+      const container = document.getElementById('duties-list');
+      container.innerHTML = DUTIES.map(d => `
+        <div class="duty-card">
+          <h3><span class="status-badge badge-action">Article ${d.article}</span> ${esc(d.title)}</h3>
+          <p>${esc(d.desc)}</p>
+        </div>
+      `).join('');
+    }
+
+    async function loadDeadlines() {
+      const container = document.getElementById('deadlines-list');
+      try {
+        const data = await api('listMeetings', { query: { future: true, limit: 5 } });
+        const meetings = data.meetings || [];
+        if (!meetings.length) {
+          container.innerHTML = AYCPortal.renderEmpty('Aucune échéance à venir');
+          return;
+        }
+        container.innerHTML = meetings.map(m => `
+          <div class="list-item">
+            <span class="list-item-title">${esc(m.title)}</span>
+            <span class="list-item-meta">${AYCPortal.formatDate(m.starts_at)} · ${esc(m.location || 'À confirmer')}</span>
+          </div>
+        `).join('');
+      } catch (e) {
+        container.innerHTML = AYCPortal.renderEmpty('Aucune échéance à venir');
+      }
+    }
+
+    async function loadMeetings() {
+      const container = document.getElementById('reunions-list');
+      try {
+        const data = await api('listMeetings', { query: { future: true } });
+        const meetings = data.meetings || [];
+        if (!meetings.length) {
+          container.innerHTML = AYCPortal.renderEmpty('Aucune réunion à présider');
+          return;
+        }
+        container.innerHTML = meetings.map(m => `
+          <div class="list-item">
+            <span class="list-item-title">${esc(m.title)}</span>
+            <span class="list-item-meta">${AYCPortal.formatDate(m.starts_at, true)} · ${esc(m.location || 'Lieu à confirmer')}</span>
+          </div>
+        `).join('');
+      } catch (e) {
+        container.innerHTML = AYCPortal.renderEmpty('Aucune réunion à présider');
+      }
+    }
+
+    load().catch(e => AYCPortal.renderError(document.getElementById('notice'), e));
+  </script>
+</body>
+</html>
