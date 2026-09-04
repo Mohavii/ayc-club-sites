@@ -187,19 +187,21 @@
     document.getElementById('btn-save').addEventListener('click', async () => {
       readBlocks();
       const status = document.getElementById('pv-status').value;
+      const noticeEl = document.getElementById('notice');
       try {
         await AYCPortal.api('meeting', { 
           method: 'POST', 
           body: { 
-            action: 'savePv', 
+            action: 'save_minutes', 
             meetingId, 
-            blocks: pvBlocks, 
+            agendaBlocks: pvBlocks.filter(b => b.title || b.discussion || b.decision), 
             status 
           } 
         });
-        document.getElementById('notice').innerHTML = '<div class="alert alert-success">PV enregistré avec succès!</div>';
+        noticeEl.innerHTML = '<div class="alert alert-success">PV enregistré avec succès!</div>';
+        setTimeout(() => window.close(), 2000);
       } catch (e) {
-        AYCPortal.renderError(document.getElementById('notice'), e);
+        AYCPortal.renderError(noticeEl, e);
       }
     });
 
