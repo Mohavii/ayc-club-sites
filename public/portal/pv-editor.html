@@ -257,7 +257,11 @@
         
         const canEditPV = meetingData.canEditPV || member?.isNationalAdmin;
         
-        document.getElementById('pv-editor-content').innerHTML = renderPvEditor(canEditPV, meetingData.minutes, meetingData.roster, meetingData.eplMembers, meetingData.structured?.attendance, m.meeting_type === 'reunion_nationale');
+        // Find the club secretary from the roster
+        const secretary = (meetingData.roster || []).find(r => r.role === 'secretaire' || r.display_role === 'secretaire');
+        const secretaryName = secretary ? (secretary.display_name || secretary.username) : null;
+        
+        document.getElementById('pv-editor-content').innerHTML = renderPvEditor(canEditPV, meetingData.minutes, meetingData.roster, meetingData.eplMembers, meetingData.structured?.attendance, m.meeting_type === 'reunion_nationale', secretaryName);
         
         bindPvEditor(canEditPV, meetingData.roster, m.meeting_type === 'reunion_nationale');
         
