@@ -190,6 +190,7 @@
       if (!canAccess) return;
 
       const esc = AYCPortal.escapeHtml;
+      const notice = document.getElementById('notice');
       
       const DUTIES = [
         { id: 'plan', title: 'Plan d\'action annuel', desc: 'Assurer l\'application du plan d\'action annuel et sa continuité', article: '4.2.1' },
@@ -259,8 +260,38 @@
         }
       }
 
-      document.getElementById('btn-refresh').onclick = loadMeetings;
-      await loadMeetings();
+      // Load tasks
+      async function loadTasks() {
+        try {
+          const data = await AYCPortal.api('tasks');
+          const tasks = data.tasks || [];
+          const pending = tasks.filter(t => t.status !== 'completed' && t.status !== 'done');
+          document.getElementById('kpi-taches').textContent = pending.length;
+        } catch(e) {
+          document.getElementById('kpi-taches').textContent = '0';
+        }
+      }
+
+      // Refresh button
+      document.getElementById('btn-refresh').onclick = async () => {
+        notice.innerHTML = '';
+        await Promise.all([loadMeetings(), loadTasks()]);
+        notice.innerHTML = '<div class="alert alert-success">Données actualisées.</div>';
+        setTimeout(() => notice.innerHTML = '', 3000);
+      };
+
+      // Edit plan button - show message
+      document.getElementById('btn-edit-plan').onclick = () => {
+        alert('Fonctionnalité en cours de développement.Contactez un administrateur national pour modifier le plan d\'action.');
+      };
+
+      // New project button - redirect to projects page
+      document.getElementById('btn-new-project').onclick = () => {
+        location.href = 'projects';
+      };
+
+      // Load initial data
+      await Promise.all([loadMeetings(), loadTasks()]);
     })().catch(e => AYCPortal.renderError(document.getElementById('notice'), e));
   </script>
 </body>
