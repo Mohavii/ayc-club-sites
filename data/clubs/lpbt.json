@@ -1,0 +1,55 @@
+{
+  "slug": "lpbt",
+  "status": "live",
+  "name": "Lycée Pilote Borguiba",
+  "city": "Tunis",
+  "founded": 2016,
+  "memberCount": 0,
+  "about": "",
+  "heroImage": null,
+  "logo": null,
+  "officers": [
+    "746843897350848514"
+  ],
+  "events": [],
+  "bel": [],
+  "partners": [],
+  "forms": {
+    "join": {
+      "enabled": false,
+      "title": "Rejoindre le club",
+      "fields": []
+    },
+    "team_communication": {
+      "enabled": false,
+      "title": "Équipe Communication",
+      "fields": []
+    },
+    "team_logistique": {
+      "enabled": false,
+      "title": "Équipe Logistique",
+      "fields": []
+    },
+    "team_sponsoring": {
+      "enabled": false,
+      "title": "Équipe Sponsoring",
+      "fields": []
+    }
+  },
+  "vpcRoleId": "1545551415299149854",
+  "formWebhooks": {
+    "join": "https://discord.com/api/webhooks/1545551418763776122/jrVR96228PxL-UseFdvIe6PbtVaIL0YwAKmyXleEu615igstu9iBHyuoIACuNRuMtISL",
+    "team_communication": "https://discord.com/api/webhooks/1545551421141680199/Xngb0E69vUCTUjLjhrfn5xB3ZyxWxbcsVDl4ZfyAsoduQkvva7dmNdWhGq4GFLRl4HT6",
+    "team_logistique": "https://discord.com/api/webhooks/1545551423243296869/At9rMZRcm1oEGKaqZh5gnoPwJRcjvandBpdEC_xyUhKd_A7xeb5rrHWklHnO_x7lPvZ9",
+    "team_sponsoring": "https://discord.com/api/webhooks/1545551425415938169/5KPYWTTHdIzoSrhuKlRg2AwZ4D2_GXc5zqejkKIbNnVv9-6x6lq8mfIIEFNZnWaoheCR"
+  },
+  "controlRoomChannelId": "1545551417165488208",
+  "categoryId": "1545551416158982154",
+  "channelIds": [
+    "1545551417165488208",
+    "1545551418117595146",
+    "1545551420114210848",
+    "1545551422097981542",
+    "1545551424404983908"
+  ]
+}
