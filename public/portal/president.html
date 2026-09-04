@@ -178,35 +178,30 @@
     </main>
   </div>
 
-  <script type="module">
-    import * as AYCPortal from './portal-common.js';
-
-    const esc = AYCPortal.escapeHtml;
-    const api = AYCPortal.api;
-
-    const DUTIES = [
-      { id: 'plan', title: 'Plan d\'action annuel', desc: 'Assurer l\'application du plan d\'action annuel et sa continuité', article: '4.2.1' },
-      { id: 'operations', title: 'Opérations locales', desc: 'Planifier les opérations et projets locaux du club', article: '4.2.2' },
-      { id: 'taches', title: 'Répartition des tâches', desc: 'S\'assurer de la répartition des tâches au sein du club', article: '4.2.3' },
-      { id: 'suivi', title: 'Suivi et mise à jour', desc: 'Mettre à jour les acteurs principaux sur l\'avancée du travail', article: '4.2.4' },
-      { id: 'evaluation', title: 'Évaluation des projets', desc: 'Évaluer les projets entrepris par le club', article: '4.2.5' },
-      { id: 'rapports', title: 'Rapports stratégiques', desc: 'Rédiger et présenter les parties d\'avancement stratégique', article: '4.2.6' },
-      { id: 'presider', title: 'Présider les réunions', desc: 'Demander et présider les réunions du club et du BEL', article: '4.2.7' },
-      { id: 'representer', title: 'Représenter le club', desc: 'Représenter le club envers le CLS, le Coordinateur Régional et le Président National', article: '4.2.8-9' },
-      { id: 'position', title: 'Position commune', desc: 'S\'assurer que le club maintient une seule position partagée', article: '4.2.10' },
-    ];
-
-    async function load() {
+  <script src="portal-common.js"></script>
+  <script>
+    (async()=>{
       const member = await AYCPortal.initPortalShell({ requireActive: true });
       if (!member) return;
 
       const canAccess = member.isNationalAdmin || member.access?.isPresident;
       document.getElementById('pres-restricted').hidden = canAccess;
       document.getElementById('pres-workspace').hidden = !canAccess;
-
       if (!canAccess) return;
 
-      document.getElementById('btn-refresh').onclick = load;
+      const esc = AYCPortal.escapeHtml;
+      
+      const DUTIES = [
+        { id: 'plan', title: 'Plan d\'action annuel', desc: 'Assurer l\'application du plan d\'action annuel et sa continuité', article: '4.2.1' },
+        { id: 'operations', title: 'Opérations locales', desc: 'Planifier les opérations et projets locaux du club', article: '4.2.2' },
+        { id: 'taches', title: 'Répartition des tâches', desc: 'S\'assurer de la répartition des tâches au sein du club', article: '4.2.3' },
+        { id: 'suivi', title: 'Suivi et mise à jour', desc: 'Mettre à jour les acteurs principaux sur l\'avancée du travail', article: '4.2.4' },
+        { id: 'evaluation', title: 'Évaluation des projets', desc: 'Évaluer les projets entrepris par le club', article: '4.2.5' },
+        { id: 'rapports', title: 'Rapports stratégiques', desc: 'Rédiger et présenter les parties d\'avancement stratégique', article: '4.2.6' },
+        { id: 'presider', title: 'Présider les réunions', desc: 'Demander et présider les réunions du club et du BEL', article: '4.2.7' },
+        { id: 'representer', title: 'Représenter le club', desc: 'Représenter le club envers le CLS, le Coordinateur Régional et le Président National', article: '4.2.8-9' },
+        { id: 'position', title: 'Position commune', desc: 'S\'assurer que le club maintient une seule position partagée', article: '4.2.10' },
+      ];
 
       // Tab switching
       document.querySelectorAll('.pres-tab').forEach(tab => {
@@ -218,82 +213,55 @@
         };
       });
 
-      // Load data
-      await Promise.all([
-        loadKPIs(),
-        loadDuties(),
-        loadDeadlines(),
-        loadMeetings()
-      ]);
-    }
-
-    async function loadKPIs() {
-      try {
-        const [projects, meetings, tasks] = await Promise.all([
-          api('listProjects'),
-          api('listMeetings', { query: { future: true } }),
-          api('listTasks')
-        ]);
-        document.getElementById('kpi-projects').textContent = (projects.projects || []).length;
-        document.getElementById('kpi-reunions').textContent = (meetings.meetings || []).length;
-        document.getElementById('kpi-rapports').textContent = '0';
-        document.getElementById('kpi-taches').textContent = (tasks.tasks || []).filter(t => t.status !== 'completed').length;
-      } catch (e) {
-        console.error('Failed to load KPIs:', e);
-      }
-    }
-
-    function loadDuties() {
-      const container = document.getElementById('duties-list');
-      container.innerHTML = DUTIES.map(d => `
+      // Load duties list
+      document.getElementById('duties-list').innerHTML = DUTIES.map(d => `
         <div class="duty-card">
           <h3><span class="status-badge badge-action">Article ${d.article}</span> ${esc(d.title)}</h3>
           <p>${esc(d.desc)}</p>
         </div>
       `).join('');
-    }
 
-    async function loadDeadlines() {
-      const container = document.getElementById('deadlines-list');
-      try {
-        const data = await api('listMeetings', { query: { future: true, limit: 5 } });
-        const meetings = data.meetings || [];
-        if (!meetings.length) {
-          container.innerHTML = AYCPortal.renderEmpty('Aucune échéance à venir');
-          return;
+      // Load meetings
+      async function loadMeetings() {
+        try {
+          const data = await AYCPortal.api('meetings');
+          const meetings = data.meetings || [];
+          const future = meetings.filter(m => new Date(m.starts_at) > new Date());
+          
+          document.getElementById('kpi-reunions').textContent = future.length;
+          
+          const deadlines = document.getElementById('deadlines-list');
+          if (future.length === 0) {
+            deadlines.innerHTML = AYCPortal.renderEmpty('Aucune échéance à venir');
+          } else {
+            deadlines.innerHTML = future.slice(0, 5).map(m => `
+              <div class="list-item">
+                <span class="list-item-title">${esc(m.title)}</span>
+                <span class="list-item-meta">${AYCPortal.formatDate(m.starts_at)} · ${esc(m.location || 'À confirmer')}</span>
+              </div>
+            `).join('');
+          }
+
+          const reunions = document.getElementById('reunions-list');
+          if (future.length === 0) {
+            reunions.innerHTML = AYCPortal.renderEmpty('Aucune réunion à présider');
+          } else {
+            reunions.innerHTML = future.map(m => `
+              <div class="list-item">
+                <span class="list-item-title">${esc(m.title)}</span>
+                <span class="list-item-meta">${AYCPortal.formatDate(m.starts_at, true)} · ${esc(m.location || 'Lieu à confirmer')}</span>
+              </div>
+            `).join('');
+          }
+        } catch(e) {
+          document.getElementById('deadlines-list').innerHTML = AYCPortal.renderEmpty('Aucune échéance à venir');
+          document.getElementById('reunions-list').innerHTML = AYCPortal.renderEmpty('Aucune réunion à présider');
         }
-        container.innerHTML = meetings.map(m => `
-          <div class="list-item">
-            <span class="list-item-title">${esc(m.title)}</span>
-            <span class="list-item-meta">${AYCPortal.formatDate(m.starts_at)} · ${esc(m.location || 'À confirmer')}</span>
-          </div>
-        `).join('');
-      } catch (e) {
-        container.innerHTML = AYCPortal.renderEmpty('Aucune échéance à venir');
       }
-    }
 
-    async function loadMeetings() {
-      const container = document.getElementById('reunions-list');
-      try {
-        const data = await api('listMeetings', { query: { future: true } });
-        const meetings = data.meetings || [];
-        if (!meetings.length) {
-          container.innerHTML = AYCPortal.renderEmpty('Aucune réunion à présider');
-          return;
-        }
-        container.innerHTML = meetings.map(m => `
-          <div class="list-item">
-            <span class="list-item-title">${esc(m.title)}</span>
-            <span class="list-item-meta">${AYCPortal.formatDate(m.starts_at, true)} · ${esc(m.location || 'Lieu à confirmer')}</span>
-          </div>
-        `).join('');
-      } catch (e) {
-        container.innerHTML = AYCPortal.renderEmpty('Aucune réunion à présider');
-      }
-    }
-
-    load().catch(e => AYCPortal.renderError(document.getElementById('notice'), e));
+      document.getElementById('btn-refresh').onclick = loadMeetings;
+      await loadMeetings();
+    })().catch(e => AYCPortal.renderError(document.getElementById('notice'), e));
   </script>
 </body>
 </html>
