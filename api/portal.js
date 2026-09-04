@@ -319,9 +319,11 @@ async function meetingDetail(req, res, member, body) {
           order by m.display_name
         `
       : db`
-          select m.id, m.display_name, m.username, m.membership_status, r.role as display_role
+          select m.id, m.display_name, m.username, m.membership_status,
+            (select r2.role from portal_club_display_roles r2
+             where r2.member_id = m.id and r2.school_id = ${meeting.school_id} and r2.ended_at is null
+             order by r2.started_at desc limit 1) as display_role
           from portal_members m
-          left join portal_club_display_roles r on r.member_id = m.id and r.school_id = m.school_id and r.ended_at is null
           where m.school_id = ${meeting.school_id} and m.status = 'active'
           order by m.display_name
         `,
