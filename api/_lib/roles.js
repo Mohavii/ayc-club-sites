@@ -344,7 +344,9 @@ async function getMemberPortalAccess(member) {
     canViewClubWork: canManageClubWork,
     canCreateMeeting: has("meeting_organizer"),
     canEditPV: has("pv_editor"),
-    canEditAssemblyPV: isNationalAdmin || isEpnMember,
+    canEditNationalAssemblyPV: isNationalAdmin || isEpnMember,
+    // Note: canEditLocalAssemblyPV requires checking EPL membership for the specific club,
+    // which must be checked per-request in portal.js with isEplMember(memberId, schoolId)
     canCreateProject: has("project_manager"),
     canCreateNationalProject: hasNational("national_projects"),
     nationalCapabilities,
