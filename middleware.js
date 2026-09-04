@@ -41,7 +41,7 @@ export default function middleware(request) {
 
   // Only the internes-facing deployment is locked down. Everything else
   // (local dev, bot, service projects) passes through unmodified.
-  if (target !== "portal-edge" && target !== "portal-auth") {
+  if (target !== "portal-auth") {
     return;
   }
 

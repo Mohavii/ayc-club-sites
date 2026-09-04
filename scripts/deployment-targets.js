@@ -29,9 +29,6 @@ const TARGETS = {
 
   bot: ["api/chat.js", "api/interactions.js", "api/submit-form.js", "api/session.js"],
 
-  // Public-facing project: static public/portal/** plus proxy rewrites.
-  "portal-edge": [],
-
   "portal-auth": [
     "api/auth/google/callback.js",
     "api/auth/google/start.js",
