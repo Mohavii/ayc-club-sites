@@ -102,15 +102,14 @@
       </div>`;
     }
 
-    function pvOrganizerFieldMarkup(minutes, eplMembers) {
+    function pvOrganizerFieldMarkup(minutes, eplMembers, secretaryName) {
       const current = minutes?.organizer || '';
-      const eplNames = (eplMembers || []).map(m => m.display_name || m.username).filter(Boolean);
-      const autoValue = current || eplNames.join(', ');
-      const datalist = eplNames.length ? `<datalist id="pv-organizer-options">${eplNames.map(n => `<option value="${esc(n)}">`).join('')}${eplNames.length > 1 ? `<option value="${esc(eplNames.join(', '))}">` : ''}</datalist>` : '';
-      const hint = eplNames.length
-        ? `Pré-rempli avec l'Équipe Plénière Locale (${esc(eplNames.join(', '))}) — modifiable.`
-        : `Aucune EPL enregistrée pour ce club.`;
-      return `<div class="form-field"><label for="pv-organizer">Rédigé par</label><input id="pv-organizer"${eplNames.length ? ' list="pv-organizer-options"' : ''} value="${esc(autoValue)}">${datalist}<p class="pv-organizer-hint">${hint}</p></div>`;
+      // For reunions, the rédacteur is ALWAYS the club secretary
+      const autoValue = current || secretaryName || '';
+      const hint = secretaryName
+        ? `Rédigé par le Secrétaire du club (${esc(secretaryName)}).`
+        : `Aucun Secrétaire de club enregistré.`;
+      return `<div class="form-field"><label for="pv-organizer">Rédigé par</label><input id="pv-organizer" value="${esc(autoValue)}" readonly><p class="pv-organizer-hint">${hint}</p></div>`;
     }
 
     function pvAttendanceFieldMarkup(roster, savedAttendance) {
@@ -127,7 +126,7 @@
         <div class="pv-attendance-grid" id="pv-attendance-grid">${rows}</div>`;
     }
 
-    function renderPvEditor(canEditPV, minutes, roster, eplMembers, savedAttendance, isNationalMeeting) {
+    function renderPvEditor(canEditPV, minutes, roster, eplMembers, savedAttendance, isNationalMeeting, secretaryName) {
       if (!canEditPV) return '<p>Vous n\'avez pas la permission d\'éditer ce PV.</p>';
       const cardsHtml = pvBlocks.map((b, i) => pvPointCard(b, i)).join('');
       return `<section class="portal-card" style="margin-top:18px">
@@ -135,7 +134,7 @@
         <div class="pv-points" id="pv-editor-table">${cardsHtml}</div>
         <button type="button" class="btn btn-quiet btn-sm" id="pv-add-point" style="margin-top:10px">+ Ajouter un point</button>
         <div class="form-grid" style="margin-top:14px">
-          ${pvOrganizerFieldMarkup(minutes, eplMembers)}
+          ${pvOrganizerFieldMarkup(minutes, eplMembers, secretaryName)}
           <div class="form-field"><label for="pv-status">Statut</label><select id="pv-status"><option value="draft"${(!minutes || minutes.status==='draft') ? ' selected' : ''}>Brouillon</option><option value="sent"${minutes?.status==='sent' ? ' selected' : ''}>Publié</option><option value="validated"${minutes?.status==='validated' ? ' selected' : ''}>Validé</option></select></div>
         </div>
         ${isNationalMeeting ? '' : `<div style="margin-top:16px">${pvAttendanceFieldMarkup(roster, savedAttendance)}</div>`}
