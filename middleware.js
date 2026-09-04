@@ -20,7 +20,7 @@ export const config = {
   matcher: "/:path*",
 };
 
-const ALLOWED_PREFIXES = ["/portal", "/api"];
+const ALLOWED_PREFIXES = ["/portal"];
 
 // Static assets the portal pages themselves depend on (icons, fonts,
 // shared images referenced with a root-relative /assets/... path).
