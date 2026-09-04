@@ -23,7 +23,7 @@
             clubItems.push(["tresorerie", "", "Trésorerie"]);
           }
           if (access.isPresident || member?.isNationalAdmin) {
-            clubItems.push(["home", "", "Président Local"]);
+            clubItems.push(["president", "", "Président Local"]);
           }
           groups.push({
             label: "Vie du club",
