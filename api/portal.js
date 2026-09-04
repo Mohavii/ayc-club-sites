@@ -2221,14 +2221,19 @@ async function secretaryDashboard(req, res, member) {
   const meetingCompliance = meetings.map(m => {
     let noticeHours = null;
     let compliantNotice = true;
+    let requiredNoticeHours = 72;
+    const isBelMeeting = /BEL|bureau ex(é|e)cutif local/i.test(m.title || "");
+    if (isBelMeeting) requiredNoticeHours = 24;
     if (m.announced_at) {
       noticeHours = Math.round((new Date(m.starts_at) - new Date(m.announced_at)) / (1000 * 60 * 60));
-      compliantNotice = m.is_extraordinary || noticeHours >= 72;
+      compliantNotice = m.is_extraordinary || noticeHours >= requiredNoticeHours;
     }
     return {
       ...m,
       noticeHours,
       compliantNotice,
+      requiredNoticeHours,
+      isBelMeeting,
     };
   });
 
@@ -2265,11 +2270,12 @@ async function announceMeeting(req, res, member, body) {
   const startsAt = new Date(meeting.starts_at);
   const diffHours = Math.round((startsAt - now) / (1000 * 60 * 60));
   const isExtraordinary = Boolean(body.isExtraordinary);
-  const isCompliant = isExtraordinary || diffHours >= 72;
+  const requiredNoticeHours = /BEL|bureau ex(é|e)cutif local/i.test(meeting.title || "") ? 24 : 72;
+  const isCompliant = isExtraordinary || diffHours >= requiredNoticeHours;
 
   let warning = null;
   if (!isCompliant) {
-    warning = `Attention : Le délai de préavis fixé par l'association est de 72 heures minimum. La réunion a été annoncée ${diffHours}h avant le début.`;
+    warning = `Attention : Le délai de préavis fixé par l'association est de ${requiredNoticeHours} heures minimum. La réunion a été annoncée ${diffHours}h avant le début.`;
   }
 
   const updated = await db`

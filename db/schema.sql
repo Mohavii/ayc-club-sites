@@ -1323,3 +1323,20 @@ create table if not exists portal_treasury_transfers (
   updated_at timestamptz not null default now()
 );
 create index if not exists idx_portal_treasury_transfers_school on portal_treasury_transfers(school_id, transfer_date desc);
+
+-- =======================================================================
+-- SECRÉTARIAT LOCAL — CARNET DES POINTS SUSPENDUS DE RÉUNION
+-- =======================================================================
+create table if not exists portal_suspended_points (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  meeting_id uuid references portal_meetings(id) on delete set null,
+  title text not null,
+  notes text,
+  status text not null default 'pending' check (status in ('pending', 'included_in_agenda', 'resolved')),
+  recorded_by uuid not null references portal_members(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_suspended_points_school on portal_suspended_points(school_id, status);
+
