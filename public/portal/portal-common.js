@@ -22,6 +22,9 @@
           if (access.canAccessTreasury || access.canViewClubWork || member?.isNationalAdmin) {
             clubItems.push(["tresorerie", "", "Trésorerie"]);
           }
+          if (access.isPresident || member?.isNationalAdmin) {
+            clubItems.push(["secretariat", "", "Président Local"]);
+          }
           groups.push({
             label: "Vie du club",
             items: clubItems,
