@@ -40,9 +40,20 @@ async function submitEdit({ clubSlug, submittedBy, submittedByTag, type, path, i
     newValue,
     label, // human-readable one-liner for the review message
     status: "pending",
+    reviewMessageId: null, // filled in after postToReviewChannel — see attachReviewMessageId
   };
   await store.savePendingEdit(edit);
   return edit;
+}
+
+// Records which Discord message a pending edit was posted as, so it can
+// be looked up and edited in place later (e.g. once an image link is
+// added — see the "add image" flow in control-panel.js).
+async function attachReviewMessageId(edit, messageId) {
+  if (!messageId) return edit;
+  const updated = { ...edit, reviewMessageId: messageId };
+  await store.savePendingEdit(updated);
+  return updated;
 }
 
 function formatValue(v) {
@@ -59,7 +70,12 @@ function formatValue(v) {
 }
 
 function isImageUrl(v) {
-  return typeof v === "string" && /^https?:\/\/.*\.(png|jpe?g|webp|gif)(\?|$)/i.test(v);
+  if (typeof v !== "string") return false;
+  if (/^https?:\/\/.*\.(png|jpe?g|webp|gif)(\?|$)/i.test(v)) return true;
+  // Google Drive direct-view links (see normalizeDriveImageLink in
+  // images.js) don't end in a file extension, so match them explicitly.
+  if (/^https:\/\/drive\.google\.com\/uc\?export=view&id=/i.test(v)) return true;
+  return false;
 }
 
 function findImageUrl(edit) {
@@ -131,21 +147,65 @@ function buildReviewMessage(edit) {
   return payload;
 }
 
+// Returns the posted message (so its id can be saved on the pending edit
+// and used later to refresh the embed once an image link is added — see
+// updateReviewMessage below), or null if posting wasn't possible/failed.
 async function postToReviewChannel(payload) {
   const channelId = process.env.REVIEW_CHANNEL_ID;
   const botToken = process.env.DISCORD_BOT_TOKEN;
   if (!channelId || !botToken) {
     console.error("REVIEW_CHANNEL_ID or DISCORD_BOT_TOKEN missing — cannot post review message.");
-    return;
+    return null;
   }
-  await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bot ${botToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bot ${botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      console.error("postToReviewChannel failed:", res.status, await res.text().catch(() => ""));
+      return null;
+    }
+    return await res.json();
+  } catch (err) {
+    console.error("postToReviewChannel failed:", err.message);
+    return null;
+  }
 }
 
-module.exports = { submitEdit, buildReviewMessage, postToReviewChannel, randomEditId };
+// Edits an already-posted review message in place — used once someone
+// adds an image link after the fact, so the preview embed appears on the
+// SAME approve/reject message instead of a confusing duplicate.
+async function updateReviewMessage(messageId, payload) {
+  const channelId = process.env.REVIEW_CHANNEL_ID;
+  const botToken = process.env.DISCORD_BOT_TOKEN;
+  if (!channelId || !botToken || !messageId) return;
+  try {
+    const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bot ${botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      console.error("updateReviewMessage failed:", res.status, await res.text().catch(() => ""));
+    }
+  } catch (err) {
+    console.error("updateReviewMessage failed:", err.message);
+  }
+}
+
+module.exports = {
+  submitEdit,
+  buildReviewMessage,
+  postToReviewChannel,
+  updateReviewMessage,
+  attachReviewMessageId,
+  randomEditId,
+};

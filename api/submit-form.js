@@ -34,7 +34,10 @@ function formatAnswersForDiscord(club, form, answers) {
     const raw = answers[field.id];
     let displayValue;
     if (field.type === "checkbox") displayValue = raw ? "✅ Oui" : "❌ Non";
-    else if (raw === undefined || raw === null || raw === "") displayValue = "*(vide)*";
+    else if (field.type === "checkbox_group") {
+      const selected = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
+      displayValue = selected.length ? selected.join(", ") : "*(vide)*";
+    } else if (raw === undefined || raw === null || raw === "") displayValue = "*(vide)*";
     else displayValue = String(raw);
     lines.push(`**${field.label}** : ${displayValue}`);
   }
@@ -97,7 +100,12 @@ module.exports = async (req, res) => {
     for (const field of form.fields) {
       if (!field.required) continue;
       const val = answers[field.id];
-      const missing = field.type === "checkbox" ? !val : val === undefined || val === null || String(val).trim() === "";
+      const missing =
+        field.type === "checkbox"
+          ? !val
+          : field.type === "checkbox_group"
+          ? !(Array.isArray(val) ? val.filter(Boolean).length : val)
+          : val === undefined || val === null || String(val).trim() === "";
       if (missing) {
         res.status(400).json({ error: `Le champ "${field.label}" est obligatoire.` });
         return;

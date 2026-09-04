@@ -114,4 +114,32 @@ async function uploadDiscordAttachment(attachmentUrl, { kind = "bel", folder = "
   return json.secure_url; // permanent CDN URL to store in the club's JSON
 }
 
-module.exports = { uploadDiscordAttachment };
+// Turns a Google Drive share link into Drive's own direct-image endpoint
+// so it actually renders as a picture (in a Discord embed, and on the
+// club site) instead of just linking out to a Drive viewer page. Accepts
+// the common share link shapes:
+//   https://drive.google.com/file/d/<ID>/view?usp=sharing
+//   https://drive.google.com/open?id=<ID>
+//   https://drive.google.com/uc?id=<ID>
+// Returns null if the string isn't a recognizable Drive link at all —
+// callers should treat that as a validation error, not silently store a
+// broken link.
+function driveFileId(url) {
+  const patterns = [/\/file\/d\/([^/]+)/, /[?&]id=([^&]+)/];
+  for (const re of patterns) {
+    const match = url.match(re);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+function normalizeDriveImageLink(rawUrl) {
+  const url = (rawUrl || "").trim();
+  if (!url) return null;
+  if (!/^https:\/\/(drive|docs)\.google\.com\//i.test(url)) return null;
+  const id = driveFileId(url);
+  if (!id) return null;
+  return `https://drive.google.com/uc?export=view&id=${id}`;
+}
+
+module.exports = { uploadDiscordAttachment, normalizeDriveImageLink };

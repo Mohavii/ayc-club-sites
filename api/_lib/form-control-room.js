@@ -21,6 +21,7 @@ const FORM_LABELS = {
 const FIELD_TYPE_LABELS = {
   short_text: "Texte court",
   date: "Date",
+  checkbox: "Case à cocher",
   checkbox_group: "Cases à cocher",
   drive_link: "Lien Google Drive",
 };

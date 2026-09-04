@@ -73,6 +73,9 @@ const CHANNEL_DEFS = [
 // form id -> webhook URL, or {} if anything failed partway (partial
 // provisioning is treated as "not ready" rather than left half-built —
 // caller stores whatever succeeded so submissions still work per-form).
+// Also returns categoryId and channelIds (every channel created under
+// that category) so the whole thing can be torn down later if the club
+// is deleted — see deprovisionClubDiscordResources below.
 async function provisionClubChannels(slug, vpcRoleId) {
   const guildId = process.env.DISCORD_GUILD_ID;
   const adminRoleId = process.env.NATIONAL_ADMIN_ROLE_ID;
@@ -103,6 +106,7 @@ async function provisionClubChannels(slug, vpcRoleId) {
   }
 
   const formWebhooks = {};
+  const channelIds = [];
   let controlRoomChannelId = null;
   for (const def of CHANNEL_DEFS) {
     try {
@@ -112,6 +116,7 @@ async function provisionClubChannels(slug, vpcRoleId) {
         parent_id: category.id,
         permission_overwrites: permissionOverwrites,
       });
+      channelIds.push(channel.id);
       if (def.noWebhook) {
         controlRoomChannelId = channel.id;
         continue;
@@ -126,7 +131,7 @@ async function provisionClubChannels(slug, vpcRoleId) {
       // partial provisioning is better than none.
     }
   }
-  return { formWebhooks, controlRoomChannelId };
+  return { formWebhooks, controlRoomChannelId, categoryId: category.id, channelIds };
 }
 
 // Full provisioning flow for a newly-approved club. Never throws — club
@@ -135,9 +140,9 @@ async function provisionClubChannels(slug, vpcRoleId) {
 async function provisionClubDiscordResources(slug, clubName) {
   const vpcRoleId = await createClubRole(slug);
   if (!vpcRoleId) {
-    return { vpcRoleId: null, formWebhooks: {}, controlRoomChannelId: null };
+    return { vpcRoleId: null, formWebhooks: {}, controlRoomChannelId: null, categoryId: null, channelIds: [] };
   }
-  const { formWebhooks, controlRoomChannelId } = await provisionClubChannels(slug, vpcRoleId);
+  const { formWebhooks, controlRoomChannelId, categoryId, channelIds } = await provisionClubChannels(slug, vpcRoleId);
 
   if (controlRoomChannelId) {
     try {
@@ -183,7 +188,49 @@ async function provisionClubDiscordResources(slug, clubName) {
     }
   }
 
-  return { vpcRoleId, formWebhooks, controlRoomChannelId };
+  return { vpcRoleId, formWebhooks, controlRoomChannelId, categoryId, channelIds: channelIds || [] };
 }
 
-module.exports = { provisionClubDiscordResources };
+// Full teardown for a club that's being deleted entirely: removes every
+// text channel created for it, the category that held them, and its VPC
+// role. Best-effort and never throws — club deletion (the GitHub file
+// removal) must succeed even if Discord cleanup partially fails (e.g.
+// something was already manually deleted, or the bot briefly lacks
+// permission). Each resource is attempted independently so one failure
+// doesn't block the others.
+async function deprovisionClubDiscordResources(club) {
+  if (!club) return;
+  const guildId = process.env.DISCORD_GUILD_ID;
+  if (!guildId) return;
+
+  const channelIds = Array.isArray(club.channelIds) ? club.channelIds : [];
+  // Fall back to the one channel id older club records might still have
+  // if they were provisioned before channelIds existed.
+  if (!channelIds.length && club.controlRoomChannelId) channelIds.push(club.controlRoomChannelId);
+
+  for (const channelId of channelIds) {
+    try {
+      await discordRequest("DELETE", `/channels/${channelId}`);
+    } catch (err) {
+      console.error(`Failed to delete channel ${channelId} for ${club.slug}:`, err.message);
+    }
+  }
+
+  if (club.categoryId) {
+    try {
+      await discordRequest("DELETE", `/channels/${club.categoryId}`);
+    } catch (err) {
+      console.error(`Failed to delete category ${club.categoryId} for ${club.slug}:`, err.message);
+    }
+  }
+
+  if (club.vpcRoleId) {
+    try {
+      await discordRequest("DELETE", `/guilds/${guildId}/roles/${club.vpcRoleId}`);
+    } catch (err) {
+      console.error(`Failed to delete role ${club.vpcRoleId} for ${club.slug}:`, err.message);
+    }
+  }
+}
+
+module.exports = { provisionClubDiscordResources, deprovisionClubDiscordResources };

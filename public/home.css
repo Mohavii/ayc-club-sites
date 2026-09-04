@@ -453,6 +453,16 @@
 .form-field-checkbox input[type="checkbox"]{ width:auto; margin-top:3px; accent-color:var(--blue-2); }
 .form-field-checkbox label{ font-weight:500; }
 .form-field-hint{ font-size:0.74rem; color:var(--ink-soft); margin:2px 0 0; }
+.form-field-checkbox-group{ display:flex; flex-direction:column; gap:8px; }
+.form-field-group-label{
+  font-family:var(--font-body); font-weight:600; font-size:0.78rem;
+  color:var(--navy-1); letter-spacing:0.01em;
+}
+.form-field-option{ display:flex; align-items:flex-start; gap:10px; }
+.form-field-option input[type="checkbox"], .form-field-option input[type="radio"]{
+  width:auto; margin-top:3px; accent-color:var(--blue-2);
+}
+.form-field-option label{ font-weight:500; font-size:0.92rem; color:var(--ink); }
 .form-submit-state{
   grid-column:1 / -1; padding:14px 16px; border-radius:12px; font-size:0.88rem;
   display:none;

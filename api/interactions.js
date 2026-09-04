@@ -986,6 +986,7 @@ const FIELD_TYPE_LABELS = {
   short_text: "Texte court",
   date: "Date",
   checkbox: "Case à cocher",
+  checkbox_group: "Cases à cocher (options)",
   drive_link: "Lien Google Drive",
 };
 

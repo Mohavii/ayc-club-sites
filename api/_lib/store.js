@@ -12,6 +12,7 @@
 
 const { Octokit } = require("@octokit/rest");
 const { syncSchoolOnSave, syncSchoolOnDelete } = require("./schools-sync");
+const { deprovisionClubDiscordResources } = require("./discord-provisioning");
 
 function getClient() {
   return new Octokit({ auth: process.env.GITHUB_TOKEN });
@@ -115,8 +116,20 @@ async function saveClub(club, commitMessage) {
 }
 
 async function deleteClub(slug, commitMessage) {
-  const { sha } = await readJsonFile(clubPath(slug));
+  const { data: club, sha } = await readJsonFile(clubPath(slug));
   if (!sha) return; // already gone
+
+  // Tear down everything Discord-side (VPC role, category, channels)
+  // BEFORE the club's JSON file is deleted — we need the club record's
+  // vpcRoleId/categoryId/channelIds to know what to remove. Best-effort:
+  // logged failures here never block the actual deletion below, so a
+  // Discord hiccup can't leave a club stuck and undeletable.
+  try {
+    await deprovisionClubDiscordResources(club);
+  } catch (err) {
+    console.error(`Failed to deprovision Discord resources for ${slug}:`, err);
+  }
+
   await deleteFile(clubPath(slug), commitMessage, sha);
   // Deactivates the portal school and deletes any member accounts tied
   // to it — a club being deleted here means it no longer exists at all.

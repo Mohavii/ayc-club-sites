@@ -12,8 +12,11 @@
 
 const store = require("./store");
 const { checkClubEditPermission } = require("./permissions");
-const { submitEdit, buildReviewMessage, postToReviewChannel } = require("./edits");
-const { uploadDiscordAttachment } = require("./images");
+const { submitEdit, buildReviewMessage, postToReviewChannel, updateReviewMessage, attachReviewMessageId } = require("./edits");
+const { normalizeDriveImageLink } = require("./images");
+
+// Which field on an item holds its picture, per section.
+const IMAGE_FIELD = { events: "image", bel: "photo", partners: "logo" };
 
 const AXIS_CHOICES = ["Citoyenneté", "Santé", "Scolarité", "Éducation formelle", "Vie active"];
 const BEL_ROLES = [
@@ -262,7 +265,7 @@ async function handleAddModalSubmit(section, clubSlug, interaction) {
     return { type: 4, data: { content: "Section inconnue.", flags: 64 } };
   }
 
-  const edit = await submitEdit({
+  let edit = await submitEdit({
     clubSlug,
     submittedBy: userId,
     submittedByTag: userTag,
@@ -271,12 +274,99 @@ async function handleAddModalSubmit(section, clubSlug, interaction) {
     newValue: item,
     label,
   });
-  await postToReviewChannel(buildReviewMessage(edit));
+  const posted = await postToReviewChannel(buildReviewMessage(edit));
+  if (posted && posted.id) edit = await attachReviewMessageId(edit, posted.id);
 
+  // Immediately offer a second, ephemeral step to attach a picture via a
+  // Google Drive link — separate from the modal above because Discord
+  // modals can't have a "paste this after you get the link" flow in a
+  // single popup, and not every add needs a photo anyway (hence the
+  // explicit "Passer" button rather than forcing it).
   return {
     type: 4,
     data: {
       embeds: [{ title: "✅ Envoyé en révision", description: label, color: 0x22c55e }],
+      components: [
+        {
+          type: 1,
+          components: [
+            {
+              type: 2,
+              style: 1,
+              label: "🖼️ Ajouter une image (lien Drive)",
+              custom_id: `panel:addimage:${section}:${clubSlug}:${edit.editId}`,
+            },
+            { type: 2, style: 2, label: "Passer", custom_id: `panel:skipimage:${section}:${clubSlug}:${edit.editId}` },
+          ],
+        },
+      ],
+      flags: 64,
+    },
+  };
+}
+
+// ---------------- add-image-link follow-up (events / bel / partners) ----------------
+
+function buildImageLinkModal(section, clubSlug, editId) {
+  return {
+    custom_id: `panel:submitimage:${section}:${clubSlug}:${editId}`,
+    title: "Image (lien Google Drive)",
+    components: [
+      {
+        type: 1,
+        components: [
+          {
+            type: 4,
+            custom_id: "drive_link",
+            style: 1,
+            label: "Lien Google Drive de l'image",
+            placeholder: "https://drive.google.com/file/d/.../view?usp=sharing",
+            required: true,
+            max_length: 300,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+async function handleImageLinkModalSubmit(section, clubSlug, editId, interaction) {
+  const { error, club } = await requirePermission(clubSlug, interaction);
+  if (error) return { type: 4, data: error };
+
+  const { data: edit, sha } = await store.getPendingEdit(clubSlug, editId);
+  if (!edit || edit.status !== "pending") {
+    return {
+      type: 4,
+      data: { content: "⚠️ Cette proposition n'existe plus (déjà traitée par un·e admin ?).", flags: 64 },
+    };
+  }
+
+  const rawLink = (getModalValue(interaction, "drive_link") || "").trim();
+  const imageUrl = normalizeDriveImageLink(rawLink);
+  if (!imageUrl) {
+    return {
+      type: 4,
+      data: {
+        content: "❌ Ce n'est pas un lien Google Drive valide. Utilise le lien de partage d'un fichier (\"Partager\" → \"Copier le lien\"), et assure-toi que l'accès est réglé sur \"Toute personne disposant du lien\".",
+        flags: 64,
+      },
+    };
+  }
+
+  const field = IMAGE_FIELD[section];
+  const updatedItem = { ...edit.newValue, [field]: imageUrl };
+  const updatedEdit = { ...edit, newValue: updatedItem };
+  await store.savePendingEdit(updatedEdit);
+
+  if (edit.reviewMessageId) {
+    await updateReviewMessage(edit.reviewMessageId, buildReviewMessage(updatedEdit));
+  }
+
+  return {
+    type: 4,
+    data: {
+      embeds: [{ title: "✅ Image ajoutée", description: `L'image a été ajoutée à la proposition en révision : ${edit.label}`, color: 0x22c55e }],
       flags: 64,
     },
   };
@@ -383,6 +473,22 @@ async function handlePanelComponent(interaction) {
   if (action === "removeconfirm") {
     const [, , section, clubSlug] = parts;
     return handleRemoveConfirm(section, clubSlug, interaction);
+  }
+
+  if (action === "addimage") {
+    const [, , section, clubSlug, editId] = parts;
+    // Same reasoning as "add" above — modals must be shown within
+    // Discord's strict window, so no permission round-trip before
+    // opening it. handleImageLinkModalSubmit checks permission before
+    // writing anything.
+    return { type: 9, data: buildImageLinkModal(section, clubSlug, editId) };
+  }
+
+  if (action === "skipimage") {
+    return {
+      type: 7,
+      data: { embeds: [{ title: "✅ Envoyé en révision", description: "Sans image.", color: 0x22c55e }], components: [] },
+    };
   }
 
   if (action === "info") {
@@ -502,6 +608,10 @@ async function handlePanelModalSubmit(interaction) {
   if (parts[1] === "submitinfo") {
     const [, , field, clubSlug] = parts;
     return handleInfoModalSubmit(field, clubSlug, interaction);
+  }
+  if (parts[1] === "submitimage") {
+    const [, , section, clubSlug, editId] = parts;
+    return handleImageLinkModalSubmit(section, clubSlug, editId, interaction);
   }
   return { type: 4, data: { content: "Formulaire inconnu.", flags: 64 } };
 }

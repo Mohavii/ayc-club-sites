@@ -495,6 +495,24 @@ function renderFormField(field) {
           <p class="form-field-hint">Assure-toi que le lien est accessible ("Toute personne disposant du lien").</p>
         </div>`;
   }
+  if (field.type === "checkbox_group" && Array.isArray(field.options)) {
+    const inputType = field.multiSelect ? "checkbox" : "radio";
+    const options = field.options
+      .map((opt, i) => {
+        const optId = `${escapeHtml(field.id)}__${i}`;
+        return `
+          <div class="form-field-option">
+            <input type="${inputType}" id="${optId}" name="${escapeHtml(field.id)}${field.multiSelect ? "[]" : ""}" value="${escapeHtml(opt)}">
+            <label for="${optId}">${escapeHtml(opt)}</label>
+          </div>`;
+      })
+      .join("");
+    return `
+        <div class="form-field form-field-full form-field-checkbox-group" data-required="${field.required ? "1" : "0"}" data-name="${escapeHtml(field.id)}">
+          <span class="form-field-group-label">${escapeHtml(field.label)}${reqLabel}</span>
+          ${options}
+        </div>`;
+  }
   // short_text (default)
   return `
         <div class="form-field">
@@ -560,13 +578,46 @@ function renderFormPage(club, formId, form, apiBaseUrl) {
           }
           stateEl.className = 'form-submit-state';
           stateEl.textContent = '';
+
+          // novalidate is set above so required checkbox-group fields (which
+          // don't map to a single native input) still block submission —
+          // native HTML5 "required" can't express "at least one of these
+          // checkboxes", so this checks it manually before posting.
+          var missingGroup = null;
+          Array.from(form.querySelectorAll('.form-field-checkbox-group[data-required="1"]')).forEach(function(group){
+            if (missingGroup) return;
+            var anyChecked = Array.from(group.querySelectorAll('input')).some(function(i){ return i.checked; });
+            if (!anyChecked) missingGroup = group;
+          });
+          if (missingGroup) {
+            stateEl.className = 'form-submit-state is-error';
+            stateEl.textContent = 'Merci de sélectionner au moins une option pour les champs obligatoires.';
+            return;
+          }
+
           btn.disabled = true;
           btn.textContent = 'Envoi...';
 
           var data = {};
           Array.from(form.elements).forEach(function(el){
             if (!el.name) return;
-            data[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+            // Checkbox-group fields are rendered as name="fieldId[]" (multi-select)
+            // or name="fieldId" with type=radio (single-select) — both collapse
+            // back down to the plain fieldId key the server expects, collecting
+            // every checked value into an array so multi-select answers aren't
+            // silently overwritten by the last checkbox alone.
+            var isGroupCheckbox = el.type === 'checkbox' && /\[\]$/.test(el.name);
+            var isGroupRadio = el.type === 'radio';
+            if (isGroupCheckbox) {
+              var key = el.name.replace(/\[\]$/, '');
+              if (!Array.isArray(data[key])) data[key] = [];
+              if (el.checked) data[key].push(el.value);
+            } else if (isGroupRadio) {
+              if (el.checked) data[el.name] = el.value;
+              else if (!(el.name in data)) data[el.name] = null;
+            } else {
+              data[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+            }
           });
 
           fetch(${JSON.stringify(apiBaseUrl)} + '/api/submit-form', {
