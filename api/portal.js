@@ -1389,7 +1389,8 @@ function majorityOutcome(forVotes, againstVotes, abstentions, majorityType) {
 async function treasuryTransactions(req, res, member, body) {
   const schoolId = schoolScope(member, req.method === 'GET' ? req.query?.schoolId : body.schoolId);
   if (!schoolId) return json(res, 400, { error: "Club non spécifié." });
-  if (!(member.is_national_admin || member.access?.canAccessTreasury)) {
+  const access = await getMemberPortalAccess(member);
+  if (!(member.is_national_admin || access.canAccessTreasury)) {
     return json(res, 403, { error: "Accès réservé au trésorier du club ou aux administrateurs nationaux." });
   }
   const db = sql();
@@ -1453,7 +1454,8 @@ async function treasuryTransactions(req, res, member, body) {
 async function treasuryDues(req, res, member, body) {
   const schoolId = schoolScope(member, req.method === 'GET' ? req.query?.schoolId : body.schoolId);
   if (!schoolId) return json(res, 400, { error: "Club non spécifié." });
-  if (!(member.is_national_admin || member.access?.canAccessTreasury)) {
+  const access = await getMemberPortalAccess(member);
+  if (!(member.is_national_admin || access.canAccessTreasury)) {
     return json(res, 403, { error: "Accès réservé au trésorier du club ou aux administrateurs nationaux." });
   }
   const db = sql();
@@ -1490,7 +1492,8 @@ async function treasuryDues(req, res, member, body) {
 async function treasuryTransfers(req, res, member, body) {
   const schoolId = schoolScope(member, req.method === 'GET' ? req.query?.schoolId : body.schoolId);
   if (!schoolId) return json(res, 400, { error: "Club non spécifié." });
-  if (!(member.is_national_admin || member.access?.canAccessTreasury)) {
+  const access = await getMemberPortalAccess(member);
+  if (!(member.is_national_admin || access.canAccessTreasury)) {
     return json(res, 403, { error: "Accès réservé au trésorier du club ou aux administrateurs nationaux." });
   }
   const db = sql();

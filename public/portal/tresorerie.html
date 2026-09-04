@@ -102,7 +102,7 @@
               <div class="toolbar">
                 <div>
                   <p class="eyebrow">Saisie</p>
-                  <h2>Nouvelle transaction</h2>
+                  <h2 id="tx-form-title">Nouvelle transaction</h2>
                 </div>
               </div>
               <form id="transaction-form">
@@ -143,7 +143,8 @@
                   <input id="tx-receipt" type="url" placeholder="https://...">
                 </div>
                 <div class="form-actions">
-                  <button class="btn btn-primary" type="submit">Enregistrer</button>
+                  <button class="btn btn-primary" type="submit" id="tx-submit">Enregistrer</button>
+                  <button class="btn btn-secondary" type="button" id="tx-cancel-edit" hidden>Annuler</button>
                 </div>
               </form>
             </div>
@@ -277,8 +278,10 @@
             trRows = document.getElementById('transfers-rows');
       const byId = id => document.getElementById(id), esc = AYCPortal.escapeHtml;
       const fmt = (v) => new Intl.NumberFormat('fr-TN', { style: 'currency', currency: 'TND' }).format(v || 0);
+      const toDateInput = (v) => { if (!v) return ''; const d = new Date(v); return Number.isNaN(d.getTime()) ? String(v).slice(0, 10) : d.toISOString().slice(0, 10); };
+      const TRANSFER_STATUS = { pending: 'En attente', verified: 'Validé', rejected: 'Refusé' };
       let member, txs = [], dues = [], transfers = [];
-      let activeFilter = 'all';
+      let activeFilter = 'all', editingTxId = null;
 
       function renderKpis() {
         const credits = txs.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0);
@@ -292,49 +295,49 @@
 
       function renderTransactions() {
         const filtered = activeFilter === 'all' ? txs : txs.filter(t => t.type === activeFilter);
-        txRows.innerHTML = filtered.length ? filtered.map(t => \`
+        txRows.innerHTML = filtered.length ? filtered.map(t => `
           <tr>
-            <td>\${AYCPortal.formatDate(t.transaction_date)}</td>
-            <td>\${esc(t.description)}</td>
-            <td>\${esc(t.category)}</td>
-            <td style="color:\${t.type === 'credit' ? 'var(--portal-green)' : 'var(--portal-red)'}; font-weight:800">
-              \${t.type === 'credit' ? '+' : '-'}\${fmt(t.amount)}
+            <td>${AYCPortal.formatDate(t.transaction_date)}</td>
+            <td>${esc(t.description)}</td>
+            <td>${esc(t.category)}</td>
+            <td style="color:${t.type === 'credit' ? 'var(--portal-green)' : 'var(--portal-red)'}; font-weight:800">
+              ${t.type === 'credit' ? '+' : '-'}${fmt(t.amount)}
             </td>
-            <td>\${esc(t.recorded_by_name)}</td>
+            <td>${esc(t.recorded_by_name)}</td>
             <td>
-              <button class="btn btn-secondary btn-sm" data-edit="\${t.id}">Modifier</button>
-              <button class="btn btn-danger btn-sm" data-delete="\${t.id}">Supprimer</button>
+              <button class="btn btn-secondary btn-sm" data-edit="${t.id}">Modifier</button>
+              <button class="btn btn-danger btn-sm" data-delete="${t.id}">Supprimer</button>
             </td>
-          </tr>\`).join('') : \`<tr><td colspan="6">\${AYCPortal.renderEmpty('Aucune transaction enregistrée')}</td></tr>\`;
+          </tr>`).join('') : `<tr><td colspan="6">${AYCPortal.renderEmpty('Aucune transaction enregistrée')}</td></tr>`;
       }
 
       function renderDues() {
-        duesRows.innerHTML = dues.length ? dues.map(m => \`
+        duesRows.innerHTML = dues.length ? dues.map(m => `
           <tr>
-            <td>\${esc(m.display_name || m.username)}</td>
-            <td>\${m.amount ? '<span class="stat-badge badge-ok">Payé</span>' : '<span class="stat-badge badge-danger">Impayé</span>'}</td>
-            <td>\${fmt(m.amount || 0)}</td>
-            <td>\${m.payment_date ? AYCPortal.formatDate(m.payment_date) : '—'}</td>
-            <td>\${esc(m.receipt_serial || '—')}</td>
-            <td><button class="btn btn-secondary btn-sm" data-record="\${m.id}">Saisir</button></td>
-          </tr>\`).join('') : \`<tr><td colspan="6">\${AYCPortal.renderEmpty('Aucun membre trouvé')}</td></tr>\`;
+            <td>${esc(m.display_name || m.username)}</td>
+            <td>${m.amount ? '<span class="stat-badge badge-ok">Payé</span>' : '<span class="stat-badge badge-danger">Impayé</span>'}</td>
+            <td>${fmt(m.amount || 0)}</td>
+            <td>${m.payment_date ? AYCPortal.formatDate(m.payment_date) : '—'}</td>
+            <td>${esc(m.receipt_serial || '—')}</td>
+            <td><button class="btn btn-secondary btn-sm" data-record="${m.id}">Saisir</button></td>
+          </tr>`).join('') : `<tr><td colspan="6">${AYCPortal.renderEmpty('Aucun membre trouvé')}</td></tr>`;
       }
 
       function renderTransfers() {
-        trRows.innerHTML = transfers.length ? transfers.map(t => \`
+        trRows.innerHTML = transfers.length ? transfers.map(t => `
           <tr>
-            <td>\${AYCPortal.formatDate(t.transfer_date)}</td>
-            <td>\${t.destination === 'national_bank' ? 'Banque Nationale' : 'Poste'}</td>
-            <td>\${fmt(t.amount)}</td>
-            <td><a href="\${esc(t.receipt_url)}" target="_blank" class="btn btn-secondary btn-sm">Voir</a></td>
-            <td><span class="stat-badge \${t.status === 'verified' ? 'badge-ok' : t.status === 'rejected' ? 'badge-danger' : 'badge-warn'}">\${t.status}</span></td>
+            <td>${AYCPortal.formatDate(t.transfer_date)}</td>
+            <td>${t.destination === 'national_bank' ? 'Banque Nationale' : 'Poste'}</td>
+            <td>${fmt(t.amount)}</td>
+            <td><a href="${esc(t.receipt_url)}" target="_blank" class="btn btn-secondary btn-sm">Voir</a></td>
+            <td><span class="stat-badge ${t.status === 'verified' ? 'badge-ok' : t.status === 'rejected' ? 'badge-danger' : 'badge-warn'}">${TRANSFER_STATUS[t.status] || t.status}</span></td>
             <td>
-              \${member?.isNationalAdmin ? \`
-                <button class="btn btn-secondary btn-sm" data-verify-ok="\${t.id}">Valider</button>
-                <button class="btn btn-danger btn-sm" data-verify-no="\${t.id}">Refuser</button>
-              \` : '—'}
+              ${member?.isNationalAdmin ? `
+                <button class="btn btn-secondary btn-sm" data-verify-ok="${t.id}">Valider</button>
+                <button class="btn btn-danger btn-sm" data-verify-no="${t.id}">Refuser</button>
+              ` : '—'}
             </td>
-          </tr>\`).join('') : \`<tr><td colspan="6">\${AYCPortal.renderEmpty('Aucun virement enregistré')}</td></tr>\`;
+          </tr>`).join('') : `<tr><td colspan="6">${AYCPortal.renderEmpty('Aucun virement enregistré')}</td></tr>`;
       }
 
       async function loadAll() {
@@ -356,7 +359,7 @@
         } catch (err) { showError(err); }
       }
 
-      function showError(err) { notice.innerHTML = \`<div class="alert alert-error">\${esc(err.message || err)}</div>\`; }
+      function showError(err) { notice.innerHTML = `<div class="alert alert-error">${esc(err.message || err)}</div>`; }
 
       // Event Listeners
       document.querySelectorAll('.treasury-tab').forEach(tab => {
@@ -377,23 +380,31 @@
         });
       });
 
+      function resetTxForm() {
+        editingTxId = null;
+        byId('transaction-form').reset();
+        byId('tx-form-title').textContent = 'Nouvelle transaction';
+        byId('tx-submit').textContent = 'Enregistrer';
+        byId('tx-cancel-edit').hidden = true;
+      }
+
       byId('transaction-form').onsubmit = async e => {
         e.preventDefault();
+        const wasEditing = Boolean(editingTxId);
+        const body = {
+          action: wasEditing ? 'update' : 'create',
+          transactionDate: byId('tx-date').value,
+          type: byId('tx-type').value,
+          amount: byId('tx-amount').value,
+          description: byId('tx-desc').value,
+          category: byId('tx-category').value,
+          receiptUrl: byId('tx-receipt').value
+        };
+        if (wasEditing) body.transactionId = editingTxId;
         try {
-          await AYCPortal.api('treasury_transactions', { 
-            method: 'POST', 
-            body: { 
-              action: 'create', 
-              transactionDate: byId('tx-date').value, 
-              type: byId('tx-type').value, 
-              amount: byId('tx-amount').value, 
-              description: byId('tx-desc').value, 
-              category: byId('tx-category').value, 
-              receiptUrl: byId('tx-receipt').value 
-            } 
-          });
-          notice.innerHTML = '<div class="alert alert-success">Transaction enregistrée.</div>';
-          e.target.reset();
+          await AYCPortal.api('treasury_transactions', { method: 'POST', body });
+          notice.innerHTML = `<div class="alert alert-success">${wasEditing ? 'Transaction mise à jour.' : 'Transaction enregistrée.'}</div>`;
+          resetTxForm();
           await loadAll();
         } catch (err) { showError(err); }
       };
@@ -458,22 +469,25 @@
         const editBtn = e.target.closest('[data-edit]');
         if (editBtn) {
           const id = editBtn.dataset.edit;
-          const tx = txs.find(t => t.id === id);
+          const tx = txs.find(t => String(t.id) === String(id));
           if (tx) {
-            byId('tx-date').value = tx.transaction_date;
+            editingTxId = tx.id;
+            byId('tx-date').value = toDateInput(tx.transaction_date);
             byId('tx-type').value = tx.type;
             byId('tx-amount').value = tx.amount;
             byId('tx-category').value = tx.category;
             byId('tx-desc').value = tx.description;
             byId('tx-receipt').value = tx.receipt_url || '';
-            byId('tx-type').dispatchEvent(new Event('change')); // Trigger filter logic if any
+            byId('tx-form-title').textContent = 'Modifier la transaction';
+            byId('tx-submit').textContent = 'Mettre à jour';
+            byId('tx-cancel-edit').hidden = false;
             document.getElementById('panel-transactions').scrollIntoView({ behavior: 'smooth' });
           }
         }
         const verifyOk = e.target.closest('[data-verify-ok]');
         if (verifyOk) {
           try {
-            await AYCPortal.api('treasury_transfers', { method: 'POST', body: { action: 'verify', transferId: verifyOk.dataset.verify_ok, status: 'verified' } });
+            await AYCPortal.api('treasury_transfers', { method: 'POST', body: { action: 'verify', transferId: verifyOk.dataset.verifyOk, status: 'verified' } });
             notice.innerHTML = '<div class="alert alert-success">Virement validé.</div>';
             await loadAll();
           } catch (err) { showError(err); }
@@ -481,7 +495,7 @@
         const verifyNo = e.target.closest('[data-verify-no]');
         if (verifyNo) {
           try {
-            await AYCPortal.api('treasury_transfers', { method: 'POST', body: { action: 'verify', transferId: verifyNo.dataset.verify_no, status: 'rejected' } });
+            await AYCPortal.api('treasury_transfers', { method: 'POST', body: { action: 'verify', transferId: verifyNo.dataset.verifyNo, status: 'rejected' } });
             notice.innerHTML = '<div class="alert alert-error">Virement refusé.</div>';
             await loadAll();
           } catch (err) { showError(err); }
@@ -500,9 +514,10 @@
         await loadAll();
         // Populate member select for dues
         const roster = await AYCPortal.api('roster');
-        byId('due-member').innerHTML = roster.members.map(m => \`<option value="\${m.id}">\${esc(m.display_name || m.username)}</option>\`).join('');
+        byId('due-member').innerHTML = roster.members.map(m => `<option value="${m.id}">${esc(m.display_name || m.username)}</option>`).join('');
       } catch (e) { showError(e); }
       byId('btn-refresh').onclick = loadAll;
+      byId('tx-cancel-edit').onclick = resetTxForm;
     })();
   </script>
 </body>
