@@ -11,7 +11,17 @@
   "officers": [
     "746843897350848514"
   ],
-  "events": [],
+  "events": [
+    {
+      "id": "evt_4kyft4",
+      "title": "Youth Expo",
+      "date": "2026-08-31",
+      "location": "Mannouba",
+      "description": "Youth Expo event",
+      "axis": "Education Formelle",
+      "image": null
+    }
+  ],
   "bel": [],
   "partners": [],
   "forms": {
