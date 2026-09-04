@@ -318,7 +318,13 @@ async function meetingDetail(req, res, member, body) {
             and r.ended_at is null and m.status = 'active'
           order by m.display_name
         `
-      : db`select id, display_name, username, membership_status from portal_members where school_id = ${meeting.school_id} and status = 'active' order by display_name`,
+      : db`
+          select m.id, m.display_name, m.username, m.membership_status, r.role as display_role
+          from portal_members m
+          left join portal_club_display_roles r on r.member_id = m.id and r.school_id = m.school_id and r.ended_at is null
+          where m.school_id = ${meeting.school_id} and m.status = 'active'
+          order by m.display_name
+        `,
     isNationalMeeting
       ? db`
           select s.id as school_id, s.name as school_name,
