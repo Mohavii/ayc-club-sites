@@ -247,6 +247,13 @@ function needsDefer(group, action) {
   if (group === "event" && (action === "add" || action === "set-photo")) return true;
   if (group === "set-hero-image") return true;
   if (group === "set-logo") return true;
+  // create and delete each do a GitHub write (submitEdit) AND a Discord
+  // API call (postToReviewChannel) before they can respond — two
+  // sequential network round-trips is already enough to blow past
+  // Discord's 3s interaction budget, so these need the same
+  // ack-now/finish-in-background treatment as the upload commands above.
+  if (group === "create") return true;
+  if (group === "delete") return true;
   return false;
 }
 
@@ -319,13 +326,24 @@ async function handleCommand(interaction, res) {
           finalMessage = await cmdSetHeroImage(opts, userTag, interaction);
         } else if (group === "set-logo") {
           finalMessage = await cmdSetLogo(opts, userTag, interaction);
+        } else if (group === "create") {
+          finalMessage = await cmdCreate(opts, userId, userTag);
+        } else if (group === "delete") {
+          finalMessage = await cmdDelete(opts, userTag, interaction);
         }
       } catch (err) {
         console.error("Background command work failed:", err);
         finalMessage = { content: `❌ Une erreur est survenue : ${err.message}` };
       }
       try {
-        await editOriginalResponse(interaction, finalMessage.content);
+        // Command handlers return two different shapes: plain
+        // { content } (the upload commands this deferred path was
+        // originally built for) or the full ephemeral(...) wrapper
+        // { type, data: { content, flags } } (cmdCreate/cmdDelete,
+        // shared with the non-deferred switch below). Handle both so
+        // the edited message isn't left blank.
+        const content = finalMessage && (finalMessage.content ?? finalMessage.data?.content);
+        await editOriginalResponse(interaction, content);
       } catch (err) {
         console.error("Failed to edit original Discord response:", err);
       }
@@ -337,14 +355,9 @@ async function handleCommand(interaction, res) {
 
   let result;
   switch (group) {
-    case "create":
-      result = await cmdCreate(opts, userId, userTag);
-      break;
+    // "create" and "delete" are handled above via the deferred path.
     case "list":
       result = await cmdList();
-      break;
-    case "delete":
-      result = await cmdDelete(opts, userTag, interaction);
       break;
     case "set-about":
       result = await cmdSetSimpleField(opts, userTag, interaction, "about", "text", "À propos");

@@ -176,10 +176,20 @@ function pendingPath(slug, editId) {
 }
 
 async function savePendingEdit(edit) {
+  const path = pendingPath(edit.clubSlug, edit.editId);
+  // The same edit record gets written more than once (e.g. once on
+  // submit, again later via attachReviewMessageId/control-panel.js once
+  // the review message id or an image link is added). GitHub's contents
+  // API requires the current file's sha on every update after the first
+  // create, so look it up here instead of assuming this is always a
+  // brand-new file — otherwise the second write 400s with
+  // `"sha" wasn't supplied`.
+  const { sha } = await readJsonFile(path);
   await writeJsonFile(
-    pendingPath(edit.clubSlug, edit.editId),
+    path,
     edit,
-    `Pending edit: ${edit.clubSlug} / ${edit.path} (by ${edit.submittedBy})`
+    `Pending edit: ${edit.clubSlug} / ${edit.path} (by ${edit.submittedBy})`,
+    sha
   );
 }
 
