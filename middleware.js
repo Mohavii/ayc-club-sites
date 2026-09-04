@@ -20,7 +20,7 @@ export const config = {
   matcher: "/:path*",
 };
 
-const ALLOWED_PREFIXES = ["/portal"];
+const ALLOWED_PREFIXES = ["/portal", "/api"];
 
 // Static assets the portal pages themselves depend on (icons, fonts,
 // shared images referenced with a root-relative /assets/... path).
@@ -41,7 +41,7 @@ export default function middleware(request) {
 
   // Only the internes-facing deployment is locked down. Everything else
   // (local dev, bot, service projects) passes through unmodified.
-  if (target !== "portal-edge") {
+  if (target !== "portal-edge" && target !== "portal-auth") {
     return;
   }
 
@@ -52,7 +52,6 @@ export default function middleware(request) {
   }
 
   // Anything outside /portal (and the /api proxies /portal pages call) is
-  // out of bounds on this domain — send visitors to the login page rather
-  // than exposing the externe site or a raw 404.
-  return Response.redirect(new URL("/portal/login", request.url), 302);
+  // out of bounds on this domain — send visitors to the portal home page.
+  return Response.redirect(new URL("/portal/home", request.url), 302);
 }
