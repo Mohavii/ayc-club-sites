@@ -28,7 +28,20 @@
     "join": {
       "enabled": false,
       "title": "Rejoindre le club",
-      "fields": []
+      "fields": [
+        {
+          "id": "fld_oi8ur2",
+          "type": "checkbox_group",
+          "label": "Nom&Prénom",
+          "required": true,
+          "options": [
+            "eslem",
+            "achraf",
+            "moemen"
+          ],
+          "multiSelect": false
+        }
+      ]
     },
     "team_communication": {
       "enabled": false,
