@@ -344,6 +344,7 @@ async function getMemberPortalAccess(member) {
     canViewClubWork: canManageClubWork,
     canCreateMeeting: has("meeting_organizer"),
     canEditPV: has("pv_editor"),
+    canEditAssemblyPV: isNationalAdmin || isEpnMember,
     canCreateProject: has("project_manager"),
     canCreateNationalProject: hasNational("national_projects"),
     nationalCapabilities,

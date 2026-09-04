@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Éditeur de PV · Portail YOUTHCLUBber</title>
+  <link rel="icon" href="../assets/favicon-32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="portal.css">
+  <style>
+    body { background: #f5f7fa; }
+    .pv-editor-shell { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .pv-editor-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding: 26px 30px 20px; background: linear-gradient(180deg, #fbfdff, #f5f8fc); border-bottom: 1px solid #e5eaf2; border-radius: 16px 16px 0 0; }
+    .pv-editor-header h2 { margin: 5px 0 7px; color: var(--portal-navy); font: 400 2rem "Fjalla One", sans-serif; }
+    .pv-editor-header p { margin: 0; color: #72809a; font-size: .85rem; }
+    .pv-editor-toolbar { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; padding: 20px 30px; background: #fff; border-bottom: 1px solid #e5eaf2; }
+    .pv-editor-toolbar h3 { margin: 0; color: var(--portal-navy); font: 400 1.3rem "Fjalla One", sans-serif; }
+    .pv-points { padding: 20px 30px; background: #fff; }
+    .pv-point-card { display: grid; grid-template-columns: 40px 1fr; gap: 16px; align-items: start; padding: 20px; background: #fff; border: 1px solid #e2e8f1; border-radius: 12px; margin-bottom: 16px; }
+    .pv-block-number { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: #e9f0ff; color: #416bc1; font-weight: 900; font-size: 1rem; }
+    .pv-block-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .pv-block-fields label { font-size: .75rem; font-weight: 800; color: #6a748b; margin-bottom: 4px; display: block; }
+    .pv-block-fields input, .pv-block-fields textarea, .pv-block-fields select { width: 100%; padding: 10px 12px; border: 1px solid #dbe2ef; border-radius: 8px; font-size: .9rem; }
+    .pv-block-fields textarea { min-height: 80px; resize: vertical; }
+    .pv-full-width { grid-column: 1 / -1; }
+    .pv-footer-actions { padding: 20px 30px; background: #fff; border-radius: 0 0 16px 16px; display: flex; gap: 12px; justify-content: flex-end; }
+    .meeting-info { background: #fff; padding: 20px 30px; border-bottom: 1px solid #e5eaf2; }
+  </style>
+</head>
+<body>
+  <div class="pv-editor-shell">
+    <header class="pv-editor-header">
+      <div>
+        <p class="eyebrow">Éditeur de Procès-Verbal</p>
+        <h2 id="meeting-title">Chargement...</h2>
+        <p id="meeting-meta"></p>
+      </div>
+      <div>
+        <button class="btn btn-secondary btn-sm" id="btn-close">Fermer</button>
+      </div>
+    </header>
+
+    <div class="meeting-info" id="meeting-info"></div>
+
+    <div class="pv-editor-toolbar">
+      <div>
+        <h3>Points à l'ordre du jour</h3>
+        <p style="margin: 5px 0 0; color: #77839a; font-size: .8rem;">Ajoutez les points discutés et les décisions prises</p>
+      </div>
+      <button class="btn btn-primary btn-sm" id="btn-add-point">+ Ajouter un point</button>
+    </div>
+
+    <div class="pv-points" id="pv-points"></div>
+
+    <div class="pv-editor-toolbar">
+      <div>
+        <h3>Statut du PV</h3>
+      </div>
+      <select id="pv-status" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #dbe2ef;">
+        <option value="draft">Brouillon</option>
+        <option value="sent">Publié</option>
+        <option value="validated">Validé</option>
+      </select>
+    </div>
+
+    <div class="pv-footer-actions">
+      <button class="btn btn-secondary" id="btn-cancel">Annuler</button>
+      <button class="btn btn-primary" id="btn-save">Enregistrer le PV</button>
+    </div>
+
+    <div id="notice" style="padding: 20px 30px;"></div>
+  </div>
+
+  <script src="portal-common.js"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const meetingId = urlParams.get('meetingId');
+    let meetingData = null;
+    let pvBlocks = [];
+
+    const esc = AYCPortal.escapeHtml;
+
+    function renderPointCard(block, i) {
+      return `<div class="pv-point-card" data-block="${i}">
+        <div class="pv-block-number">${i + 1}</div>
+        <div class="pv-block-fields">
+          <div class="pv-full-width">
+            <label>Titre du point</label>
+            <input type="text" class="pv-title" value="${esc(block.title || '')}" placeholder="Ex: Lecture du PV précédent">
+          </div>
+          <div>
+            <label>Durée prévue (min)</label>
+            <input type="number" class="pv-duration" value="${block.durationMinutes || ''}" placeholder="15">
+          </div>
+          <div>
+            <label>Durée réelle (min)</label>
+            <input type="number" class="pv-actual-duration" value="${block.actualDurationMinutes || ''}" placeholder="12">
+          </div>
+          <div class="pv-full-width">
+            <label>Discussion</label>
+            <textarea class="pv-discussion" placeholder="Résumé de la discussion...">${esc(block.discussion || '')}</textarea>
+          </div>
+          <div class="pv-full-width">
+            <label>Décision</label>
+            <textarea class="pv-decision" placeholder="Décision prise (le cas échéant)...">${esc(block.decision || '')}</textarea>
+          </div>
+          <div class="pv-full-width">
+            <label>Prochaines étapes</label>
+            <textarea class="pv-next-steps" placeholder="Actions à suivre...">${esc(block.nextSteps || '')}</textarea>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function readBlocks() {
+      document.querySelectorAll('.pv-point-card[data-block]').forEach(row => {
+        const i = Number(row.dataset.block);
+        if (!pvBlocks[i]) return;
+        pvBlocks[i].title = row.querySelector('.pv-title').value.trim();
+        pvBlocks[i].durationMinutes = row.querySelector('.pv-duration').value ? Number(row.querySelector('.pv-duration').value) : null;
+        pvBlocks[i].actualDurationMinutes = row.querySelector('.pv-actual-duration').value ? Number(row.querySelector('.pv-actual-duration').value) : null;
+        pvBlocks[i].discussion = row.querySelector('.pv-discussion').value.trim();
+        pvBlocks[i].decision = row.querySelector('.pv-decision').value.trim();
+        pvBlocks[i].nextSteps = row.querySelector('.pv-next-steps').value.trim();
+      });
+    }
+
+    function renderBlocks() {
+      document.getElementById('pv-points').innerHTML = pvBlocks.length ? pvBlocks.map((b, i) => renderPointCard(b, i)).join('') : '<p style="text-align:center;color:#8792a6;padding:40px;">Aucun point ajouté. Cliquez sur "+ Ajouter un point" pour commencer.</p>';
+    }
+
+    async function load() {
+      if (!meetingId) {
+        document.getElementById('meeting-title').textContent = 'Aucune réunion sélectionnée';
+        return;
+      }
+
+      try {
+        meetingData = await AYCPortal.api('meeting', { query: { meetingId } });
+        const m = meetingData.meeting;
+        
+        document.getElementById('meeting-title').textContent = m.title;
+        document.getElementById('meeting-meta').textContent = `${AYCPortal.formatDate(m.starts_at, true)} · ${esc(m.location || 'Lieu à confirmer')}`;
+        
+        const typeLabels = { 
+          reunion_nationale: 'Réunion nationale', 
+          alofm: 'ALOFM', 
+          ale: 'ALE', 
+          aloe: 'ALOE',
+          agomm: 'AGOMM',
+          agofm: 'AGOFM',
+          age: 'AGE'
+        };
+        
+        document.getElementById('meeting-info').innerHTML = `
+          <p><strong>Type:</strong> ${esc(typeLabels[m.meeting_type] || m.meeting_type)}</p>
+          <p><strong>Club:</strong> ${esc(m.school_name || 'National')}</p>
+          <p><strong>Lieu:</strong> ${esc(m.location || 'À confirmer')}</p>
+        `;
+
+        // Load existing PV blocks
+        pvBlocks = meetingData.minutes?.blocks || [];
+        if (pvBlocks.length === 0) {
+          pvBlocks = [{ title: '', durationMinutes: null, actualDurationMinutes: null, discussion: '', decision: '', nextSteps: '' }];
+        }
+        renderBlocks();
+
+        // Set status
+        if (meetingData.minutes?.status) {
+          document.getElementById('pv-status').value = meetingData.minutes.status;
+        }
+      } catch (e) {
+        AYCPortal.renderError(document.getElementById('notice'), e);
+      }
+    }
+
+    // Event listeners
+    document.getElementById('btn-add-point').addEventListener('click', () => {
+      readBlocks();
+      pvBlocks.push({ title: '', durationMinutes: null, actualDurationMinutes: null, discussion: '', decision: '', nextSteps: '' });
+      renderBlocks();
+    });
+
+    document.getElementById('btn-save').addEventListener('click', async () => {
+      readBlocks();
+      const status = document.getElementById('pv-status').value;
+      try {
+        await AYCPortal.api('meeting', { 
+          method: 'POST', 
+          body: { 
+            action: 'savePv', 
+            meetingId, 
+            blocks: pvBlocks, 
+            status 
+          } 
+        });
+        document.getElementById('notice').innerHTML = '<div class="alert alert-success">PV enregistré avec succès!</div>';
+      } catch (e) {
+        AYCPortal.renderError(document.getElementById('notice'), e);
+      }
+    });
+
+    document.getElementById('btn-cancel').addEventListener('click', () => {
+      window.close();
+    });
+
+    document.getElementById('btn-close').addEventListener('click', () => {
+      window.close();
+    });
+
+    // Initialize
+    (async () => {
+      const member = await AYCPortal.initPortalShell({ requireActive: true });
+      if (!member) return;
+      await load();
+    })();
+  </script>
+</body>
+</html>

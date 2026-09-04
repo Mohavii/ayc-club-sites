@@ -149,7 +149,7 @@
   function renderList(rows) {
     const filtered = rows.filter(m => REUNION_TYPES.includes(m.meeting_type));
     if (!filtered.length) { list.innerHTML = AYCPortal.renderEmpty('Aucune réunion planifiée'); return; }
-    list.innerHTML = filtered.map(m => `<article class="list-item"><div class="meeting-date"><strong>${new Date(m.starts_at).toLocaleDateString('fr-FR',{day:'2-digit'})}</strong><span>${new Date(m.starts_at).toLocaleDateString('fr-FR',{month:'short'})}</span></div><div class="list-item-main"><span class="list-item-title">${esc(m.title)}</span><span class="list-item-meta">${esc(typeLabels[m.meeting_type] || m.meeting_type)} · ${esc(m.school_name || 'National')} · ${AYCPortal.formatDate(m.starts_at, true)}</span><span class="list-item-meta">${m.attendee_count || 0} réponse(s)</span></div><div class="heading-actions"><span class="status-badge">${esc(statusLabels[m.status] || m.status)}</span><button class="btn btn-secondary btn-sm" data-open="${m.id}">Ouvrir</button></div></article>`).join('');
+    list.innerHTML = filtered.map(m => `<article class="list-item"><div class="meeting-date"><strong>${new Date(m.starts_at).toLocaleDateString('fr-FR',{day:'2-digit'})}</strong><span>${new Date(m.starts_at).toLocaleDateString('fr-FR',{month:'short'})}</span></div><div class="list-item-main"><span class="list-item-title">${esc(m.title)}</span><span class="list-item-meta">${esc(typeLabels[m.meeting_type] || m.meeting_type)} · ${esc(m.school_name || 'National')} · ${AYCPortal.formatDate(m.starts_at, true)}</span><span class="list-item-meta">${m.attendee_count || 0} réponse(s)</span></div><div class="heading-actions"><span class="status-badge">${esc(statusLabels[m.status] || m.status)}</span><button class="btn btn-secondary btn-sm" data-open="${m.id}">Ouvrir</button><button class="btn btn-primary btn-sm" data-edit-pv="${m.id}" style="margin-left:6px">Éditer PV</button></div></article>`).join('');
   }
   async function load() { const data = await AYCPortal.api('meetings'); renderList(data.meetings || []); }
 
@@ -357,7 +357,12 @@
     detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   async function openMeeting(id) { try { renderDetail(await AYCPortal.api('meeting', { query: { meetingId: id } })); } catch (e) { apiError(e); } }
-  list.addEventListener('click', e => { const b = e.target.closest('[data-open]'); if (b) openMeeting(b.dataset.open); });
+  list.addEventListener('click', e => { 
+      const b = e.target.closest('[data-open]'); 
+      if (b) openMeeting(b.dataset.open); 
+      const pv = e.target.closest('[data-edit-pv]');
+      if (pv) window.open(`pv-editor.html?meetingId=${pv.dataset.editPv}`, '_blank');
+    });
   document.getElementById('refresh').onclick = () => load().catch(apiError);
 
   document.getElementById('meeting-form').addEventListener('submit', async e => {
