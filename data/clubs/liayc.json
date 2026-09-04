@@ -26,7 +26,7 @@
   "partners": [],
   "forms": {
     "join": {
-      "enabled": false,
+      "enabled": true,
       "title": "Rejoindre le club",
       "fields": [
         {
