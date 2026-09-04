@@ -96,7 +96,18 @@ module.exports = async (req, res) => {
 
   try {
     if (interaction.type === InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE) {
-      const result = await handleAutocomplete(interaction);
+      // Autocomplete MUST get back an APPLICATION_COMMAND_AUTOCOMPLETE_RESULT
+      // (type 8) no matter what — Discord's client shows "Loading options
+      // failed" if it gets anything else (including the ephemeral error
+      // message the other branches use), so errors here get their own
+      // safe fallback instead of falling through to the shared catch below.
+      let result;
+      try {
+        result = await handleAutocomplete(interaction);
+      } catch (err) {
+        console.error("Autocomplete failed:", err);
+        result = { type: InteractionResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT, data: { choices: [] } };
+      }
       res.status(200).json(result);
       return;
     }
@@ -155,9 +166,13 @@ async function handleAutocomplete(interaction) {
     const clubs = await store.listClubs();
     const visible = admin ? clubs : clubs.filter((c) => hasRole(c) || isOfficer(c));
     const choices = visible
-      .filter((c) => c.name.toLowerCase().includes(query) || c.slug.includes(query))
+      // Defensive: a malformed club record (missing name/slug) shouldn't
+      // throw and break autocomplete for every other club too — skip it
+      // instead of crashing the whole request.
+      .filter((c) => typeof c.name === "string" && typeof c.slug === "string")
+      .filter((c) => c.name.toLowerCase().includes(query) || c.slug.toLowerCase().includes(query))
       .slice(0, 25)
-      .map((c) => ({ name: `${c.name} (${c.slug})`, value: c.slug }));
+      .map((c) => ({ name: `${c.name} (${c.slug})`.slice(0, 100), value: c.slug }));
     return { type: InteractionResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT, data: { choices } };
   }
 
@@ -177,12 +192,13 @@ async function handleAutocomplete(interaction) {
     const items = Array.isArray(club[listKey]) ? club[listKey] : [];
     const labelFor = (item) =>
       focusedName === "event"
-        ? `${item.title}${item.date ? " — " + item.date : ""}`
+        ? `${item.title || "(sans titre)"}${item.date ? " — " + item.date : ""}`
         : focusedName === "member"
-        ? `${item.name} (${item.role})`
-        : item.name;
+        ? `${item.name || "(sans nom)"} (${item.role || "?"})`
+        : item.name || "(sans nom)";
 
     const choices = items
+      .filter((item) => item && typeof item.id === "string")
       .filter((item) => labelFor(item).toLowerCase().includes(query))
       .slice(0, 25)
       .map((item) => ({ name: labelFor(item).slice(0, 100), value: item.id }));
@@ -201,6 +217,7 @@ async function handleAutocomplete(interaction) {
     const form = club && club.forms && club.forms[formId];
     const fields = form && Array.isArray(form.fields) ? form.fields : [];
     const choices = fields
+      .filter((f) => f && typeof f.label === "string")
       .filter((f) => f.label.toLowerCase().includes(query))
       .slice(0, 25)
       .map((f) => ({ name: f.label.slice(0, 100), value: f.id }));

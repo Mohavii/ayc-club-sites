@@ -94,21 +94,53 @@ async function getClub(slug) {
   return data;
 }
 
+// Autocomplete fires on every keystroke and needs to answer well within
+// Discord's ~3s interaction budget. Re-listing + re-fetching every club
+// file from the GitHub API on each keystroke was slow enough (especially
+// as the club count grows) to blow that budget and show as "Loading
+// options failed" client-side — this short cache keeps repeated
+// keystrokes during one typing burst fast, while still refreshing often
+// enough that a just-created/deleted club shows up within a few seconds.
+const LIST_CLUBS_CACHE_MS = 10_000;
+let listClubsCache = null; // { at: number, promise: Promise<club[]> }
+
 async function listClubs() {
-  const entries = await listDir("data/clubs");
-  const clubs = [];
-  for (const entry of entries) {
-    if (!entry.name.endsWith(".json")) continue;
-    const slug = entry.name.replace(/\.json$/, "");
-    const club = await getClub(slug);
-    if (club) clubs.push(club);
+  const now = Date.now();
+  if (listClubsCache && now - listClubsCache.at < LIST_CLUBS_CACHE_MS) {
+    return listClubsCache.promise;
   }
-  return clubs;
+  const promise = (async () => {
+    const entries = await listDir("data/clubs");
+    const jsonEntries = entries.filter((entry) => entry.name.endsWith(".json"));
+    // Fetch every club file in parallel instead of one-by-one — with N
+    // clubs, sequential awaits meant N+1 round-trips before autocomplete
+    // could even respond.
+    const results = await Promise.all(
+      jsonEntries.map((entry) => getClub(entry.name.replace(/\.json$/, "")))
+    );
+    return results.filter(Boolean);
+  })();
+  listClubsCache = { at: now, promise };
+  // If the fetch fails, don't leave a rejected promise cached — the next
+  // call should retry rather than keep re-throwing the same error for
+  // LIST_CLUBS_CACHE_MS.
+  promise.catch(() => {
+    if (listClubsCache && listClubsCache.promise === promise) listClubsCache = null;
+  });
+  return promise;
+}
+
+// Clears the listClubs cache immediately — called after any write so a
+// club that was just created/deleted/renamed shows up right away instead
+// of waiting out the cache window.
+function invalidateClubsCache() {
+  listClubsCache = null;
 }
 
 async function saveClub(club, commitMessage) {
   const { sha } = await readJsonFile(clubPath(club.slug));
   await writeJsonFile(clubPath(club.slug), club, commitMessage, sha);
+  invalidateClubsCache();
   // Keep the member portal's school list live-synced with this club.
   // See schools-sync.js — failures there are logged, never thrown, so
   // a portal/database hiccup can't break the Discord bot's own save.
@@ -131,6 +163,7 @@ async function deleteClub(slug, commitMessage) {
   }
 
   await deleteFile(clubPath(slug), commitMessage, sha);
+  invalidateClubsCache();
   // Deactivates the portal school and deletes any member accounts tied
   // to it — a club being deleted here means it no longer exists at all.
   await syncSchoolOnDelete(slug);
@@ -176,6 +209,7 @@ module.exports = {
   listClubs,
   saveClub,
   deleteClub,
+  invalidateClubsCache,
   savePendingEdit,
   getPendingEdit,
   deletePendingEdit,
