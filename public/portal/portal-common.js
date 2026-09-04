@@ -61,9 +61,9 @@
             <span class="brand-tag">Association YOUTH CLUBs</span>
           </a>
           <nav class="public-nav" aria-label="Navigation principale">
-            <a href="../index">Actualité</a>
+            <a href="https://associationyouthclubs.org/index">Actualité</a>
             <a href="https://associationyouthclubs.org/strategie">Stratégie</a>
-            <a href="../contact">Contact</a>
+            <a href="https://associationyouthclubs.org/contact">Contact</a>
           </nav>
           <div class="account-slot">
             ${member ? `${avatar}<span class="account-name">${escapeHtml(member.displayName || member.username)}</span><button class="btn-logout" id="logout-btn" type="button">Se déconnecter</button>` : `<a class="btn btn-primary" href="/api/auth/google/start">Se connecter</a>`}
