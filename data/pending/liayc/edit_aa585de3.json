@@ -1,0 +1,23 @@
+{
+  "editId": "edit_aa585de3",
+  "clubSlug": "liayc",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-09-04T21:38:39.194Z",
+  "type": "add",
+  "path": "events",
+  "itemId": null,
+  "oldValue": null,
+  "newValue": {
+    "id": "evt_4kyft4",
+    "title": "Youth Expo",
+    "date": "2026-08-31",
+    "location": "Mannouba",
+    "description": "Youth Expo event",
+    "axis": "Education Formelle",
+    "image": null
+  },
+  "label": "Nouvel événement : Youth Expo",
+  "status": "pending",
+  "reviewMessageId": null
+}
