@@ -1,0 +1,36 @@
+{
+  "editId": "edit_f588d66c",
+  "clubSlug": "liayc",
+  "submittedBy": "746843897350848514",
+  "submittedByTag": "d.eg",
+  "submittedAt": "2026-09-04T21:41:26.776Z",
+  "type": "update",
+  "path": "forms.join",
+  "itemId": null,
+  "oldValue": {
+    "enabled": false,
+    "title": "Rejoindre le club",
+    "fields": []
+  },
+  "newValue": {
+    "enabled": false,
+    "title": "Rejoindre le club",
+    "fields": [
+      {
+        "id": "fld_oi8ur2",
+        "type": "checkbox_group",
+        "label": "Nom&Prénom",
+        "required": true,
+        "options": [
+          "eslem",
+          "achraf",
+          "moemen"
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  "label": "Nouvelle question (Rejoindre le club) : \"Nom&Prénom\" [Cases à cocher]",
+  "status": "pending",
+  "reviewMessageId": null
+}
