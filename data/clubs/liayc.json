@@ -1,0 +1,55 @@
+{
+  "slug": "liayc",
+  "status": "live",
+  "name": "Lycée Ibn Abi Dhiaf",
+  "city": "Mannouba",
+  "founded": 2026,
+  "memberCount": 0,
+  "about": "",
+  "heroImage": null,
+  "logo": null,
+  "officers": [
+    "746843897350848514"
+  ],
+  "events": [],
+  "bel": [],
+  "partners": [],
+  "forms": {
+    "join": {
+      "enabled": false,
+      "title": "Rejoindre le club",
+      "fields": []
+    },
+    "team_communication": {
+      "enabled": false,
+      "title": "Équipe Communication",
+      "fields": []
+    },
+    "team_logistique": {
+      "enabled": false,
+      "title": "Équipe Logistique",
+      "fields": []
+    },
+    "team_sponsoring": {
+      "enabled": false,
+      "title": "Équipe Sponsoring",
+      "fields": []
+    }
+  },
+  "vpcRoleId": "1545547934995849340",
+  "formWebhooks": {
+    "join": "https://discord.com/api/webhooks/1545547956525076522/hrIecX7fOopfZK-ajLIqOhG6kFHK4jRMIF8ZVHY7JcIJdcdYphWJx8uKEHsOe9MI7pbp",
+    "team_communication": "https://discord.com/api/webhooks/1545547958554992680/rdR8PczcP70xb_frIJsevTPArYFiUZxpllelOJHUS8qv6znmKS1-twEa_hGd5qjjGvse",
+    "team_logistique": "https://discord.com/api/webhooks/1545547960287371324/DDL1B_YF-HZcERXytjI182ZZ4KscoJ7G-GIUYPPy2xGwZsIv7QkFTqLqPhs-JLTzYNNS",
+    "team_sponsoring": "https://discord.com/api/webhooks/1545547961751310419/aN3sTK-77kOwSQVV-dHZmCRNenMb5OQ_pb-u9DjYbKI55dNF701rubkZSYFaDkiHAq4L"
+  },
+  "controlRoomChannelId": "1545547937336004689",
+  "categoryId": "1545547936010739792",
+  "channelIds": [
+    "1545547937336004689",
+    "1545547944084766791",
+    "1545547957686898769",
+    "1545547959326998548",
+    "1545547961201598535"
+  ]
+}
