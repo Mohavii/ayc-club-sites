@@ -1,0 +1,55 @@
+{
+  "slug": "lpse",
+  "status": "live",
+  "name": "Lycée Pilote Sekiet Ezzit",
+  "city": "Sfax",
+  "founded": 2016,
+  "memberCount": 0,
+  "about": "",
+  "heroImage": null,
+  "logo": null,
+  "officers": [
+    "746843897350848514"
+  ],
+  "events": [],
+  "bel": [],
+  "partners": [],
+  "forms": {
+    "join": {
+      "enabled": false,
+      "title": "Rejoindre le club",
+      "fields": []
+    },
+    "team_communication": {
+      "enabled": false,
+      "title": "Équipe Communication",
+      "fields": []
+    },
+    "team_logistique": {
+      "enabled": false,
+      "title": "Équipe Logistique",
+      "fields": []
+    },
+    "team_sponsoring": {
+      "enabled": false,
+      "title": "Équipe Sponsoring",
+      "fields": []
+    }
+  },
+  "vpcRoleId": "1545777981409202301",
+  "formWebhooks": {
+    "join": "https://discord.com/api/webhooks/1545777985980989592/d_nn_36X45U5cBqnGT6BX68Ln5ffxhSSweviZ1vB_bPpKLqzGdmvhH98Rw783Q-ama9l",
+    "team_communication": "https://discord.com/api/webhooks/1545777990020104233/PTsEARmSXnLXt4RzPPQ_ZEOivMKwGF3ln2aWJDn3DXuqkVM_RUWS87wxbxco1AsBGFSF",
+    "team_logistique": "https://discord.com/api/webhooks/1545777994394763304/BqFH1K0Pn1VpeRvr1Ws3_URiHQQ_nHkQWRJfbW_FGXWg_WDfXpGWSN5Hauxx8LxBLqNf",
+    "team_sponsoring": "https://discord.com/api/webhooks/1545777995887673357/LQHlQ9f8JQEye-KEWCAzNUizaXxriTDPeZJjx97hRkeECCPJe20UZaI61g8qtqSn80OF"
+  },
+  "controlRoomChannelId": "1545777983543836712",
+  "categoryId": "1545777982327496846",
+  "channelIds": [
+    "1545777983543836712",
+    "1545777984995069962",
+    "1545777987041890386",
+    "1545777991374602382",
+    "1545777995309121576"
+  ]
+}
