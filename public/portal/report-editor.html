@@ -26,6 +26,37 @@
     .section-block textarea{width:100%;min-height:110px}
     .review-note{border-left:3px solid #c02b2b;background:#fdf0f0;padding:10px 12px;border-radius:8px;margin-bottom:10px;font-size:.82rem;color:#7a2020}
     .editor-sticky{position:sticky;bottom:0;background:#fff;border-top:1px solid #e2e8f1;padding:14px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+    /* ---- recursive structured-report renderer (schema_json) ---- */
+    .tpl-section{border:1px solid #e2e8f1;border-radius:12px;padding:14px 16px;margin-bottom:12px;background:#fcfdff}
+    .tpl-section.depth-0{background:#f7f9fd;border-color:#dbe2ef}
+    .tpl-section > .tpl-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
+    .tpl-section > .tpl-section-head h3,.tpl-section > .tpl-section-head h4{margin:0;color:#1f2a5a;font-weight:800}
+    .tpl-section.depth-0 > .tpl-section-head h3{font-size:1rem}
+    .tpl-section.depth-1 > .tpl-section-head h4{font-size:.9rem}
+    .tpl-section-note,.tpl-field-note{font-size:.74rem;color:#7a849a;margin:0 0 10px;font-style:italic}
+    .tpl-field{margin-bottom:12px}
+    .tpl-field:last-child{margin-bottom:0}
+    .tpl-field label{display:block;font-weight:800;font-size:.78rem;color:#1f2a5a;margin-bottom:6px}
+    .tpl-field textarea,.tpl-field select{width:100%;box-sizing:border-box;border:1px solid #d9dfeb;border-radius:10px;background:#fff;padding:10px 11px;color:#36415a;font:inherit;font-size:.83rem}
+    .tpl-field textarea{min-height:80px;resize:vertical}
+    .tpl-checklist{display:flex;flex-wrap:wrap;gap:8px}
+    .tpl-checklist label{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:.78rem;color:#3d4861;background:#fff;border:1px solid #dbe2ef;border-radius:999px;padding:6px 12px;margin:0;cursor:pointer}
+    .tpl-checklist input{margin:0}
+    .tpl-table-wrap{overflow-x:auto;border:1px solid #e2e8f1;border-radius:10px}
+    table.tpl-table{width:100%;border-collapse:collapse;font-size:.8rem}
+    table.tpl-table th{text-align:left;color:#77819a;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;padding:9px 8px;border-bottom:1px solid var(--portal-line,#e2e7f0);background:#f7f9fd;white-space:nowrap}
+    table.tpl-table td{padding:6px;border-bottom:1px solid #edf0f6;vertical-align:top}
+    table.tpl-table td:last-child{white-space:nowrap;width:1%}
+    table.tpl-table tr:last-child td{border-bottom:0}
+    table.tpl-table textarea{width:100%;min-width:120px;min-height:44px;box-sizing:border-box;border:1px solid #e2e8f1;border-radius:8px;padding:6px 8px;font:inherit;font-size:.8rem;resize:vertical}
+    .tpl-row-remove{border:1px solid #f0c8cc;background:#fff3f3;color:#8f2630;border-radius:8px;padding:6px 9px;font-size:.72rem;font-weight:800;cursor:pointer}
+    .tpl-row-add{margin-top:8px}
+    .tpl-add-btn{border:1px dashed #b9c8e5;background:#fff;color:#3b5bdb;border-radius:9px;padding:7px 12px;font-size:.76rem;font-weight:800;cursor:pointer}
+    .tpl-add-btn:hover{background:#f0f4ff}
+    .tpl-group-item{border:1px solid #e2e8f1;border-radius:10px;padding:12px;margin-bottom:10px;background:#fff;position:relative}
+    .tpl-group-item .tpl-row-remove{position:absolute;top:10px;right:10px}
+    .tpl-group-item-label{font-size:.68rem;font-weight:900;color:#8fa4d4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
   </style>
 </head>
 <body>
@@ -201,15 +232,176 @@
           <strong>${esc(t.name)}</strong>
           <span>${esc(t.description || 'Aucune description enregistrée.')}</span>
           ${t.owner_role ? `<span class="tpl-owner">${esc(ROLE_LABELS[t.owner_role] || t.owner_role)}</span>` : ''}
+          ${!t.owner_role && (t.scope || 'local') === 'national' ? `<span class="tpl-owner" style="background:#fff5dc;color:#966b10">Référence nationale</span>` : ''}
+          ${t.is_form ? `<span class="tpl-owner" style="background:#eef2f8;color:#526078">Formulaire</span>` : ''}
         </button>
       `).join('') : AYCPortal.renderEmpty('Aucun modèle de rapport disponible');
     }
 
-    // ---- dynamic sections ------------------------------------------------
+    // ---- dynamic sections --------------------------------------------------
+    // Two rendering modes:
+    //  - current.schema_json present -> full recursive renderer (sections,
+    //    nested sub-sections, tables with add/remove rows, repeatable
+    //    groups, checklists), matching the official AYC document structure.
+    //  - otherwise -> legacy flat renderer, one textarea per entry of
+    //    current.required_sections (kept for the earlier hand-authored
+    //    templates that have no schema_json).
+    // currentPayload holds the live, nested form state; the DOM is
+    // re-rendered from it on every add/remove-row so array indices stay
+    // in sync, while individual text edits write straight into it without
+    // a re-render (keeps the caret / focus stable while typing).
+    let currentPayload = {};
+
+    function getAtPath(obj, path) {
+      return path.reduce((o, k) => (o == null ? undefined : o[k]), obj);
+    }
+    function setAtPath(obj, path, value) {
+      let node = obj;
+      for (let i = 0; i < path.length - 1; i++) {
+        const k = path[i];
+        if (node[k] == null || typeof node[k] !== 'object') node[k] = typeof path[i + 1] === 'number' ? [] : {};
+        node = node[k];
+      }
+      node[path[path.length - 1]] = value;
+    }
+
+    function fieldId(path) { return 'f_' + path.map(p => String(p)).join('_').replace(/[^\w]/g, ''); }
+
+    // JSON.stringify() always uses double quotes, so embedding it inside a
+    // double-quoted HTML attribute (the convention everywhere else in this
+    // file) truncates the attribute at the first quote and corrupts the
+    // markup that follows. These inline handlers therefore use single
+    // quotes for the attribute, with the JSON string's own single quotes
+    // (none normally, but titles/labels can end up inside via ${...}
+    // arguments) escaped as &#39; so the attribute always parses cleanly.
+    const attrJson = value => esc(JSON.stringify(value)).replace(/&quot;/g, '"');
+
+    function renderField(field, path) {
+      const id = fieldId(path);
+      const value = getAtPath(currentPayload, path);
+      const setter = `AYC_setField(${attrJson(path)}, this.value)`;
+
+      if (field.type === 'text') {
+        return `
+          <div class="tpl-field">
+            <label for="${id}">${esc(field.label)}</label>
+            <textarea id="${id}" oninput='${setter}' placeholder="${esc(field.placeholder || field.label + '…')}">${esc(value || '')}</textarea>
+          </div>`;
+      }
+      if (field.type === 'select') {
+        const opts = jsonArray(field.options);
+        return `
+          <div class="tpl-field">
+            <label for="${id}">${esc(field.label)}</label>
+            <select id="${id}" onchange='${setter}'>
+              <option value="">À préciser</option>
+              ${opts.map(o => `<option value="${esc(o)}"${value === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}
+            </select>
+          </div>`;
+      }
+      if (field.type === 'list') {
+        // Multi-select checklist stored as an array of the checked option strings.
+        const opts = jsonArray(field.options);
+        const checked = jsonArray(value);
+        return `
+          <div class="tpl-field">
+            <label>${esc(field.label)}</label>
+            <div class="tpl-checklist">
+              ${opts.map((o, i) => `
+                <label><input type="checkbox" ${checked.includes(o) ? 'checked' : ''}
+                  onchange='AYC_toggleListItem(${attrJson(path)}, ${attrJson(o)}, this.checked)'> ${esc(o)}</label>
+              `).join('')}
+            </div>
+          </div>`;
+      }
+      if (field.type === 'repeatable_text') {
+        const items = jsonArray(value);
+        return `
+          <div class="tpl-field">
+            <label>${esc(field.label)}</label>
+            ${items.map((v, i) => `
+              <div style="display:flex;gap:8px;margin-bottom:6px">
+                <textarea style="flex:1" oninput='AYC_setListIndex(${attrJson(path)}, ${i}, this.value)' placeholder="${esc(field.label)}…">${esc(v || '')}</textarea>
+                <button type="button" class="tpl-row-remove" onclick='AYC_removeListIndex(${attrJson(path)}, ${i})'>Retirer</button>
+              </div>
+            `).join('')}
+            <button type="button" class="tpl-add-btn tpl-row-add" onclick='AYC_addListIndex(${attrJson(path)})'>+ Ajouter</button>
+          </div>`;
+      }
+      if (field.type === 'table') return renderTable(field, path);
+      if (field.type === 'repeatable_group') return renderRepeatableGroup(field, path);
+      if (field.type === 'section') return renderSectionNode(field, path, (path.length || 1));
+      return '';
+    }
+
+    function renderTable(field, path) {
+      const rows = jsonArray(getAtPath(currentPayload, path));
+      const cols = jsonArray(field.columns);
+      return `
+        <div class="tpl-field">
+          <label>${esc(field.label)}</label>
+          ${field.note ? `<p class="tpl-field-note">${esc(field.note)}</p>` : ''}
+          <div class="tpl-table-wrap">
+            <table class="tpl-table">
+              <thead><tr>${cols.map(c => `<th>${esc(c.label)}</th>`).join('')}<th></th></tr></thead>
+              <tbody>
+                ${rows.map((row, i) => `
+                  <tr>
+                    ${cols.map(c => `<td><textarea oninput='AYC_setTableCell(${attrJson(path)}, ${i}, ${attrJson(c.key)}, this.value)'>${esc(row?.[c.key] || '')}</textarea></td>`).join('')}
+                    <td><button type="button" class="tpl-row-remove" onclick='AYC_removeTableRow(${attrJson(path)}, ${i})'>Retirer</button></td>
+                  </tr>
+                `).join('')}
+                ${!rows.length ? `<tr><td colspan="${cols.length + 1}" style="color:#9aa4ba;font-size:.78rem;padding:12px">Aucune ligne. Ajoute la première ci-dessous.</td></tr>` : ''}
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="tpl-add-btn tpl-row-add" onclick='AYC_addTableRow(${attrJson(path)}, ${attrJson(cols.map(c => c.key))})'>+ Ajouter une ligne</button>
+        </div>`;
+    }
+
+    function renderRepeatableGroup(field, path) {
+      const items = jsonArray(getAtPath(currentPayload, path));
+      const itemFields = jsonArray(field.itemFields);
+      return `
+        <div class="tpl-field">
+          <label>${esc(field.label)}</label>
+          ${items.map((item, i) => `
+            <div class="tpl-group-item">
+              <button type="button" class="tpl-row-remove" onclick='AYC_removeGroupItem(${attrJson(path)}, ${i})'>Retirer</button>
+              <div class="tpl-group-item-label">${esc(field.label)} #${i + 1}</div>
+              ${itemFields.map(f => renderField(f, [...path, i, f.key])).join('')}
+            </div>
+          `).join('')}
+          ${!items.length ? '<p class="tpl-field-note">Aucune entrée. Ajoute la première ci-dessous.</p>' : ''}
+          <button type="button" class="tpl-add-btn tpl-row-add" onclick='AYC_addGroupItem(${attrJson(path)})'>+ Ajouter ${esc(field.label.toLowerCase())}</button>
+        </div>`;
+    }
+
+    function renderSectionNode(node, path, depth) {
+      const d = Math.min(depth, 1);
+      const HTag = d === 0 ? 'h3' : 'h4';
+      return `
+        <div class="tpl-section depth-${d}">
+          <div class="tpl-section-head"><${HTag}>${esc(node.label)}</${HTag}></div>
+          ${node.note ? `<p class="tpl-section-note">${esc(node.note)}</p>` : ''}
+          ${jsonArray(node.children).map(child => renderField(child, [...path, child.key])).join('')}
+        </div>`;
+    }
+
     function renderSections(payload) {
+      const container = byId('dynamic-sections');
+      const schema = current?.schema_json;
+
+      if (schema && jsonArray(schema.sections).length) {
+        currentPayload = payload && typeof payload === 'object' ? JSON.parse(JSON.stringify(payload)) : {};
+        container.innerHTML = schema.sections.map(section => renderField(section, [section.key])).join('');
+        return;
+      }
+
+      // Legacy flat fallback for templates without schema_json.
       const sections = jsonArray(current?.required_sections);
       const data = payload || {};
-      const container = byId('dynamic-sections');
+      currentPayload = JSON.parse(JSON.stringify(data));
       if (!sections.length) {
         container.innerHTML = `
           <div class="section-block">
@@ -226,7 +418,70 @@
       `).join('');
     }
 
+    // ---- structured-field mutation helpers (called from inline handlers) --
+    // Text/select edits mutate currentPayload directly (no re-render, so
+    // focus/caret is preserved). Add/remove-row actions mutate then
+    // re-render the section container, since row indices shift.
+    window.AYC_setField = (path, value) => { setAtPath(currentPayload, path, value); };
+    window.AYC_toggleListItem = (path, option, checked) => {
+      const current = jsonArray(getAtPath(currentPayload, path)).slice();
+      const next = checked ? Array.from(new Set([...current, option])) : current.filter(v => v !== option);
+      setAtPath(currentPayload, path, next);
+    };
+    window.AYC_setListIndex = (path, index, value) => {
+      const arr = jsonArray(getAtPath(currentPayload, path)).slice();
+      arr[index] = value;
+      setAtPath(currentPayload, path, arr);
+    };
+    window.AYC_addListIndex = (path) => {
+      const arr = jsonArray(getAtPath(currentPayload, path)).slice();
+      arr.push('');
+      setAtPath(currentPayload, path, arr);
+      renderSections(currentPayload);
+    };
+    window.AYC_removeListIndex = (path, index) => {
+      const arr = jsonArray(getAtPath(currentPayload, path)).slice();
+      arr.splice(index, 1);
+      setAtPath(currentPayload, path, arr);
+      renderSections(currentPayload);
+    };
+    window.AYC_setTableCell = (path, rowIndex, colKey, value) => {
+      const rows = jsonArray(getAtPath(currentPayload, path)).slice();
+      rows[rowIndex] = { ...(rows[rowIndex] || {}), [colKey]: value };
+      setAtPath(currentPayload, path, rows);
+    };
+    window.AYC_addTableRow = (path, colKeys) => {
+      const rows = jsonArray(getAtPath(currentPayload, path)).slice();
+      const blank = {};
+      colKeys.forEach(k => { blank[k] = ''; });
+      rows.push(blank);
+      setAtPath(currentPayload, path, rows);
+      renderSections(currentPayload);
+    };
+    window.AYC_removeTableRow = (path, rowIndex) => {
+      const rows = jsonArray(getAtPath(currentPayload, path)).slice();
+      rows.splice(rowIndex, 1);
+      setAtPath(currentPayload, path, rows);
+      renderSections(currentPayload);
+    };
+    window.AYC_addGroupItem = (path) => {
+      const items = jsonArray(getAtPath(currentPayload, path)).slice();
+      items.push({});
+      setAtPath(currentPayload, path, items);
+      renderSections(currentPayload);
+    };
+    window.AYC_removeGroupItem = (path, index) => {
+      const items = jsonArray(getAtPath(currentPayload, path)).slice();
+      items.splice(index, 1);
+      setAtPath(currentPayload, path, items);
+      renderSections(currentPayload);
+    };
+
     function collectPayload() {
+      if (current?.schema_json && jsonArray(current.schema_json.sections).length) {
+        return currentPayload;
+      }
+      // Legacy flat fallback.
       const out = {};
       document.querySelectorAll('#dynamic-sections textarea[data-section]').forEach(el => {
         const value = el.value.trim();
@@ -238,12 +493,23 @@
     function renderMeta() {
       if (!current) { byId('meta-strip').innerHTML = ''; return; }
       const departments = jsonArray(current.validator_departments);
+      const users = jsonArray(current.utilise_par);
       const chips = [];
       if (current.recipient) chips.push(`<span class="meta-chip">Destinataire : ${esc(current.recipient)}</span>`);
       if (current.deadline_rule) chips.push(`<span class="meta-chip warn">Échéance : ${esc(current.deadline_rule)}</span>`);
       if (departments.length) chips.push(`<span class="meta-chip">Validation : ${esc(departments.map(d => DEPARTMENT_LABELS[d] || d).join(' + '))}</span>`);
       if (current.owner_role) chips.push(`<span class="meta-chip">Poste responsable : ${esc(ROLE_LABELS[current.owner_role] || current.owner_role)}</span>`);
+      if (users.length) chips.push(`<span class="meta-chip">Rédigé par : ${esc(users.join(' / '))}</span>`);
       byId('meta-strip').innerHTML = chips.join('');
+      const isNational = (current.scope || 'local') === 'national';
+      byId('form-status').closest('.toolbar').querySelector('.scope-notice')?.remove();
+      if (isNational) {
+        const notice = document.createElement('div');
+        notice.className = 'review-note scope-notice';
+        notice.style.cssText = 'border-left-color:#b27b00;background:#fff8e6;color:#7a5800';
+        notice.innerHTML = `<strong>Document de niveau national.</strong> Ce modèle suit la structure officielle de l'Annexe du système de mise à jour, mais est normalement rédigé au niveau national${current.is_form ? ' via un formulaire dédié' : ''}. Tu peux t'en servir comme référence ou le remplir si ta fonction te le demande explicitement.`;
+        byId('form-card').insertBefore(notice, byId('review-feedback'));
+      }
     }
 
     function renderReviewFeedback() {

@@ -852,7 +852,16 @@ async function reports(req, res, member, body) {
     return json(res, result[0] ? 200 : 404, result[0] ? { report: result[0] } : { error: "Rapport introuvable." });
   }
   const schoolId = schoolScope(member, body.schoolId);
-  const allowedTypes = ["pre_projet", "post_projet", "proces_verbal", "collaboration", "mise_a_jour", "supervision", "investigation"];
+  // Kept in sync with the CHECK constraint on portal_reports.report_type
+  // (db/schema.sql) — every report_type a portal_report_templates row can
+  // carry must also be creatable here, or a valid template becomes
+  // unusable the moment someone tries to submit against it.
+  const allowedTypes = [
+    "pre_projet", "post_projet", "proces_verbal", "collaboration", "mise_a_jour", "supervision", "investigation",
+    "plan_action", "avancement_strategique", "bilan_financier", "plan_mediatique", "bilan_mediatique",
+    "pre_delegation", "post_delegation", "partenariat", "recommandation_parrains", "identification_besoins",
+    "annonce_reunion", "recommandation_vpa", "amendement", "motion_procedurale", "pv_assemblee", "cscy_final",
+  ];
   if (!schoolId || !body.title || !allowedTypes.includes(body.reportType)) return json(res, 400, { error: "Type, club et titre requis." });
   if (!(await canCreateReport(schoolId))) return json(res, 403, { error: "La rédaction de rapports est réservée aux responsables du club ou aux personnes mandatées." });
   const templateSlug = String(body.templateSlug || body.reportType);
