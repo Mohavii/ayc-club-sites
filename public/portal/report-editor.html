@@ -11,150 +11,191 @@
   <link rel="stylesheet" href="../theme.css">
   <link rel="stylesheet" href="portal.css">
   <style>
-    .tpl-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
-    .tpl-card{border:1px solid var(--portal-line,#e2e7f0);border-radius:12px;padding:14px;background:#fff;cursor:pointer;text-align:left;transition:all .15s ease}
-    .tpl-card:hover{border-color:#b4c3de;transform:translateY(-1px)}
-    .tpl-card.active{border-color:var(--portal-navy,#1f2a5a);box-shadow:0 0 0 2px rgba(31,42,90,.12)}
-    .tpl-card strong{display:block;font-size:.9rem;color:#1f2a5a;margin-bottom:4px}
-    .tpl-card span{display:block;font-size:.76rem;color:#6a748b;line-height:1.45}
-    .tpl-owner{display:inline-block;margin-top:8px;padding:2px 8px;border-radius:999px;font-size:.68rem;font-weight:800;background:#f0f4ff;color:#3b5bdb}
-    .meta-strip{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
-    .meta-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:.75rem;font-weight:700;background:#f1f4f9;color:#536387;border:1px solid #dbe2ef}
-    .meta-chip.warn{background:#fff8e6;color:#b27b00;border-color:#ffe69c}
-    .section-block{border:1px solid #e2e8f1;border-radius:12px;padding:14px;margin-bottom:12px;background:#fcfdff}
-    .section-block label{display:block;font-weight:800;font-size:.82rem;color:#1f2a5a;margin-bottom:6px;text-transform:capitalize}
-    .section-block textarea{width:100%;min-height:110px}
-    .review-note{border-left:3px solid #c02b2b;background:#fdf0f0;padding:10px 12px;border-radius:8px;margin-bottom:10px;font-size:.82rem;color:#7a2020}
-    .editor-sticky{position:sticky;bottom:0;background:#fff;border-top:1px solid #e2e8f1;padding:14px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-
-    /* ---- recursive structured-report renderer (schema_json) ---- */
-    .tpl-section{border:1px solid #e2e8f1;border-radius:12px;padding:14px 16px;margin-bottom:12px;background:#fcfdff}
-    .tpl-section.depth-0{background:#f7f9fd;border-color:#dbe2ef}
-    .tpl-section > .tpl-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
-    .tpl-section > .tpl-section-head h3,.tpl-section > .tpl-section-head h4{margin:0;color:#1f2a5a;font-weight:800}
-    .tpl-section.depth-0 > .tpl-section-head h3{font-size:1rem}
-    .tpl-section.depth-1 > .tpl-section-head h4{font-size:.9rem}
-    .tpl-section-note,.tpl-field-note{font-size:.74rem;color:#7a849a;margin:0 0 10px;font-style:italic}
-    .tpl-field{margin-bottom:12px}
-    .tpl-field:last-child{margin-bottom:0}
-    .tpl-field label{display:block;font-weight:800;font-size:.78rem;color:#1f2a5a;margin-bottom:6px}
-    .tpl-field textarea,.tpl-field select{width:100%;box-sizing:border-box;border:1px solid #d9dfeb;border-radius:10px;background:#fff;padding:10px 11px;color:#36415a;font:inherit;font-size:.83rem}
-    .tpl-field textarea{min-height:80px;resize:vertical}
-    .tpl-checklist{display:flex;flex-wrap:wrap;gap:8px}
-    .tpl-checklist label{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:.78rem;color:#3d4861;background:#fff;border:1px solid #dbe2ef;border-radius:999px;padding:6px 12px;margin:0;cursor:pointer}
-    .tpl-checklist input{margin:0}
-    .tpl-table-wrap{overflow-x:auto;border:1px solid #e2e8f1;border-radius:10px}
-    table.tpl-table{width:100%;border-collapse:collapse;font-size:.8rem}
-    table.tpl-table th{text-align:left;color:#77819a;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;padding:9px 8px;border-bottom:1px solid var(--portal-line,#e2e7f0);background:#f7f9fd;white-space:nowrap}
-    table.tpl-table td{padding:6px;border-bottom:1px solid #edf0f6;vertical-align:top}
-    table.tpl-table td:last-child{white-space:nowrap;width:1%}
-    table.tpl-table tr:last-child td{border-bottom:0}
-    table.tpl-table textarea{width:100%;min-width:120px;min-height:44px;box-sizing:border-box;border:1px solid #e2e8f1;border-radius:8px;padding:6px 8px;font:inherit;font-size:.8rem;resize:vertical}
-    .tpl-row-remove{border:1px solid #f0c8cc;background:#fff3f3;color:#8f2630;border-radius:8px;padding:6px 9px;font-size:.72rem;font-weight:800;cursor:pointer}
-    .tpl-row-add{margin-top:8px}
-    .tpl-add-btn{border:1px dashed #b9c8e5;background:#fff;color:#3b5bdb;border-radius:9px;padding:7px 12px;font-size:.76rem;font-weight:800;cursor:pointer}
-    .tpl-add-btn:hover{background:#f0f4ff}
-    .tpl-group-item{border:1px solid #e2e8f1;border-radius:10px;padding:12px;margin-bottom:10px;background:#fff;position:relative}
-    .tpl-group-item .tpl-row-remove{position:absolute;top:10px;right:10px}
-    .tpl-group-item-label{font-size:.68rem;font-weight:900;color:#8fa4d4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
-
-    /* ---- multi-report tab strip (open several drafts at once, Google-Docs style) ---- */
-    .doc-tabs{display:flex;align-items:flex-end;gap:2px;margin-bottom:14px;overflow-x:auto;scrollbar-width:thin;padding-bottom:1px}
-    .doc-tab{display:flex;align-items:center;gap:7px;max-width:220px;padding:9px 8px 9px 14px;border-radius:10px 10px 0 0;background:#eef1f8;color:#5c6683;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap;border:1px solid transparent;border-bottom:none;flex-shrink:0;transition:background .12s ease}
-    .doc-tab:hover{background:#e4e9f5}
-    .doc-tab.active{background:#fff;color:#1f2a5a;border-color:#e2e8f1;box-shadow:0 -2px 0 var(--portal-navy,#1f2a5a) inset}
-    .doc-tab .tab-title{overflow:hidden;text-overflow:ellipsis;max-width:150px}
-    .doc-tab .tab-dot{width:6px;height:6px;border-radius:50%;background:#e08a2c;flex-shrink:0}
-    .doc-tab .tab-close{border:none;background:transparent;color:#94a0ba;font-size:1rem;line-height:1;cursor:pointer;padding:2px 4px;border-radius:5px;flex-shrink:0}
-    .doc-tab .tab-close:hover{background:#dbe2f0;color:#1f2a5a}
-    .doc-tab-add{flex-shrink:0;border:1px dashed #b9c8e5;background:#fff;color:#3b5bdb;border-radius:10px 10px 0 0;padding:9px 14px;font-size:.8rem;font-weight:900;cursor:pointer}
-    .doc-tab-add:hover{background:#f0f4ff}
-
-    /* ---- paper / document look for the report body, mirroring the source PDFs ---- */
-    .doc-page{background:#fff;border:1px solid #e2e8f1;border-radius:6px;box-shadow:0 1px 3px rgba(20,30,60,.06);padding:32px clamp(16px,5vw,60px);font-family:Georgia,'Times New Roman',serif;color:#2a3350}
-    .doc-page .tpl-field label{font-family:'Fjalla One',Georgia,serif;letter-spacing:.01em}
-    .doc-page .tpl-section-head h3,.doc-page .tpl-section-head h4,.doc-page .tpl-section-head h5,.doc-page .tpl-section-head h6{font-family:'Fjalla One',Georgia,serif}
-    .doc-page .tpl-field{background:transparent;border:none;padding:0 0 16px;margin-bottom:16px;border-bottom:1px solid #eef1f8}
-    .doc-page .tpl-field:last-child{border-bottom:none}
-    .tpl-section.depth-0{background:transparent;border:none;border-top:2px solid #1f2a5a;border-radius:0;padding:18px 0 4px;margin-bottom:2px}
-    .tpl-section.depth-0>.tpl-section-head h3{font-size:1.05rem;letter-spacing:.02em}
-    .tpl-section.depth-1{background:transparent;border:none;border-left:3px solid #dbe2ef;border-radius:0;padding:4px 0 4px 18px;margin:4px 0 12px}
-    .tpl-section.depth-2{background:#fbfcfe;border:1px solid #edf0f6;border-radius:8px;padding:12px 16px;margin:6px 0 12px 18px}
-    .tpl-section.depth-3{background:#fff;border:1px dashed #dbe2ef;border-radius:8px;padding:10px 14px;margin:6px 0 10px 30px}
-    .doc-page>.tpl-field:first-child,.doc-page>.tpl-section:first-child{margin-top:0}
-
     /* ==========================================================================
-       Standalone report workspace theme.
-       This page is opened in its own browser tab (not inside the portal's
-       nav/sidebar chrome), so it gets its own compact app header and a
-       dedicated visual language: soft paper background, generously rounded
-       cards, and the site's existing display/body font pairing used more
-       deliberately (Fjalla One for headings, Inter for everything else).
-       The shared portal-common.js is still used for auth/session handling,
-       but its topbar/sidebar mounts are neutralised below rather than shown.
+       Standalone document editor.
+       Each report is a real browser tab (report-editor?id=... or
+       ?template=...), never a form buried in the portal's own nav/sidebar.
+       The page reads as one continuous paper document: a title you type
+       into directly, a slim strip of metadata fields, then the
+       template's own sections flowing underneath — all on the same sheet,
+       the way a Word/Docs page reads, rather than a dashboard of cards.
        ========================================================================== */
-    html{ background:var(--paper); }
-    body.editor-standalone{
-      background:
-        radial-gradient(1100px 480px at 12% -10%, rgba(58,184,234,.10), transparent 60%),
-        radial-gradient(900px 420px at 100% 0%, rgba(247,164,32,.08), transparent 55%),
-        var(--paper);
-      min-height:100vh;
-    }
+    html{ background:#e9edf5; }
+    body.editor-standalone{ min-height:100vh; }
     body.editor-standalone #topbar-root,
     body.editor-standalone #sidebar-root{ display:none !important; }
     body.editor-standalone .workspace{ display:block; }
 
+    /* ---- app bar: identifies the tool and this specific report -------- */
     .editor-appbar{
       position:sticky; top:0; z-index:40;
-      display:flex; align-items:center; gap:16px;
-      padding:14px clamp(16px,4vw,40px);
-      background:rgba(255,255,255,.86); backdrop-filter:blur(10px) saturate(160%);
+      display:flex; align-items:center; gap:14px;
+      padding:12px clamp(14px,4vw,36px);
+      background:rgba(255,255,255,.92); backdrop-filter:blur(10px) saturate(160%);
       border-bottom:1px solid var(--line);
     }
-    .editor-appbar .brand-mini{
-      display:flex; align-items:center; gap:10px; text-decoration:none; flex:none;
+    .editor-appbar .brand-mini{ display:flex; align-items:center; gap:9px; text-decoration:none; flex:none; }
+    .editor-appbar .brand-mini img{ width:24px; height:24px; object-fit:contain; }
+    .editor-appbar .brand-mini span{ font-family:var(--font-display); color:var(--navy-1); font-size:.82rem; letter-spacing:.01em; }
+    .editor-appbar .appbar-divider{ width:1px; height:22px; background:var(--line); flex:none; }
+    .editor-appbar .appbar-doc{ min-width:0; display:flex; align-items:center; gap:8px; }
+    .editor-appbar .appbar-doc-name{
+      font-family:var(--font-body); font-weight:600; font-size:.88rem; color:var(--ink);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:38vw;
     }
-    .editor-appbar .brand-mini img{ width:28px; height:28px; object-fit:contain; }
-    .editor-appbar .brand-mini span{
-      font-family:var(--font-display); color:var(--navy-1); font-size:.92rem; letter-spacing:.01em;
+    .editor-appbar .save-state{
+      font-size:.72rem; font-weight:600; color:var(--ink-soft); flex:none;
+      display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
     }
-    .editor-appbar .appbar-divider{ width:1px; height:26px; background:var(--line); flex:none; }
-    .editor-appbar .appbar-title{ min-width:0; }
-    .editor-appbar .appbar-title .eyebrow{ margin:0 0 2px; }
-    .editor-appbar .appbar-title h1{
-      margin:0; font-family:var(--font-display); font-size:1.05rem; color:var(--navy-1);
-      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    }
+    .editor-appbar .save-state .dot{ width:6px; height:6px; border-radius:50%; background:#c7cede; flex:none; }
+    .editor-appbar .save-state.is-dirty .dot{ background:#e08a2c; }
+    .editor-appbar .save-state.is-saved .dot{ background:#2c8659; }
     .editor-appbar .appbar-spacer{ flex:1 1 auto; }
     .editor-appbar .appbar-actions{ display:flex; align-items:center; gap:8px; flex:none; }
-    .editor-appbar .btn-close-tab{
+    .editor-appbar .btn-ghost{
       display:inline-flex; align-items:center; gap:8px;
-      font-family:var(--font-body); font-weight:600; font-size:.82rem; color:var(--ink-soft);
+      font-family:var(--font-body); font-weight:600; font-size:.8rem; color:var(--ink-soft);
       background:var(--paper-2); border:1px solid var(--line); border-radius:999px;
-      padding:8px 16px; cursor:pointer; transition:background .18s var(--ease), color .18s var(--ease), border-color .18s var(--ease);
+      padding:8px 15px; cursor:pointer; transition:background .18s var(--ease), color .18s var(--ease), border-color .18s var(--ease);
       text-decoration:none;
     }
-    .editor-appbar .btn-close-tab:hover{ background:#fff; border-color:#c7d2e6; color:var(--navy-1); }
+    .editor-appbar .btn-ghost:hover{ background:#fff; border-color:#c7d2e6; color:var(--navy-1); }
 
-    .editor-shell{
-      max-width:1080px; margin:0 auto; padding:32px clamp(16px,4vw,40px) 96px;
-    }
-    .editor-shell .portal-heading{
-      background:var(--white); border:1px solid var(--line); border-radius:var(--radius-lg);
-      box-shadow:var(--shadow-card); padding:26px 30px; margin-bottom:22px;
-    }
-    .editor-shell .portal-card{ border-radius:var(--radius-lg); }
-    .editor-shell #editor-title{ font-size:1.5rem; }
+    /* ---- the page itself ---------------------------------------------- */
+    .editor-shell{ max-width:900px; margin:0 auto; padding:34px clamp(12px,4vw,28px) 110px; }
 
-    /* rounder, calmer surfaces throughout the doc/section builder */
-    .tpl-card, .section-block, .review-note, .tpl-section, .doc-page{ border-radius:16px; }
-    .tpl-field textarea, .tpl-field select, .form-field input, .form-field select, .form-field textarea{
-      border-radius:10px !important;
+    .doc-sheet{
+      background:var(--white); border:1px solid var(--line); border-radius:20px;
+      box-shadow:0 1px 2px rgba(28,32,56,.05), 0 24px 48px -28px rgba(39,40,99,.22);
+      overflow:hidden;
     }
-    .doc-tab, .doc-tab-add{ border-radius:12px 12px 0 0; }
-    .meta-chip{ border-radius:999px; }
-    .doc-page{ box-shadow:0 1px 2px rgba(28,32,56,.04), 0 8px 24px -12px rgba(39,40,99,.10); }
+    .doc-head{ padding:34px clamp(20px,6vw,64px) 6px; }
+    .doc-title-input{
+      width:100%; border:none; outline:none; background:transparent;
+      font-family:var(--font-display); color:var(--navy-1); font-size:2rem; letter-spacing:.01em;
+      padding:2px 0 10px; border-bottom:2px solid transparent;
+    }
+    .doc-title-input::placeholder{ color:#b7c0d6; }
+    .doc-title-input:focus{ border-bottom-color:var(--blue-2); }
+
+    .doc-meta-row{
+      display:grid; grid-template-columns:repeat(auto-fit, minmax(170px,1fr)); gap:10px 16px;
+      padding:14px clamp(20px,6vw,64px) 22px; border-bottom:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(246,248,251,.6), transparent);
+    }
+    .doc-meta-field label{
+      display:block; font-family:var(--font-body); font-weight:700; font-size:.66rem;
+      text-transform:uppercase; letter-spacing:.06em; color:#8b95ac; margin-bottom:5px;
+    }
+    .doc-meta-field input, .doc-meta-field select{
+      width:100%; box-sizing:border-box; border:1px solid transparent; background:transparent;
+      font-family:var(--font-body); font-size:.86rem; color:var(--ink); padding:5px 7px; margin:-5px -7px;
+      border-radius:8px; transition:border-color .15s var(--ease), background .15s var(--ease);
+    }
+    .doc-meta-field input:hover, .doc-meta-field select:hover{ background:var(--paper-2); }
+    .doc-meta-field input:focus, .doc-meta-field select:focus{
+      outline:none; background:#fff; border-color:var(--blue-2); box-shadow:0 0 0 3px rgba(58,184,234,.14);
+    }
+
+    .meta-strip{ display:flex; flex-wrap:wrap; gap:8px; padding:16px clamp(20px,6vw,64px) 0; }
+    .meta-chip{ display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; font-size:.73rem; font-weight:700; background:#f1f4f9; color:#536387; border:1px solid #dbe2ef; }
+    .meta-chip.warn{ background:#fff8e6; color:#b27b00; border-color:#ffe69c; }
+
+    .review-note{ margin:16px clamp(20px,6vw,64px) 0; border-left:3px solid #c02b2b; background:#fdf0f0; padding:12px 14px; border-radius:10px; font-size:.83rem; color:#7a2020; }
+
+    /* ---- document body: template sections, continuous sheet ----------- */
+    .doc-body{ padding:24px clamp(20px,6vw,64px) 8px; font-family:Georgia,'Times New Roman',serif; color:#2a3350; }
+    .doc-body-intro{ margin-bottom:6px; }
+    .doc-body-intro label{
+      display:block; font-family:var(--font-body); font-weight:700; font-size:.7rem;
+      text-transform:uppercase; letter-spacing:.06em; color:#8b95ac; margin-bottom:8px;
+    }
+    .doc-body-intro textarea{ font-family:var(--font-body); }
+
+    .tpl-section{ border:none; padding:0; margin-bottom:2px; }
+    .tpl-section.depth-0{ border-top:2px solid #1f2a5a; padding:22px 0 4px; margin-bottom:2px; }
+    .tpl-section.depth-0:first-child{ border-top:none; padding-top:0; }
+    .tpl-section.depth-1{ border-left:3px solid #dbe2ef; padding:4px 0 4px 18px; margin:6px 0 14px; }
+    .tpl-section.depth-2{ background:#fbfcfe; border:1px solid #edf0f6; border-radius:12px; padding:14px 18px; margin:8px 0 14px 18px; }
+    .tpl-section.depth-3{ background:#fff; border:1px dashed #dbe2ef; border-radius:12px; padding:12px 16px; margin:8px 0 12px 30px; }
+    .tpl-section > .tpl-section-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:12px; }
+    .tpl-section > .tpl-section-head h3,.tpl-section > .tpl-section-head h4,
+    .tpl-section > .tpl-section-head h5,.tpl-section > .tpl-section-head h6{
+      margin:0; color:#1f2a5a; font-weight:800; font-family:'Fjalla One',Georgia,serif; letter-spacing:.02em;
+    }
+    .tpl-section.depth-0 > .tpl-section-head h3{ font-size:1.12rem; }
+    .tpl-section.depth-1 > .tpl-section-head h4{ font-size:.96rem; }
+    .tpl-section-note,.tpl-field-note{ font-size:.76rem; color:#7a849a; margin:0 0 12px; font-style:italic; font-family:var(--font-body); }
+
+    .tpl-field{ padding:0 0 18px; margin-bottom:18px; border-bottom:1px solid #eef1f8; }
+    .tpl-field:last-child{ border-bottom:none; margin-bottom:0; padding-bottom:0; }
+    .tpl-field label{ display:block; font-family:'Fjalla One',Georgia,serif; font-weight:700; font-size:.86rem; color:#1f2a5a; margin-bottom:8px; letter-spacing:.01em; }
+    .tpl-field textarea,.tpl-field select{
+      width:100%; box-sizing:border-box; border:1px solid transparent; background:transparent;
+      padding:6px 2px; color:#2a3350; font:inherit; font-size:.95rem; line-height:1.6; border-radius:8px;
+      transition:border-color .15s var(--ease), background .15s var(--ease), box-shadow .15s var(--ease);
+    }
+    .tpl-field textarea{ min-height:70px; resize:vertical; font-family:inherit; }
+    .tpl-field textarea:hover, .tpl-field select:hover{ background:#fbfcfe; }
+    .tpl-field textarea:focus, .tpl-field select:focus{
+      outline:none; background:#fff; border-color:var(--blue-2); box-shadow:0 0 0 3px rgba(58,184,234,.12); padding-left:11px; padding-right:11px;
+    }
+    .tpl-field textarea::placeholder{ color:#b7c0d6; font-style:italic; }
+
+    .tpl-checklist{ display:flex; flex-wrap:wrap; gap:8px; font-family:var(--font-body); }
+    .tpl-checklist label{ display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:.8rem; color:#3d4861; background:#fff; border:1px solid #dbe2ef; border-radius:999px; padding:7px 13px; margin:0; cursor:pointer; }
+    .tpl-checklist input{ margin:0; }
+
+    .tpl-table-wrap{ overflow-x:auto; border:1px solid #e2e8f1; border-radius:12px; font-family:var(--font-body); }
+    table.tpl-table{ width:100%; border-collapse:collapse; font-size:.82rem; }
+    table.tpl-table th{ text-align:left; color:#77819a; font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; padding:10px 9px; border-bottom:1px solid var(--line); background:#f7f9fd; white-space:nowrap; }
+    table.tpl-table td{ padding:7px; border-bottom:1px solid #edf0f6; vertical-align:top; }
+    table.tpl-table td:last-child{ white-space:nowrap; width:1%; }
+    table.tpl-table tr:last-child td{ border-bottom:0; }
+    table.tpl-table textarea{ width:100%; min-width:120px; min-height:44px; box-sizing:border-box; border:1px solid #e2e8f1; border-radius:9px; padding:7px 9px; font:inherit; font-size:.83rem; resize:vertical; font-family:var(--font-body); }
+    .tpl-row-remove{ border:1px solid #f0c8cc; background:#fff3f3; color:#8f2630; border-radius:9px; padding:6px 10px; font-size:.72rem; font-weight:800; cursor:pointer; font-family:var(--font-body); }
+    .tpl-row-add{ margin-top:10px; }
+    .tpl-add-btn{ border:1px dashed #b9c8e5; background:#fff; color:#3b5bdb; border-radius:10px; padding:8px 14px; font-size:.78rem; font-weight:800; cursor:pointer; font-family:var(--font-body); }
+    .tpl-add-btn:hover{ background:#f0f4ff; }
+    .tpl-group-item{ border:1px solid #e2e8f1; border-radius:12px; padding:14px; margin-bottom:10px; background:#fff; position:relative; }
+    .tpl-group-item .tpl-row-remove{ position:absolute; top:10px; right:10px; }
+    .tpl-group-item-label{ font-size:.68rem; font-weight:900; color:#8fa4d4; text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; font-family:var(--font-body); }
+
+    /* ---- bottom action bar --------------------------------------------- */
+    .doc-actions{
+      position:sticky; bottom:0; z-index:30; margin-top:18px;
+      background:rgba(255,255,255,.94); backdrop-filter:blur(8px);
+      border-top:1px solid var(--line); border-radius:0 0 20px 20px;
+      padding:16px clamp(20px,6vw,64px); display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    }
+    .doc-actions .field-hint{ margin:0; }
+
+    /* ---- template picker: choosing a document to start ----------------- */
+    .picker-shell{ max-width:1000px; margin:0 auto; padding:40px clamp(12px,4vw,28px) 100px; }
+    .picker-head{ margin-bottom:22px; }
+    .picker-head h1{ font-family:var(--font-display); color:var(--navy-1); font-size:1.7rem; margin:0 0 6px; }
+    .picker-head p{ color:var(--ink-soft); margin:0; }
+    .filter-tabs{ display:flex; gap:6px; margin:18px 0 20px; flex-wrap:wrap; }
+    .filter-tabs button{
+      font-family:var(--font-body); font-weight:600; font-size:.82rem; color:var(--ink-soft);
+      background:var(--white); border:1px solid var(--line); border-radius:999px; padding:8px 16px; cursor:pointer;
+      transition:all .15s var(--ease);
+    }
+    .filter-tabs button.active{ background:var(--navy-1); border-color:var(--navy-1); color:#fff; }
+    .tpl-picker{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+    .tpl-card{
+      border:1px solid var(--line); border-radius:16px; padding:18px; background:#fff; cursor:pointer;
+      text-align:left; transition:all .15s var(--ease); box-shadow:var(--shadow-card);
+    }
+    .tpl-card:hover{ border-color:#b4c3de; transform:translateY(-2px); }
+    .tpl-card strong{ display:block; font-family:var(--font-display); font-size:.95rem; color:#1f2a5a; margin-bottom:6px; letter-spacing:.01em; }
+    .tpl-card span{ display:block; font-size:.8rem; color:#6a748b; line-height:1.5; }
+    .tpl-owner{ display:inline-block; margin-top:10px; padding:3px 9px; border-radius:999px; font-size:.68rem; font-weight:800; background:#f0f4ff; color:#3b5bdb; }
+
+    @media (max-width:640px){
+      .editor-appbar .appbar-doc-name{ max-width:32vw; }
+      .doc-meta-row{ grid-template-columns:1fr 1fr; }
+    }
   </style>
 </head>
 <body class="editor-standalone">
@@ -167,113 +208,97 @@
       <span>YOUTH CLUBs</span>
     </a>
     <span class="appbar-divider"></span>
-    <div class="appbar-title">
-      <p class="eyebrow">Rédaction de rapport</p>
-      <h1 id="appbar-report-title">Éditeur de rapports</h1>
+    <div class="appbar-doc">
+      <span class="appbar-doc-name" id="appbar-doc-name">Éditeur de rapports</span>
+      <span class="save-state" id="save-state"><span class="dot"></span><span id="save-state-text">Brouillon non enregistré</span></span>
     </div>
     <span class="appbar-spacer"></span>
     <div class="appbar-actions">
-      <a class="btn-close-tab" href="reports" target="_blank" rel="noopener">Voir tous les rapports</a>
-      <button type="button" class="btn-close-tab" onclick="window.close()">Fermer l’onglet</button>
+      <a class="btn-ghost" href="reports" target="_blank" rel="noopener">Tous les rapports</a>
+      <button type="button" class="btn-ghost" onclick="window.close()">Fermer l’onglet</button>
     </div>
   </header>
 
   <div class="workspace">
-    <main class="portal-content editor-shell">
-      <div class="portal-heading">
-        <div>
-          <p class="eyebrow">Système de mise à jour · Rédaction</p>
-          <h1 id="editor-title">Éditeur de rapports</h1>
-          <p id="editor-subtitle">Choisis un modèle de rapport : les sections obligatoires, le destinataire et l’échéance viennent du système de mise à jour.</p>
-        </div>
-      </div>
+    <main class="portal-content">
 
-      <div id="notice"></div>
+      <div id="notice" style="max-width:900px;margin:16px auto 0;padding:0 clamp(12px,4vw,28px)"></div>
 
-      <section id="editor-restricted" class="portal-card restricted-state" hidden>
+      <section id="editor-restricted" class="portal-card restricted-state" style="max-width:640px;margin:48px auto" hidden>
         <h2>Espace réservé aux responsables</h2>
         <p>La rédaction des rapports officiels est réservée aux responsables du club et aux personnes mandatées.</p>
       </section>
 
-      <div id="editor-workspace" hidden>
+      <!-- Step 1: no ?id and no ?template in the URL — pick which document to start. -->
+      <section id="picker-shell" class="picker-shell" hidden>
+        <div class="picker-head">
+          <p class="eyebrow">Système de mise à jour</p>
+          <h1>Nouveau rapport</h1>
+          <p>Choisis un modèle : les sections obligatoires, le destinataire et l’échéance viennent du système de mise à jour. Le document s’ouvre ensuite dans cet onglet.</p>
+        </div>
+        <div class="filter-tabs" id="scope-filters">
+          <button class="active" type="button" data-scope="mine">Mes rapports</button>
+          <button type="button" data-scope="local">Tous les rapports locaux</button>
+          <button type="button" data-scope="all">Tous</button>
+        </div>
+        <div class="tpl-picker" id="tpl-picker"></div>
+      </section>
 
-        <div class="doc-tabs" id="doc-tabs"></div>
-
-        <section class="portal-card" id="picker-card">
-          <div class="toolbar">
-            <div>
-              <p class="eyebrow">Étape 1</p>
-              <h2>Modèle de rapport</h2>
-            </div>
-            <div class="filter-tabs" id="scope-filters">
-              <button class="active" type="button" data-scope="mine">Mes rapports</button>
-              <button type="button" data-scope="local">Tous les rapports locaux</button>
-              <button type="button" data-scope="all">Tous</button>
-            </div>
-          </div>
-          <div class="tpl-picker" id="tpl-picker"></div>
-        </section>
-
-        <section class="portal-card" id="form-card" hidden>
-          <div class="toolbar">
-            <div>
-              <p class="eyebrow">Étape 2</p>
-              <h2 id="form-heading">Contenu du rapport</h2>
-            </div>
-            <span class="section-note" id="form-status"></span>
-          </div>
-
-          <div id="review-feedback"></div>
-          <div class="meta-strip" id="meta-strip"></div>
-
-          <form id="report-form" class="form-grid">
-            <div class="form-field">
-              <label for="reportTitle">Titre du dossier</label>
-              <input id="reportTitle" required placeholder="Titre du rapport">
-            </div>
-            <div class="form-field">
-              <label for="reportRecipient">Destinataire</label>
-              <input id="reportRecipient" placeholder="Instance ou responsable">
-            </div>
-            <div class="form-field">
-              <label for="reportProject">Projet associé</label>
-              <select id="reportProject"><option value="">Aucun projet associé</option></select>
-            </div>
-            <div class="form-field">
-              <label for="reportAxis">Axe stratégique</label>
-              <select id="reportAxis"><option value="">À préciser</option></select>
-            </div>
-            <div class="form-field">
-              <label for="reportSubAxis">Sous-axe</label>
-              <select id="reportSubAxis"><option value="">À préciser</option></select>
-            </div>
-            <div class="form-field">
-              <label for="reportEventDate">Date de l’action</label>
-              <input id="reportEventDate" type="date">
-            </div>
-            <div class="form-field">
-              <label for="reportDueAt">Échéance</label>
-              <input id="reportDueAt" type="datetime-local">
-            </div>
-            <div class="form-field full">
-              <label for="reportDescription">Résumé et contexte</label>
-              <textarea id="reportDescription" placeholder="Contexte, objectifs, actions, résultats ou points à examiner"></textarea>
+      <!-- Step 2: the document itself — one report, this one tab. -->
+      <div class="editor-shell" id="editor-shell" hidden>
+        <form id="report-form">
+          <div class="doc-sheet">
+            <div class="doc-head">
+              <input id="reportTitle" class="doc-title-input" required placeholder="Titre du rapport…" autocomplete="off">
             </div>
 
-            <div class="full">
-              <p class="eyebrow" style="margin-bottom:8px">Sections imposées par le système de mise à jour</p>
-              <div id="dynamic-sections" class="doc-page"></div>
+            <div class="doc-meta-row">
+              <div class="doc-meta-field">
+                <label for="reportRecipient">Destinataire</label>
+                <input id="reportRecipient" placeholder="Instance ou responsable">
+              </div>
+              <div class="doc-meta-field">
+                <label for="reportProject">Projet associé</label>
+                <select id="reportProject"><option value="">Aucun projet associé</option></select>
+              </div>
+              <div class="doc-meta-field">
+                <label for="reportAxis">Axe stratégique</label>
+                <select id="reportAxis"><option value="">À préciser</option></select>
+              </div>
+              <div class="doc-meta-field">
+                <label for="reportSubAxis">Sous-axe</label>
+                <select id="reportSubAxis"><option value="">À préciser</option></select>
+              </div>
+              <div class="doc-meta-field">
+                <label for="reportEventDate">Date de l’action</label>
+                <input id="reportEventDate" type="date">
+              </div>
+              <div class="doc-meta-field">
+                <label for="reportDueAt">Échéance</label>
+                <input id="reportDueAt" type="datetime-local">
+              </div>
             </div>
 
-            <div class="editor-sticky full">
+            <div class="meta-strip" id="meta-strip"></div>
+            <div id="review-feedback"></div>
+
+            <div class="doc-body">
+              <div class="tpl-field doc-body-intro">
+                <label for="reportDescription">Résumé et contexte</label>
+                <textarea id="reportDescription" placeholder="Contexte, objectifs, actions, résultats ou points à examiner…"></textarea>
+              </div>
+              <div id="dynamic-sections"></div>
+            </div>
+
+            <div class="doc-actions">
               <button class="btn btn-secondary" type="button" id="save-draft">Enregistrer le brouillon</button>
               <button class="btn btn-primary" type="submit" id="submit-report">Soumettre pour validation</button>
               <span class="field-hint" id="save-hint"></span>
             </div>
-          </form>
-        </section>
-
+          </div>
+        </form>
       </div>
+
     </main>
   </div>
 
@@ -286,198 +311,36 @@
     const showError = e => AYCPortal.renderError(notice, e);
 
     const params = new URLSearchParams(location.search);
-    const editingId = params.get('id');
+    let editingId = params.get('id');
     const presetTemplate = params.get('template');
 
     let member = null;
     let templates = [];
     let projects = [];
     let axes = [];
-    let current = null;      // the selected template row, for the ACTIVE tab
-    let editing = null;      // the report row being edited, for the ACTIVE tab (or null)
+    let current = null;     // the selected template row for this report
+    let editing = null;     // the report row this tab is editing (or null = new)
     let scope = 'mine';
+    let dirty = false;
 
-    // ---- multi-report tabs ------------------------------------------------
-    // Several report drafts can be open at once, each in its own tab, the
-    // way separate Google Docs tabs behave: switching tabs never loses
-    // in-progress edits, and the set of open tabs survives a reload
-    // (sessionStorage) for the rest of the browsing session.
-    let tabs = [];
-    let activeTab = -1;
-    const TABS_KEY = 'ayc_report_tabs_v1';
-
-    function makeTab(overrides) {
-      return Object.assign({
-        reportId: null,
-        templateSlug: null,
-        title: 'Nouveau rapport',
-        meta: { recipient: '', projectId: '', axisSlug: '', subAxisSlug: '', eventDate: '', dueAt: '', description: '' },
-        payload: {},
-        reviews: [],
-        status: 'draft',
-        editingFull: null,
-        dirty: false,
-      }, overrides);
+    // ---- save-state indicator (appbar) -------------------------------
+    function setSaveState(state, label) {
+      const el = byId('save-state');
+      el.classList.remove('is-dirty', 'is-saved');
+      if (state) el.classList.add(state);
+      byId('save-state-text').textContent = label;
     }
 
-    function persistTabs() {
-      try { sessionStorage.setItem(TABS_KEY, JSON.stringify({ tabs, activeTab })); } catch { /* storage full/unavailable: tabs just won't survive a reload */ }
+    function setDocName(title) {
+      const t = (title || '').trim();
+      byId('appbar-doc-name').textContent = t || 'Éditeur de rapports';
+      document.title = `${t ? t + ' · ' : ''}Éditeur de rapports · Portail YOUTHCLUBber`;
     }
-
-    let persistTimer = null;
-    function schedulePersist() { clearTimeout(persistTimer); persistTimer = setTimeout(() => { captureActiveTab(); persistTabs(); }, 400); }
 
     function onFormChanged() {
-      if (tabs[activeTab]) tabs[activeTab].dirty = true;
-      renderTabs();
-      schedulePersist();
-      const liveTitle = byId('reportTitle')?.value.trim();
-      const appbarTitle = byId('appbar-report-title');
-      if (appbarTitle) appbarTitle.textContent = liveTitle || 'Éditeur de rapports';
-      document.title = `${liveTitle ? liveTitle + ' · ' : ''}Éditeur de rapports · Portail YOUTHCLUBber`;
-    }
-
-    function renderTabs() {
-      const bar = byId('doc-tabs');
-      if (!bar) return;
-      bar.innerHTML = tabs.map((t, i) => `
-        <div class="doc-tab ${i === activeTab ? 'active' : ''}" data-tab-index="${i}" title="${esc(t.title)}">
-          <span class="tab-title">${esc(t.title || 'Nouveau rapport')}</span>
-          ${t.dirty ? '<span class="tab-dot" title="Modifications non enregistrées"></span>' : ''}
-          <button type="button" class="tab-close" data-close-index="${i}" aria-label="Fermer l’onglet">×</button>
-        </div>
-      `).join('') + `<button type="button" class="doc-tab-add" id="tab-add-btn">+ Nouvel onglet</button>`;
-    }
-
-    // Writes the on-screen form state (the active tab) back into tabs[activeTab]
-    // before switching away from it, so nothing typed is lost.
-    function captureActiveTab() {
-      if (activeTab < 0 || !tabs[activeTab]) return;
-      const t = tabs[activeTab];
-      t.templateSlug = current?.slug || t.templateSlug;
-      const titleVal = byId('reportTitle').value.trim();
-      if (titleVal) t.title = titleVal;
-      t.meta = {
-        recipient: byId('reportRecipient').value,
-        projectId: byId('reportProject').value,
-        axisSlug: byId('reportAxis').value,
-        subAxisSlug: byId('reportSubAxis').value,
-        eventDate: byId('reportEventDate').value,
-        dueAt: byId('reportDueAt').value,
-        description: byId('reportDescription').value,
-      };
-      if (current) t.payload = collectPayload();
-    }
-
-    // After a successful save, adopt the server's report row into the
-    // active tab (so a second "Enregistrer" updates instead of duplicating).
-    function syncSavedStateToTab() {
-      if (activeTab < 0 || !tabs[activeTab]) return;
-      const t = tabs[activeTab];
-      t.reportId = editing?.id ?? t.reportId;
-      t.status = editing?.status || t.status;
-      t.reviews = jsonArray(editing?.reviews);
-      t.editingFull = editing;
-      t.dirty = false;
-      const titleVal = byId('reportTitle').value.trim();
-      if (titleVal) t.title = titleVal;
-      renderTabs();
-      persistTabs();
-    }
-
-    // Restores tabs[index] onto the screen and makes it the active tab.
-    function applyTab(index) {
-      activeTab = index;
-      const t = tabs[index];
-      current = t.templateSlug ? (templates.find(x => x.slug === t.templateSlug) || null) : null;
-      editing = t.editingFull || null;
-
-      byId('editor-title').textContent = t.reportId ? 'Reprendre un rapport' : 'Éditeur de rapports';
-      const appbarTitle = byId('appbar-report-title');
-      if (appbarTitle) appbarTitle.textContent = (t.title && t.title !== 'Nouveau rapport') ? t.title : 'Éditeur de rapports';
-      document.title = `${(t.title && t.title !== 'Nouveau rapport') ? t.title + ' · ' : ''}Éditeur de rapports · Portail YOUTHCLUBber`;
-      byId('editor-subtitle').textContent = t.reportId
-        ? 'Corrige le dossier puis soumets-le de nouveau à la validation.'
-        : 'Choisis un modèle de rapport : les sections obligatoires, le destinataire et l’échéance viennent du système de mise à jour.';
-
-      byId('reportTitle').value = (t.reportId || t.title !== 'Nouveau rapport') ? t.title : '';
-      byId('reportRecipient').value = t.meta.recipient || '';
-      byId('reportProject').value = t.meta.projectId || '';
-      fillAxis('reportAxis', 'À préciser', t.meta.axisSlug || null);
-      syncSubAxes(t.meta.subAxisSlug || null);
-      byId('reportEventDate').value = t.meta.eventDate || '';
-      byId('reportDueAt').value = t.meta.dueAt || '';
-      byId('reportDescription').value = t.meta.description || '';
-      byId('form-status').textContent = STATUS_LABELS[t.status] || '';
-      renderReviewFeedback();
-
-      if (current) {
-        byId('picker-card').hidden = true;
-        byId('form-card').hidden = false;
-        byId('form-heading').textContent = current.name;
-        renderMeta();
-        renderSections(t.payload);
-      } else {
-        byId('picker-card').hidden = false;
-        byId('form-card').hidden = true;
-      }
-      renderPicker();
-      renderTabs();
-      persistTabs();
-    }
-
-    function switchTab(index) {
-      if (index === activeTab || !tabs[index]) return;
-      captureActiveTab();
-      applyTab(index);
-    }
-
-    function openNewTab(overrides) {
-      captureActiveTab();
-      tabs.push(makeTab(overrides || {}));
-      applyTab(tabs.length - 1);
-    }
-
-    function closeTab(index) {
-      const t = tabs[index];
-      if (!t) return;
-      if (t.dirty && !confirm('Fermer cet onglet ? Les modifications non enregistrées seront perdues.')) return;
-      const wasActive = index === activeTab;
-      tabs.splice(index, 1);
-      if (!tabs.length) tabs.push(makeTab({}));
-      if (wasActive) {
-        applyTab(Math.min(index, tabs.length - 1));
-      } else {
-        if (index < activeTab) activeTab -= 1;
-        renderTabs();
-        persistTabs();
-      }
-    }
-
-    // Fetches a report not yet open in any tab and appends a tab for it.
-    async function openReportInNewTab(id) {
-      const reportsRes = await AYCPortal.api('reports');
-      const report = (reportsRes.reports || []).find(r => String(r.id) === String(id));
-      if (!report) throw new Error('Rapport introuvable ou hors de ton périmètre.');
-      tabs.push(makeTab({
-        reportId: report.id,
-        templateSlug: report.template_slug || report.report_type,
-        title: report.title || 'Rapport',
-        meta: {
-          recipient: report.recipient || '',
-          projectId: report.project_id || '',
-          axisSlug: report.axis_slug || null,
-          subAxisSlug: report.sub_axis_slug || null,
-          eventDate: toDateInput(report.event_date),
-          dueAt: toDateTimeInput(report.due_at),
-          description: report.description || '',
-        },
-        payload: report.payload || {},
-        reviews: jsonArray(report.reviews),
-        status: report.status || 'draft',
-        editingFull: report,
-      }));
-      return tabs.length - 1;
+      dirty = true;
+      setSaveState('is-dirty', 'Modifications non enregistrées');
+      setDocName(byId('reportTitle').value);
     }
 
     const DEPARTMENT_LABELS = {
@@ -530,13 +393,11 @@
     const toDateInput = v => { if (!v) return ''; const d = new Date(v); return Number.isNaN(d.getTime()) ? String(v).slice(0, 10) : d.toISOString().slice(0, 10); };
     const toDateTimeInput = v => { if (!v) return ''; const d = new Date(v); return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 16); };
 
-    // ---- template picker -------------------------------------------------
+    // ---- template picker (only shown with no ?id and no ?template) ----
     function visibleTemplates() {
       const myRole = member?.access?.displayRole || null;
       if (scope === 'mine' && myRole) {
         const mine = templates.filter(t => t.owner_role === myRole);
-        // A member with no template of their own (or a national admin)
-        // should not be shown an empty page.
         if (mine.length) return mine;
       }
       if (scope === 'local') return templates.filter(t => (t.scope || 'local') === 'local');
@@ -546,7 +407,7 @@
     function renderPicker() {
       const list = visibleTemplates();
       byId('tpl-picker').innerHTML = list.length ? list.map(t => `
-        <button type="button" class="tpl-card ${current && current.slug === t.slug ? 'active' : ''}" data-tpl="${esc(t.slug)}">
+        <button type="button" class="tpl-card" data-tpl="${esc(t.slug)}">
           <strong>${esc(t.name)}</strong>
           <span>${esc(t.description || 'Aucune description enregistrée.')}</span>
           ${t.owner_role ? `<span class="tpl-owner">${esc(ROLE_LABELS[t.owner_role] || t.owner_role)}</span>` : ''}
@@ -554,6 +415,58 @@
           ${t.is_form ? `<span class="tpl-owner" style="background:#eef2f8;color:#526078">Formulaire</span>` : ''}
         </button>
       `).join('') : AYCPortal.renderEmpty('Aucun modèle de rapport disponible');
+    }
+
+    function openPicker() {
+      byId('picker-shell').hidden = false;
+      byId('editor-shell').hidden = true;
+      setDocName('');
+      renderPicker();
+    }
+
+    // Choosing a template turns THIS tab into that report — no new tab,
+    // no separate step; the URL is updated so a reload lands back here.
+    function chooseTemplate(slug) {
+      current = templates.find(t => t.slug === slug) || null;
+      if (!current) return;
+      const url = new URL(location.href);
+      url.searchParams.delete('id');
+      url.searchParams.set('template', slug);
+      history.replaceState(null, '', url);
+      openDocument();
+    }
+
+    // ---- document surface ----------------------------------------------
+    function openDocument() {
+      byId('picker-shell').hidden = true;
+      byId('editor-shell').hidden = false;
+
+      byId('reportTitle').value = editing?.title || '';
+      byId('reportRecipient').value = editing?.recipient || current?.recipient || '';
+      byId('reportProject').value = editing?.project_id || '';
+      fillAxis('reportAxis', 'À préciser', editing?.axis_slug || null);
+      syncSubAxes(editing?.sub_axis_slug || null);
+      byId('reportEventDate').value = toDateInput(editing?.event_date);
+      byId('reportDueAt').value = toDateTimeInput(editing?.due_at);
+      byId('reportDescription').value = editing?.description || '';
+
+      setDocName(byId('reportTitle').value);
+      setSaveState(editing ? 'is-saved' : null, editing ? (STATUS_LABELS[editing.status] || 'Enregistré') : 'Brouillon non enregistré');
+
+      renderMeta();
+      renderReviewFeedback();
+      renderSections(editing?.payload || {});
+      if (!editing) suggestDueDate();
+      dirty = false;
+    }
+
+    async function loadReportById(id) {
+      const reportsRes = await AYCPortal.api('reports');
+      const report = (reportsRes.reports || []).find(r => String(r.id) === String(id));
+      if (!report) throw new Error('Rapport introuvable ou hors de ton périmètre.');
+      editing = report;
+      current = templates.find(t => t.slug === (report.template_slug || report.report_type)) || null;
+      openDocument();
     }
 
     // ---- dynamic sections --------------------------------------------------
@@ -618,7 +531,6 @@
           </div>`;
       }
       if (field.type === 'list') {
-        // Multi-select checklist stored as an array of the checked option strings.
         const opts = jsonArray(field.options);
         const checked = jsonArray(value);
         return `
@@ -722,14 +634,14 @@
       currentPayload = JSON.parse(JSON.stringify(data));
       if (!sections.length) {
         container.innerHTML = `
-          <div class="section-block">
+          <div class="tpl-field">
             <label for="section-notes">Contenu du rapport</label>
             <textarea id="section-notes" data-section="notes" placeholder="Ce modèle n’impose pas de sections : rédige le contenu ici.">${esc(data.notes || '')}</textarea>
           </div>`;
         return;
       }
       container.innerHTML = sections.map((section, index) => `
-        <div class="section-block">
+        <div class="tpl-field">
           <label for="section-${index}">${esc(humanSection(section))}</label>
           <textarea id="section-${index}" data-section="${esc(section)}" placeholder="${esc(humanSection(section))}…">${esc(data[section] || '')}</textarea>
         </div>
@@ -737,9 +649,6 @@
     }
 
     // ---- structured-field mutation helpers (called from inline handlers) --
-    // Text/select edits mutate currentPayload directly (no re-render, so
-    // focus/caret is preserved). Add/remove-row actions mutate then
-    // re-render the section container, since row indices shift.
     window.AYC_setField = (path, value) => { setAtPath(currentPayload, path, value); };
     window.AYC_toggleListItem = (path, option, checked) => {
       const current = jsonArray(getAtPath(currentPayload, path)).slice();
@@ -799,7 +708,6 @@
       if (current?.schema_json && jsonArray(current.schema_json.sections).length) {
         return currentPayload;
       }
-      // Legacy flat fallback.
       const out = {};
       document.querySelectorAll('#dynamic-sections textarea[data-section]').forEach(el => {
         const value = el.value.trim();
@@ -819,14 +727,15 @@
       if (current.owner_role) chips.push(`<span class="meta-chip">Poste responsable : ${esc(ROLE_LABELS[current.owner_role] || current.owner_role)}</span>`);
       if (users.length) chips.push(`<span class="meta-chip">Rédigé par : ${esc(users.join(' / '))}</span>`);
       byId('meta-strip').innerHTML = chips.join('');
+      document.getElementById('scope-notice')?.remove();
       const isNational = (current.scope || 'local') === 'national';
-      byId('form-status').closest('.toolbar').querySelector('.scope-notice')?.remove();
       if (isNational) {
         const notice = document.createElement('div');
-        notice.className = 'review-note scope-notice';
+        notice.className = 'review-note';
+        notice.id = 'scope-notice';
         notice.style.cssText = 'border-left-color:#b27b00;background:#fff8e6;color:#7a5800';
         notice.innerHTML = `<strong>Document de niveau national.</strong> Ce modèle suit la structure officielle de l'Annexe du système de mise à jour, mais est normalement rédigé au niveau national${current.is_form ? ' via un formulaire dédié' : ''}. Tu peux t'en servir comme référence ou le remplir si ta fonction te le demande explicitement.`;
-        byId('form-card').insertBefore(notice, byId('review-feedback'));
+        byId('review-feedback').insertAdjacentElement('beforebegin', notice);
       }
     }
 
@@ -842,9 +751,6 @@
     }
 
     // Prefill the échéance from the template rule when the field is empty.
-    // A negative default_due_days means the deadline falls BEFORE the event
-    // (that is the convention already used by the seeded templates), so we
-    // anchor on the action date whenever the user has given one.
     function suggestDueDate() {
       if (!current || byId('reportDueAt').value) return;
       const days = Number(current.default_due_days);
@@ -862,20 +768,6 @@
     function syncSubAxes(selected) {
       const axis = axes.find(a => a.slug === byId('reportAxis').value);
       byId('reportSubAxis').innerHTML = '<option value="">À préciser</option>' + jsonArray(axis?.sub_axes).map(s => `<option value="${esc(s.slug)}"${s.slug === selected ? ' selected' : ''}>${esc(s.name)}</option>`).join('');
-    }
-
-    function selectTemplate(slug, payload) {
-      current = templates.find(t => t.slug === slug) || null;
-      if (!current) return;
-      if (tabs[activeTab]) tabs[activeTab].templateSlug = slug;
-      byId('form-card').hidden = false;
-      byId('form-heading').textContent = current.name;
-      if (!editing && !byId('reportRecipient').value && current.recipient) byId('reportRecipient').value = current.recipient;
-      renderPicker();
-      renderMeta();
-      renderSections(payload);
-      suggestDueDate();
-      renderTabs();
     }
 
     async function save(status) {
@@ -900,19 +792,33 @@
       const result = await AYCPortal.api('reports', { method: 'POST', body });
       if (status === 'draft') {
         // Staying on the page is the point of a draft: adopt the returned
-        // id so the next save updates instead of creating a duplicate.
+        // id so the next save updates instead of creating a duplicate, and
+        // reflect it in the URL so a reload/bookmark returns to this report.
         editing = { ...(editing || {}), ...(result.report || {}), reviews: jsonArray(editing?.reviews) };
+        const url = new URL(location.href);
+        url.searchParams.delete('template');
+        url.searchParams.set('id', editing.id);
+        history.replaceState(null, '', url);
+        editingId = editing.id;
         byId('save-hint').textContent = 'Brouillon enregistré à ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '.';
-        byId('form-status').textContent = STATUS_LABELS.draft;
+        setSaveState('is-saved', 'Brouillon enregistré');
         notice.innerHTML = '<div class="alert alert-success">Brouillon enregistré.</div>';
-        syncSavedStateToTab();
+        dirty = false;
       } else {
-        // Submitted: nothing left to keep editing in this tab.
-        tabs.splice(activeTab, 1);
-        persistTabs();
-        location.href = 'reports';
+        setSaveState('is-saved', 'Soumis pour validation');
+        notice.innerHTML = '<div class="alert alert-success">Rapport soumis pour validation. Tu peux fermer cet onglet.</div>';
+        dirty = false;
+        byId('submit-report').disabled = true;
+        byId('save-draft').disabled = true;
       }
     }
+
+    // Warn before an accidental close/reload if there is unsaved work.
+    window.addEventListener('beforeunload', (e) => {
+      if (!dirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    });
 
     // ---- boot ------------------------------------------------------------
     try {
@@ -924,7 +830,6 @@
         byId('editor-restricted').hidden = false;
         return;
       }
-      byId('editor-workspace').hidden = false;
 
       const [tplRes, projRes, axesRes] = await Promise.all([
         AYCPortal.api('report_templates'),
@@ -937,46 +842,19 @@
 
       byId('reportProject').innerHTML = '<option value="">Aucun projet associé</option>' + projects.map(p => `<option value="${p.id}">${esc(p.title)}</option>`).join('');
 
-      // Restore whatever tabs were open earlier in this browsing session.
-      try {
-        const saved = JSON.parse(sessionStorage.getItem(TABS_KEY) || 'null');
-        if (saved && Array.isArray(saved.tabs) && saved.tabs.length) {
-          tabs = saved.tabs;
-          activeTab = Math.min(Number(saved.activeTab) || 0, tabs.length - 1);
-        }
-      } catch { /* ignore a corrupted/unavailable session entry */ }
-      if (!tabs.length) { tabs = [makeTab({})]; activeTab = 0; }
-
-      // A link into a specific report (?id=…) either switches to that
-      // report's already-open tab, or opens a new one for it. A link that
-      // presets a template (?template=…) opens a new tab UNLESS the active
-      // tab is still an empty, unstarted one — reusing it there avoids a
-      // stray blank tab every time someone starts a fresh report.
       if (editingId) {
-        let idx = tabs.findIndex(t => String(t.reportId) === String(editingId));
-        if (idx === -1) idx = await openReportInNewTab(editingId);
-        applyTab(idx);
+        await loadReportById(editingId);
       } else if (presetTemplate) {
-        if (tabs[activeTab] && !tabs[activeTab].templateSlug) {
-          tabs[activeTab].templateSlug = presetTemplate;
-          applyTab(activeTab);
-        } else {
-          openNewTab({ templateSlug: presetTemplate });
-        }
+        current = templates.find(t => t.slug === presetTemplate) || null;
+        if (!current) throw new Error('Modèle de rapport introuvable.');
+        openDocument();
       } else {
-        applyTab(activeTab);
+        openPicker();
       }
 
-      byId('doc-tabs').addEventListener('click', e => {
-        const closeBtn = e.target.closest('[data-close-index]');
-        if (closeBtn) { e.stopPropagation(); closeTab(Number(closeBtn.dataset.closeIndex)); return; }
-        if (e.target.closest('#tab-add-btn')) { openNewTab({}); return; }
-        const tabEl = e.target.closest('[data-tab-index]');
-        if (tabEl) switchTab(Number(tabEl.dataset.tabIndex));
-      });
       byId('tpl-picker').addEventListener('click', e => {
         const card = e.target.closest('[data-tpl]');
-        if (card) selectTemplate(card.dataset.tpl, collectPayload());
+        if (card) chooseTemplate(card.dataset.tpl);
       });
       byId('scope-filters').addEventListener('click', e => {
         const btn = e.target.closest('[data-scope]');
