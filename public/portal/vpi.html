@@ -141,22 +141,21 @@
     const member = await AYCBelWorkspace.prepareShell();
     if (!member) return;
 
-    // Duties panel — straight from the règlement intérieur (RI I.7.2.1-7).
-    // Kept on the page (not in the module) so the three posts stay
-    // self-documenting: editing a duty here is a one-file change.
+    // Duties panel. Kept on the page (not in the module) so each post
+    // is self-documenting: editing a duty here is a one-file change.
     const esc = AYCPortal.escapeHtml;
     const duties = [
-      { ref: "I.7.2.1", title: "Recrutement", desc: "Assurer le recrutement des nouveaux adhérents du club, dans le respect de la procédure interne." },
-      { ref: "I.7.2.2", title: "Pré-admission & parrainage", desc: "Coordonner la phase de pré-admission et la désignation des parrains pour chaque nouveau membre." },
-      { ref: "I.7.2.3", title: "Évaluation de l’essai", desc: "Centraliser les rapports de parrains et préparer leur soumission à l’ALOV." },
-      { ref: "I.7.2.4", title: "Besoins de développement", desc: "Identifier et transmettre au niveau national ou régional les besoins de formation et d’accompagnement." },
-      { ref: "I.7.2.5", title: "Cohésion interne", desc: "Veiller au bien-être des membres et à la qualité du climat interne du club." },
-      { ref: "I.7.2.6", title: "Rapport de mise à jour", desc: "Rédiger la partie « relations internes » du rapport de mise à jour de l’ALOFM." },
-      { ref: "I.7.7.2", title: "Critères de recrutement", desc: "Définir, avant chaque ouverture de recrutement, les critères de recrutement, les critères d’évaluation des parrains et la durée de la période d’essai." },
+      { title: "Recrutement", desc: "Assurer le recrutement des nouveaux adhérents du club, dans le respect de la procédure interne." },
+      { title: "Pré-admission & parrainage", desc: "Coordonner la phase de pré-admission et la désignation des parrains pour chaque nouveau membre." },
+      { title: "Évaluation de l’essai", desc: "Centraliser les rapports de parrains et préparer leur soumission à l’ALOV." },
+      { title: "Besoins de développement", desc: "Identifier et transmettre au niveau national ou régional les besoins de formation et d’accompagnement." },
+      { title: "Cohésion interne", desc: "Veiller au bien-être des membres et à la qualité du climat interne du club." },
+      { title: "Rapport de mise à jour", desc: "Rédiger la partie « relations internes » du rapport de mise à jour de l’ALOFM." },
+      { title: "Critères de recrutement", desc: "Définir, avant chaque ouverture de recrutement, les critères de recrutement, les critères d’évaluation des parrains et la durée de la période d’essai." },
     ];
     document.getElementById('vpi-duties').innerHTML = duties.map(d => `
       <div class="duty-item">
-        <h3><span class="duty-ref">${esc(d.ref)}</span> ${esc(d.title)}</h3>
+        <h3>${esc(d.title)}</h3>
         <p>${esc(d.desc)}</p>
       </div>`).join('');
 

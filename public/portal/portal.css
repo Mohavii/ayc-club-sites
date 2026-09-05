@@ -584,4 +584,4 @@ button.task-pill:hover{filter:brightness(1.06)}
 .duty-item{border:1px solid #e2e8f1;border-radius:12px;padding:13px 15px;background:#fff}
 .duty-item h3{font-size:.9rem;color:var(--portal-navy);margin:0 0 6px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .duty-item p{font-size:.83rem;color:#536387;margin:0;line-height:1.5}
-.duty-ref{font-size:.68rem;font-weight:900;background:#f0f4ff;color:#3b5bdb;border-radius:999px;padding:2px 8px}
+

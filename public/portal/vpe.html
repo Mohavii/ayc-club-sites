@@ -142,17 +142,17 @@
 
     const esc = AYCPortal.escapeHtml;
     const duties = [
-      { ref: "I.8.2.1", title: "Stratégie de relation", desc: "Élaborer et exécuter la stratégie de relations extérieures du club, en cohérence avec le plan d’action." },
-      { ref: "I.8.2.2", title: "Convention & ANVI", desc: "Veiller au respect des conventions et à l’analyse ANVI (Analyse des besoins, Négociation, Validation, Implantation)." },
-      { ref: "I.8.2.3", title: "Représentation", desc: "Représenter le club auprès des partenaires, institutions et médias dans la limite de son mandat." },
-      { ref: "I.8.2.4", title: "Délégations", desc: "Organiser la sélection, l’encadrement et le suivi des délégations locales ou par domaine." },
-      { ref: "I.8.2.5", title: "Rapports & AL", desc: "Soumettre les rapports de partenariat et les comptes-rendus de délégation à l’assemblée locale compétente." },
-      { ref: "I.8.4.1.2", title: "Étude ANVI & critères", desc: "Pour chaque délégation, publier les critères de sélection J-7 et la liste des délégués J-4." },
-      { ref: "I.8.4.2.6", title: "Adoption en AL", desc: "Aucun partenariat n’est officiel avant l’adoption du rapport de partenariat en AL." },
+      { title: "Stratégie de relation", desc: "Élaborer et exécuter la stratégie de relations extérieures du club, en cohérence avec le plan d’action." },
+      { title: "Convention & ANVI", desc: "Veiller au respect des conventions et à l’analyse ANVI (Analyse des besoins, Négociation, Validation, Implantation)." },
+      { title: "Représentation", desc: "Représenter le club auprès des partenaires, institutions et médias dans la limite de son mandat." },
+      { title: "Délégations", desc: "Organiser la sélection, l’encadrement et le suivi des délégations locales ou par domaine." },
+      { title: "Rapports & AL", desc: "Soumettre les rapports de partenariat et les comptes-rendus de délégation à l’assemblée locale compétente." },
+      { title: "Étude ANVI & critères", desc: "Pour chaque délégation, publier les critères de sélection J-7 et la liste des délégués J-4." },
+      { title: "Adoption en AL", desc: "Aucun partenariat n’est officiel avant l’adoption du rapport de partenariat en AL." },
     ];
     document.getElementById('vpe-duties').innerHTML = duties.map(d => `
       <div class="duty-item">
-        <h3><span class="duty-ref">${esc(d.ref)}</span> ${esc(d.title)}</h3>
+        <h3>${esc(d.title)}</h3>
         <p>${esc(d.desc)}</p>
       </div>`).join('');
 

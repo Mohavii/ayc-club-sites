@@ -113,7 +113,7 @@
               <h2>Plan d'action annuel du club</h2>
               <a class="btn btn-primary btn-sm" href="report-editor?template=plan_action_local">Préparer / mettre à jour</a>
             </div>
-            <p class="field-hint" style="margin-bottom:12px">Rédigé par le président avec la partie de chaque membre du BEL (RI I.4.3.1.6). Adopté à l’ALOFM, transmis au BEN dans les 7 jours suivant l’élection.</p>
+            <p class="field-hint" style="margin-bottom:12px">Rédigé par le président avec la partie de chaque membre du BEL. Adopté à l’ALOFM, transmis au BEN dans les 7 jours suivant l’élection.</p>
             <div id="action-plan-content">
               <p class="empty-state">Aucun plan d'action annuel enregistré.</p>
             </div>
@@ -202,15 +202,15 @@
       const showError = e => AYCPortal.renderError(notice, e);
 
       const DUTIES = [
-        { id: 'plan', title: "Plan d'action annuel", desc: "Assurer l'application du plan d'action annuel et sa continuité", article: 'I.4.2.1' },
-        { id: 'operations', title: 'Opérations locales', desc: "Planifier les opérations et projets locaux du club", article: 'I.4.2.2' },
-        { id: 'taches', title: 'Répartition des tâches', desc: "S'assurer de la répartition des tâches au sein du club", article: 'I.4.2.3' },
-        { id: 'suivi', title: 'Suivi et mise à jour', desc: "Mettre à jour les acteurs principaux sur l'avancée du travail", article: 'I.4.2.4' },
-        { id: 'evaluation', title: 'Évaluation des projets', desc: "Évaluer les projets entrepris par le club", article: 'I.4.2.5' },
-        { id: 'rapports', title: 'Rapports stratégiques', desc: "Rédiger et présenter les parties d'avancement stratégique", article: 'I.4.2.6' },
-        { id: 'presider', title: 'Présider les réunions', desc: "Demander et présider les réunions du club et du BEL", article: 'I.4.2.7' },
-        { id: 'representer', title: 'Représenter le club', desc: 'Représenter le club envers le CLS, le Coordinateur Régional et le Président National', article: 'I.4.2.8-9' },
-        { id: 'position', title: 'Position commune', desc: 'S\u2019assurer que le club maintient une seule position partagée', article: 'I.4.2.10' },
+        { id: 'plan', title: "Plan d'action annuel", desc: "Assurer l'application du plan d'action annuel et sa continuité" },
+        { id: 'operations', title: 'Opérations locales', desc: "Planifier les opérations et projets locaux du club" },
+        { id: 'taches', title: 'Répartition des tâches', desc: "S'assurer de la répartition des tâches au sein du club" },
+        { id: 'suivi', title: 'Suivi et mise à jour', desc: "Mettre à jour les acteurs principaux sur l'avancée du travail" },
+        { id: 'evaluation', title: 'Évaluation des projets', desc: "Évaluer les projets entrepris par le club" },
+        { id: 'rapports', title: 'Rapports stratégiques', desc: "Rédiger et présenter les parties d'avancement stratégique" },
+        { id: 'presider', title: 'Présider les réunions', desc: "Demander et présider les réunions du club et du BEL" },
+        { id: 'representer', title: 'Représenter le club', desc: 'Représenter le club envers le CLS, le Coordinateur Régional et le Président National' },
+        { id: 'position', title: 'Position commune', desc: 'S\u2019assurer que le club maintient une seule position partagée' },
       ];
 
       // Tab switching.
@@ -223,10 +223,10 @@
         };
       });
 
-      // Static duties list (regulatory text, not data).
+      // Static duties list.
       byId('duties-list').innerHTML = DUTIES.map(d => `
         <div class="duty-card">
-          <h3><span class="status-badge badge-action">Article ${esc(d.article)}</span> ${esc(d.title)}</h3>
+          <h3>${esc(d.title)}</h3>
           <p>${esc(d.desc)}</p>
         </div>
       `).join('');
