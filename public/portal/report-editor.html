@@ -82,21 +82,109 @@
     .tpl-section.depth-2{background:#fbfcfe;border:1px solid #edf0f6;border-radius:8px;padding:12px 16px;margin:6px 0 12px 18px}
     .tpl-section.depth-3{background:#fff;border:1px dashed #dbe2ef;border-radius:8px;padding:10px 14px;margin:6px 0 10px 30px}
     .doc-page>.tpl-field:first-child,.doc-page>.tpl-section:first-child{margin-top:0}
+
+    /* ==========================================================================
+       Standalone report workspace theme.
+       This page is opened in its own browser tab (not inside the portal's
+       nav/sidebar chrome), so it gets its own compact app header and a
+       dedicated visual language: soft paper background, generously rounded
+       cards, and the site's existing display/body font pairing used more
+       deliberately (Fjalla One for headings, Inter for everything else).
+       The shared portal-common.js is still used for auth/session handling,
+       but its topbar/sidebar mounts are neutralised below rather than shown.
+       ========================================================================== */
+    html{ background:var(--paper); }
+    body.editor-standalone{
+      background:
+        radial-gradient(1100px 480px at 12% -10%, rgba(58,184,234,.10), transparent 60%),
+        radial-gradient(900px 420px at 100% 0%, rgba(247,164,32,.08), transparent 55%),
+        var(--paper);
+      min-height:100vh;
+    }
+    body.editor-standalone #topbar-root,
+    body.editor-standalone #sidebar-root{ display:none !important; }
+    body.editor-standalone .workspace{ display:block; }
+
+    .editor-appbar{
+      position:sticky; top:0; z-index:40;
+      display:flex; align-items:center; gap:16px;
+      padding:14px clamp(16px,4vw,40px);
+      background:rgba(255,255,255,.86); backdrop-filter:blur(10px) saturate(160%);
+      border-bottom:1px solid var(--line);
+    }
+    .editor-appbar .brand-mini{
+      display:flex; align-items:center; gap:10px; text-decoration:none; flex:none;
+    }
+    .editor-appbar .brand-mini img{ width:28px; height:28px; object-fit:contain; }
+    .editor-appbar .brand-mini span{
+      font-family:var(--font-display); color:var(--navy-1); font-size:.92rem; letter-spacing:.01em;
+    }
+    .editor-appbar .appbar-divider{ width:1px; height:26px; background:var(--line); flex:none; }
+    .editor-appbar .appbar-title{ min-width:0; }
+    .editor-appbar .appbar-title .eyebrow{ margin:0 0 2px; }
+    .editor-appbar .appbar-title h1{
+      margin:0; font-family:var(--font-display); font-size:1.05rem; color:var(--navy-1);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .editor-appbar .appbar-spacer{ flex:1 1 auto; }
+    .editor-appbar .appbar-actions{ display:flex; align-items:center; gap:8px; flex:none; }
+    .editor-appbar .btn-close-tab{
+      display:inline-flex; align-items:center; gap:8px;
+      font-family:var(--font-body); font-weight:600; font-size:.82rem; color:var(--ink-soft);
+      background:var(--paper-2); border:1px solid var(--line); border-radius:999px;
+      padding:8px 16px; cursor:pointer; transition:background .18s var(--ease), color .18s var(--ease), border-color .18s var(--ease);
+      text-decoration:none;
+    }
+    .editor-appbar .btn-close-tab:hover{ background:#fff; border-color:#c7d2e6; color:var(--navy-1); }
+
+    .editor-shell{
+      max-width:1080px; margin:0 auto; padding:32px clamp(16px,4vw,40px) 96px;
+    }
+    .editor-shell .portal-heading{
+      background:var(--white); border:1px solid var(--line); border-radius:var(--radius-lg);
+      box-shadow:var(--shadow-card); padding:26px 30px; margin-bottom:22px;
+    }
+    .editor-shell .portal-card{ border-radius:var(--radius-lg); }
+    .editor-shell #editor-title{ font-size:1.5rem; }
+
+    /* rounder, calmer surfaces throughout the doc/section builder */
+    .tpl-card, .section-block, .review-note, .tpl-section, .doc-page{ border-radius:16px; }
+    .tpl-field textarea, .tpl-field select, .form-field input, .form-field select, .form-field textarea{
+      border-radius:10px !important;
+    }
+    .doc-tab, .doc-tab-add{ border-radius:12px 12px 0 0; }
+    .meta-chip{ border-radius:999px; }
+    .doc-page{ box-shadow:0 1px 2px rgba(28,32,56,.04), 0 8px 24px -12px rgba(39,40,99,.10); }
   </style>
 </head>
-<body>
+<body class="editor-standalone">
   <div id="topbar-root"></div>
+  <div id="sidebar-root"></div>
+
+  <header class="editor-appbar">
+    <a class="brand-mini" href="home" target="_blank" rel="noopener">
+      <img src="../assets/logo-primary-blue.png" alt="">
+      <span>YOUTH CLUBs</span>
+    </a>
+    <span class="appbar-divider"></span>
+    <div class="appbar-title">
+      <p class="eyebrow">Rédaction de rapport</p>
+      <h1 id="appbar-report-title">Éditeur de rapports</h1>
+    </div>
+    <span class="appbar-spacer"></span>
+    <div class="appbar-actions">
+      <a class="btn-close-tab" href="reports" target="_blank" rel="noopener">Voir tous les rapports</a>
+      <button type="button" class="btn-close-tab" onclick="window.close()">Fermer l’onglet</button>
+    </div>
+  </header>
+
   <div class="workspace">
-    <div id="sidebar-root"></div>
-    <main class="portal-content">
+    <main class="portal-content editor-shell">
       <div class="portal-heading">
         <div>
           <p class="eyebrow">Système de mise à jour · Rédaction</p>
           <h1 id="editor-title">Éditeur de rapports</h1>
           <p id="editor-subtitle">Choisis un modèle de rapport : les sections obligatoires, le destinataire et l’échéance viennent du système de mise à jour.</p>
-        </div>
-        <div class="heading-actions">
-          <a class="btn btn-secondary btn-sm" href="reports">Retour aux rapports</a>
         </div>
       </div>
 
@@ -243,6 +331,10 @@
       if (tabs[activeTab]) tabs[activeTab].dirty = true;
       renderTabs();
       schedulePersist();
+      const liveTitle = byId('reportTitle')?.value.trim();
+      const appbarTitle = byId('appbar-report-title');
+      if (appbarTitle) appbarTitle.textContent = liveTitle || 'Éditeur de rapports';
+      document.title = `${liveTitle ? liveTitle + ' · ' : ''}Éditeur de rapports · Portail YOUTHCLUBber`;
     }
 
     function renderTabs() {
@@ -301,6 +393,9 @@
       editing = t.editingFull || null;
 
       byId('editor-title').textContent = t.reportId ? 'Reprendre un rapport' : 'Éditeur de rapports';
+      const appbarTitle = byId('appbar-report-title');
+      if (appbarTitle) appbarTitle.textContent = (t.title && t.title !== 'Nouveau rapport') ? t.title : 'Éditeur de rapports';
+      document.title = `${(t.title && t.title !== 'Nouveau rapport') ? t.title + ' · ' : ''}Éditeur de rapports · Portail YOUTHCLUBber`;
       byId('editor-subtitle').textContent = t.reportId
         ? 'Corrige le dossier puis soumets-le de nouveau à la validation.'
         : 'Choisis un modèle de rapport : les sections obligatoires, le destinataire et l’échéance viennent du système de mise à jour.';

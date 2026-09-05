@@ -45,8 +45,8 @@
           <p>Gestion stratégique du club, planification des opérations et rapports d'avancement.</p>
         </div>
         <div class="heading-actions" id="pres-actions">
-          <a class="btn btn-primary btn-sm" href="report-editor?template=plan_action_local">Plan d'action annuel</a>
-          <a class="btn btn-primary btn-sm" href="report-editor?template=avancement_strategique_local">Avancement stratégique</a>
+          <a class="btn btn-primary btn-sm" href="report-editor?template=plan_action_local" target="_blank" rel="noopener">Plan d'action annuel</a>
+          <a class="btn btn-primary btn-sm" href="report-editor?template=avancement_strategique_local" target="_blank" rel="noopener">Avancement stratégique</a>
           <a class="btn btn-secondary btn-sm" href="projects">Projets</a>
           <button class="btn btn-secondary btn-sm" id="btn-refresh">Actualiser</button>
         </div>
@@ -111,7 +111,7 @@
           <div class="portal-card">
             <div class="toolbar">
               <h2>Plan d'action annuel du club</h2>
-              <a class="btn btn-primary btn-sm" href="report-editor?template=plan_action_local">Préparer / mettre à jour</a>
+              <a class="btn btn-primary btn-sm" href="report-editor?template=plan_action_local" target="_blank" rel="noopener">Préparer / mettre à jour</a>
             </div>
             <p class="field-hint" style="margin-bottom:12px">Rédigé par le président avec la partie de chaque membre du BEL. Adopté à l’ALOFM, transmis au BEN dans les 7 jours suivant l’élection.</p>
             <div id="action-plan-content">
@@ -263,7 +263,7 @@
                 <span class="status-badge ${STATUS_TONE[r.status] || 'badge-action'}">${esc(STATUS_LABEL[r.status] || r.status || '—')}</span>
                 ${r.due_at ? `<span>Échéance : ${esc(AYCPortal.formatDate(r.due_at))}</span>` : ''}
                 ${r.submitter_name ? `<span>Par ${esc(r.submitter_name)}</span>` : ''}
-                <a href="report-editor?id=${encodeURIComponent(r.id)}">Reprendre</a>
+                <a href="report-editor?id=${encodeURIComponent(r.id)}" target="_blank" rel="noopener">Reprendre</a>
               </div>
             </div>`).join('');
         };
@@ -285,7 +285,7 @@
           .sort((a, b) => new Date(b.created_at || b.due_at || 0) - new Date(a.created_at || a.due_at || 0));
         const container = byId('action-plan-content');
         if (!plans.length) {
-          container.innerHTML = `<p class="empty-state">Aucun plan d'action annuel défini. <a href="report-editor?template=plan_action_local">Démarrer un plan</a>.</p>`;
+          container.innerHTML = `<p class="empty-state">Aucun plan d'action annuel défini. <a href="report-editor?template=plan_action_local" target="_blank" rel="noopener">Démarrer un plan</a>.</p>`;
           return;
         }
         const current = plans[0];
@@ -297,7 +297,7 @@
               <span class="status-badge ${STATUS_TONE[current.status] || 'badge-action'}">${esc(STATUS_LABEL[current.status] || current.status || '—')}</span>
               ${current.due_at ? `<span>Échéance : ${esc(AYCPortal.formatDate(current.due_at))}</span>` : ''}
               ${current.submitter_name ? `<span>Rédigé par ${esc(current.submitter_name)}</span>` : ''}
-              <a href="report-editor?id=${encodeURIComponent(current.id)}">Reprendre</a>
+              <a href="report-editor?id=${encodeURIComponent(current.id)}" target="_blank" rel="noopener">Reprendre</a>
             </div>
           </div>
           <p class="field-hint" style="margin-top:10px">${plans.length > 1 ? `${plans.length - 1} autre(s) version(s) dans l’historique.` : 'Première version du plan.'}</p>`;

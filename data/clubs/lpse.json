@@ -3,29 +3,53 @@
   "status": "live",
   "name": "Lycée Pilote Sekiet Ezzit",
   "city": "Sfax",
-  "founded": 2016,
-  "memberCount": 0,
+  "founded": 2017,
+  "memberCount": 98,
   "about": "",
   "heroImage": null,
   "logo": null,
   "officers": [
     "746843897350848514"
   ],
-  "events": [],
-  "bel": [],
+  "events": [
+    {
+      "id": "evt_7y55in",
+      "title": "AGOFM",
+      "location": "Sousse",
+      "description": "assemblee generale de fin mandat",
+      "axis": "Citoyenneté",
+      "image": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787189060/ayc-clubs/lpse/events/event_946ce4a2.jpg"
+    }
+  ],
+  "bel": [
+    {
+      "id": "bel_2pmtaw",
+      "role": "Président",
+      "name": "Farah Deriouch",
+      "description": "Akwa prezza fi mannouba",
+      "photo": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787189164/ayc-clubs/lpse/bel/bel_2f997348.jpg"
+    }
+  ],
   "partners": [
     {
-      "id": "ptn_vv9o1f",
-      "name": "qdqsd",
-      "description": "sd",
-      "logo": null
+      "id": "ptn_8q9o9n",
+      "name": "AG",
+      "description": "L ag wla partenaire",
+      "logo": "https://res.cloudinary.com/x35lw4sv/image/upload/v1787189294/ayc-clubs/lpse/partners/partner_22dfd099.png"
     }
   ],
   "forms": {
     "join": {
       "enabled": false,
       "title": "Rejoindre le club",
-      "fields": []
+      "fields": [
+        {
+          "id": "fld_oe33a9",
+          "type": "short_text",
+          "label": "Chno esmk",
+          "required": true
+        }
+      ]
     },
     "team_communication": {
       "enabled": false,
@@ -43,20 +67,11 @@
       "fields": []
     }
   },
-  "vpcRoleId": "1545786012725284914",
+  "vpcRoleId": "1539805758768812093",
   "formWebhooks": {
-    "join": "https://discord.com/api/webhooks/1545786016328060960/FBT5P5iFtwZXAYZirOpq0DJUhU0zaMR_pBUvhz3QKOFgWccdopHGiDvHcbUTLnupNNa6",
-    "team_communication": "https://discord.com/api/webhooks/1545786017783480422/Q_XxmWirbnIT4n3PmZc8nHaH-R02XcntLewy0pUgq2tyREuSkrLlsZfHEcZLd_pjzVIZ",
-    "team_logistique": "https://discord.com/api/webhooks/1545786020119711784/zBenxbeB67rvOcCddZCAjfxAKQ8EHdR7j7mr8Yhwgy7VJJnNxopiUwk1Sd6ufJZ-mmJd",
-    "team_sponsoring": "https://discord.com/api/webhooks/1545786021428334703/5I0oPPLkDaOan0-NMkH9s37jRLQg9sDIqCubJOTAnvu1G1mjR7demrlEyIHyl_XIv69d"
-  },
-  "controlRoomChannelId": "1545786014348480643",
-  "categoryId": "1545786013152968707",
-  "channelIds": [
-    "1545786014348480643",
-    "1545786015183020093",
-    "1545786017137819678",
-    "1545786019197091861",
-    "1545786020904173609"
-  ]
+    "join": "https://discord.com/api/webhooks/1539805761969065997/Xl_a6F5MFIaDJdDTsqp7DdMD3Fqut4g0Uthbe3sc5xMV2YfxQQBDb82PVzMSVty75nw6",
+    "team_communication": "https://discord.com/api/webhooks/1539805763940388864/U5zkstQwhAj5DvfPklj8Dt-E1ylPTT4RqU1eJgbt3SrBVhKpg8KOg2_xV0JC90YRMVEf",
+    "team_logistique": "https://discord.com/api/webhooks/1539805766800646265/g8-LA9qBv6yE0eXThHjQulruX2QCtyEa_JfG1pWahRbLCjOrln2UenCSFxMvrfqDqMT6",
+    "team_sponsoring": "https://discord.com/api/webhooks/1539805769401110549/O96a-xldXDnqwkHPV3kVvfjsZRW0AmPqMnCoodaa-q7DRzU0imtWuqSdhkR4NBsZ0k3V"
+  }
 }

@@ -1565,7 +1565,7 @@ const BEL_RESOURCES = {
     table: "portal_club_recruitment",
     accessFlag: "canAccessInternalRelations",
     owner: "VPI",
-    orderBy: "coalesce(r.opens_on, r.created_at::date) desc",
+    orderBy: "coalesce(opens_on, created_at::date) desc",
     fields: {
       title: { type: "text", max: 200, required: true },
       procedure: { type: "enum", values: ["recrutement", "parrainage", "transfert"] },
@@ -1582,7 +1582,7 @@ const BEL_RESOURCES = {
     table: "portal_club_needs",
     accessFlag: "canAccessInternalRelations",
     owner: "VPI",
-    orderBy: "r.created_at desc",
+    orderBy: "created_at desc",
     fields: {
       title: { type: "text", max: 200, required: true },
       needType: { column: "need_type", type: "enum", values: ["formation", "developpement", "bien_etre", "materiel", "autre"] },
@@ -1597,7 +1597,7 @@ const BEL_RESOURCES = {
     table: "portal_club_partnerships",
     accessFlag: "canAccessExternalRelations",
     owner: "VPE",
-    orderBy: "r.created_at desc",
+    orderBy: "created_at desc",
     fields: {
       partnerName: { column: "partner_name", type: "text", max: 200, required: true },
       relationType: { column: "relation_type", type: "enum", values: ["collaboration", "partenariat", "sponsoring", "arrangement"], required: true },
@@ -1614,7 +1614,7 @@ const BEL_RESOURCES = {
     table: "portal_club_delegations",
     accessFlag: "canAccessExternalRelations",
     owner: "VPE",
-    orderBy: "coalesce(r.happens_on, r.created_at::date) desc",
+    orderBy: "coalesce(happens_on, created_at::date) desc",
     fields: {
       title: { type: "text", max: 200, required: true },
       delegationType: { column: "delegation_type", type: "enum", values: ["locale", "par_domaine"] },
@@ -1632,7 +1632,7 @@ const BEL_RESOURCES = {
     table: "portal_club_media_plans",
     accessFlag: "canAccessCommunication",
     owner: "VPC",
-    orderBy: "r.created_at desc",
+    orderBy: "created_at desc",
     fields: {
       activityTitle: { column: "activity_title", type: "text", max: 200, required: true },
       projectId: { column: "project_id", type: "uuid" },
@@ -1723,7 +1723,7 @@ async function belResource(req, res, member, body, resourceKey) {
      from ${resource.table} r
      join portal_members m on m.id = r.created_by
      where r.school_id = $1
-     order by ${resource.orderBy}`,
+     order by r.${resource.orderBy}`,
     [schoolId]
   );
 
