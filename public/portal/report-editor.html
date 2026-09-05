@@ -57,6 +57,31 @@
     .tpl-group-item{border:1px solid #e2e8f1;border-radius:10px;padding:12px;margin-bottom:10px;background:#fff;position:relative}
     .tpl-group-item .tpl-row-remove{position:absolute;top:10px;right:10px}
     .tpl-group-item-label{font-size:.68rem;font-weight:900;color:#8fa4d4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+
+    /* ---- multi-report tab strip (open several drafts at once, Google-Docs style) ---- */
+    .doc-tabs{display:flex;align-items:flex-end;gap:2px;margin-bottom:14px;overflow-x:auto;scrollbar-width:thin;padding-bottom:1px}
+    .doc-tab{display:flex;align-items:center;gap:7px;max-width:220px;padding:9px 8px 9px 14px;border-radius:10px 10px 0 0;background:#eef1f8;color:#5c6683;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap;border:1px solid transparent;border-bottom:none;flex-shrink:0;transition:background .12s ease}
+    .doc-tab:hover{background:#e4e9f5}
+    .doc-tab.active{background:#fff;color:#1f2a5a;border-color:#e2e8f1;box-shadow:0 -2px 0 var(--portal-navy,#1f2a5a) inset}
+    .doc-tab .tab-title{overflow:hidden;text-overflow:ellipsis;max-width:150px}
+    .doc-tab .tab-dot{width:6px;height:6px;border-radius:50%;background:#e08a2c;flex-shrink:0}
+    .doc-tab .tab-close{border:none;background:transparent;color:#94a0ba;font-size:1rem;line-height:1;cursor:pointer;padding:2px 4px;border-radius:5px;flex-shrink:0}
+    .doc-tab .tab-close:hover{background:#dbe2f0;color:#1f2a5a}
+    .doc-tab-add{flex-shrink:0;border:1px dashed #b9c8e5;background:#fff;color:#3b5bdb;border-radius:10px 10px 0 0;padding:9px 14px;font-size:.8rem;font-weight:900;cursor:pointer}
+    .doc-tab-add:hover{background:#f0f4ff}
+
+    /* ---- paper / document look for the report body, mirroring the source PDFs ---- */
+    .doc-page{background:#fff;border:1px solid #e2e8f1;border-radius:6px;box-shadow:0 1px 3px rgba(20,30,60,.06);padding:32px clamp(16px,5vw,60px);font-family:Georgia,'Times New Roman',serif;color:#2a3350}
+    .doc-page .tpl-field label{font-family:'Fjalla One',Georgia,serif;letter-spacing:.01em}
+    .doc-page .tpl-section-head h3,.doc-page .tpl-section-head h4,.doc-page .tpl-section-head h5,.doc-page .tpl-section-head h6{font-family:'Fjalla One',Georgia,serif}
+    .doc-page .tpl-field{background:transparent;border:none;padding:0 0 16px;margin-bottom:16px;border-bottom:1px solid #eef1f8}
+    .doc-page .tpl-field:last-child{border-bottom:none}
+    .tpl-section.depth-0{background:transparent;border:none;border-top:2px solid #1f2a5a;border-radius:0;padding:18px 0 4px;margin-bottom:2px}
+    .tpl-section.depth-0>.tpl-section-head h3{font-size:1.05rem;letter-spacing:.02em}
+    .tpl-section.depth-1{background:transparent;border:none;border-left:3px solid #dbe2ef;border-radius:0;padding:4px 0 4px 18px;margin:4px 0 12px}
+    .tpl-section.depth-2{background:#fbfcfe;border:1px solid #edf0f6;border-radius:8px;padding:12px 16px;margin:6px 0 12px 18px}
+    .tpl-section.depth-3{background:#fff;border:1px dashed #dbe2ef;border-radius:8px;padding:10px 14px;margin:6px 0 10px 30px}
+    .doc-page>.tpl-field:first-child,.doc-page>.tpl-section:first-child{margin-top:0}
   </style>
 </head>
 <body>
@@ -83,6 +108,8 @@
       </section>
 
       <div id="editor-workspace" hidden>
+
+        <div class="doc-tabs" id="doc-tabs"></div>
 
         <section class="portal-card" id="picker-card">
           <div class="toolbar">
@@ -147,7 +174,7 @@
 
             <div class="full">
               <p class="eyebrow" style="margin-bottom:8px">Sections imposées par le système de mise à jour</p>
-              <div id="dynamic-sections"></div>
+              <div id="dynamic-sections" class="doc-page"></div>
             </div>
 
             <div class="editor-sticky full">
@@ -178,9 +205,185 @@
     let templates = [];
     let projects = [];
     let axes = [];
-    let current = null;      // the selected template row
-    let editing = null;      // the report row being edited, if any
+    let current = null;      // the selected template row, for the ACTIVE tab
+    let editing = null;      // the report row being edited, for the ACTIVE tab (or null)
     let scope = 'mine';
+
+    // ---- multi-report tabs ------------------------------------------------
+    // Several report drafts can be open at once, each in its own tab, the
+    // way separate Google Docs tabs behave: switching tabs never loses
+    // in-progress edits, and the set of open tabs survives a reload
+    // (sessionStorage) for the rest of the browsing session.
+    let tabs = [];
+    let activeTab = -1;
+    const TABS_KEY = 'ayc_report_tabs_v1';
+
+    function makeTab(overrides) {
+      return Object.assign({
+        reportId: null,
+        templateSlug: null,
+        title: 'Nouveau rapport',
+        meta: { recipient: '', projectId: '', axisSlug: '', subAxisSlug: '', eventDate: '', dueAt: '', description: '' },
+        payload: {},
+        reviews: [],
+        status: 'draft',
+        editingFull: null,
+        dirty: false,
+      }, overrides);
+    }
+
+    function persistTabs() {
+      try { sessionStorage.setItem(TABS_KEY, JSON.stringify({ tabs, activeTab })); } catch { /* storage full/unavailable: tabs just won't survive a reload */ }
+    }
+
+    let persistTimer = null;
+    function schedulePersist() { clearTimeout(persistTimer); persistTimer = setTimeout(() => { captureActiveTab(); persistTabs(); }, 400); }
+
+    function onFormChanged() {
+      if (tabs[activeTab]) tabs[activeTab].dirty = true;
+      renderTabs();
+      schedulePersist();
+    }
+
+    function renderTabs() {
+      const bar = byId('doc-tabs');
+      if (!bar) return;
+      bar.innerHTML = tabs.map((t, i) => `
+        <div class="doc-tab ${i === activeTab ? 'active' : ''}" data-tab-index="${i}" title="${esc(t.title)}">
+          <span class="tab-title">${esc(t.title || 'Nouveau rapport')}</span>
+          ${t.dirty ? '<span class="tab-dot" title="Modifications non enregistrées"></span>' : ''}
+          <button type="button" class="tab-close" data-close-index="${i}" aria-label="Fermer l’onglet">×</button>
+        </div>
+      `).join('') + `<button type="button" class="doc-tab-add" id="tab-add-btn">+ Nouvel onglet</button>`;
+    }
+
+    // Writes the on-screen form state (the active tab) back into tabs[activeTab]
+    // before switching away from it, so nothing typed is lost.
+    function captureActiveTab() {
+      if (activeTab < 0 || !tabs[activeTab]) return;
+      const t = tabs[activeTab];
+      t.templateSlug = current?.slug || t.templateSlug;
+      const titleVal = byId('reportTitle').value.trim();
+      if (titleVal) t.title = titleVal;
+      t.meta = {
+        recipient: byId('reportRecipient').value,
+        projectId: byId('reportProject').value,
+        axisSlug: byId('reportAxis').value,
+        subAxisSlug: byId('reportSubAxis').value,
+        eventDate: byId('reportEventDate').value,
+        dueAt: byId('reportDueAt').value,
+        description: byId('reportDescription').value,
+      };
+      if (current) t.payload = collectPayload();
+    }
+
+    // After a successful save, adopt the server's report row into the
+    // active tab (so a second "Enregistrer" updates instead of duplicating).
+    function syncSavedStateToTab() {
+      if (activeTab < 0 || !tabs[activeTab]) return;
+      const t = tabs[activeTab];
+      t.reportId = editing?.id ?? t.reportId;
+      t.status = editing?.status || t.status;
+      t.reviews = jsonArray(editing?.reviews);
+      t.editingFull = editing;
+      t.dirty = false;
+      const titleVal = byId('reportTitle').value.trim();
+      if (titleVal) t.title = titleVal;
+      renderTabs();
+      persistTabs();
+    }
+
+    // Restores tabs[index] onto the screen and makes it the active tab.
+    function applyTab(index) {
+      activeTab = index;
+      const t = tabs[index];
+      current = t.templateSlug ? (templates.find(x => x.slug === t.templateSlug) || null) : null;
+      editing = t.editingFull || null;
+
+      byId('editor-title').textContent = t.reportId ? 'Reprendre un rapport' : 'Éditeur de rapports';
+      byId('editor-subtitle').textContent = t.reportId
+        ? 'Corrige le dossier puis soumets-le de nouveau à la validation.'
+        : 'Choisis un modèle de rapport : les sections obligatoires, le destinataire et l’échéance viennent du système de mise à jour.';
+
+      byId('reportTitle').value = (t.reportId || t.title !== 'Nouveau rapport') ? t.title : '';
+      byId('reportRecipient').value = t.meta.recipient || '';
+      byId('reportProject').value = t.meta.projectId || '';
+      fillAxis('reportAxis', 'À préciser', t.meta.axisSlug || null);
+      syncSubAxes(t.meta.subAxisSlug || null);
+      byId('reportEventDate').value = t.meta.eventDate || '';
+      byId('reportDueAt').value = t.meta.dueAt || '';
+      byId('reportDescription').value = t.meta.description || '';
+      byId('form-status').textContent = STATUS_LABELS[t.status] || '';
+      renderReviewFeedback();
+
+      if (current) {
+        byId('picker-card').hidden = true;
+        byId('form-card').hidden = false;
+        byId('form-heading').textContent = current.name;
+        renderMeta();
+        renderSections(t.payload);
+      } else {
+        byId('picker-card').hidden = false;
+        byId('form-card').hidden = true;
+      }
+      renderPicker();
+      renderTabs();
+      persistTabs();
+    }
+
+    function switchTab(index) {
+      if (index === activeTab || !tabs[index]) return;
+      captureActiveTab();
+      applyTab(index);
+    }
+
+    function openNewTab(overrides) {
+      captureActiveTab();
+      tabs.push(makeTab(overrides || {}));
+      applyTab(tabs.length - 1);
+    }
+
+    function closeTab(index) {
+      const t = tabs[index];
+      if (!t) return;
+      if (t.dirty && !confirm('Fermer cet onglet ? Les modifications non enregistrées seront perdues.')) return;
+      const wasActive = index === activeTab;
+      tabs.splice(index, 1);
+      if (!tabs.length) tabs.push(makeTab({}));
+      if (wasActive) {
+        applyTab(Math.min(index, tabs.length - 1));
+      } else {
+        if (index < activeTab) activeTab -= 1;
+        renderTabs();
+        persistTabs();
+      }
+    }
+
+    // Fetches a report not yet open in any tab and appends a tab for it.
+    async function openReportInNewTab(id) {
+      const reportsRes = await AYCPortal.api('reports');
+      const report = (reportsRes.reports || []).find(r => String(r.id) === String(id));
+      if (!report) throw new Error('Rapport introuvable ou hors de ton périmètre.');
+      tabs.push(makeTab({
+        reportId: report.id,
+        templateSlug: report.template_slug || report.report_type,
+        title: report.title || 'Rapport',
+        meta: {
+          recipient: report.recipient || '',
+          projectId: report.project_id || '',
+          axisSlug: report.axis_slug || null,
+          subAxisSlug: report.sub_axis_slug || null,
+          eventDate: toDateInput(report.event_date),
+          dueAt: toDateTimeInput(report.due_at),
+          description: report.description || '',
+        },
+        payload: report.payload || {},
+        reviews: jsonArray(report.reviews),
+        status: report.status || 'draft',
+        editingFull: report,
+      }));
+      return tabs.length - 1;
+    }
 
     const DEPARTMENT_LABELS = {
       coordination_strategique: 'Coordination stratégique',
@@ -209,6 +412,26 @@
 
     const jsonArray = value => Array.isArray(value) ? value : [];
     const humanSection = slug => String(slug).replaceAll('_', ' ');
+
+    // Schema keys encode the official document's own numbering
+    // (I_Mandat, VIII_Les_decisions…, 1_Recrutement…, a_instruction…),
+    // straight from the source PDFs. Pulling that prefix back out and
+    // showing it next to the label is what makes the on-screen order
+    // (I. / II. … then A./B. … then a./b. …) match the paper document
+    // instead of a flat, renumbered list.
+    function tokenPrefix(key) {
+      const m = /^([A-Za-z0-9]+)_/.exec(String(key || ''));
+      if (!m) return '';
+      const t = m[1];
+      if (/^[IVXLCDM]+$/.test(t)) return t + '.';
+      if (/^[a-z]$/.test(t)) return t + '.';
+      if (/^[0-9]+$/.test(t)) return t + '.';
+      return '';
+    }
+    const labelWithNumber = field => {
+      const p = tokenPrefix(field.key);
+      return p ? `${p} ${field.label}` : field.label;
+    };
     const toDateInput = v => { if (!v) return ''; const d = new Date(v); return Number.isNaN(d.getTime()) ? String(v).slice(0, 10) : d.toISOString().slice(0, 10); };
     const toDateTimeInput = v => { if (!v) return ''; const d = new Date(v); return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 16); };
 
@@ -284,7 +507,7 @@
       if (field.type === 'text') {
         return `
           <div class="tpl-field">
-            <label for="${id}">${esc(field.label)}</label>
+            <label for="${id}">${esc(labelWithNumber(field))}</label>
             <textarea id="${id}" oninput='${setter}' placeholder="${esc(field.placeholder || field.label + '…')}">${esc(value || '')}</textarea>
           </div>`;
       }
@@ -292,7 +515,7 @@
         const opts = jsonArray(field.options);
         return `
           <div class="tpl-field">
-            <label for="${id}">${esc(field.label)}</label>
+            <label for="${id}">${esc(labelWithNumber(field))}</label>
             <select id="${id}" onchange='${setter}'>
               <option value="">À préciser</option>
               ${opts.map(o => `<option value="${esc(o)}"${value === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}
@@ -305,7 +528,7 @@
         const checked = jsonArray(value);
         return `
           <div class="tpl-field">
-            <label>${esc(field.label)}</label>
+            <label>${esc(labelWithNumber(field))}</label>
             <div class="tpl-checklist">
               ${opts.map((o, i) => `
                 <label><input type="checkbox" ${checked.includes(o) ? 'checked' : ''}
@@ -318,7 +541,7 @@
         const items = jsonArray(value);
         return `
           <div class="tpl-field">
-            <label>${esc(field.label)}</label>
+            <label>${esc(labelWithNumber(field))}</label>
             ${items.map((v, i) => `
               <div style="display:flex;gap:8px;margin-bottom:6px">
                 <textarea style="flex:1" oninput='AYC_setListIndex(${attrJson(path)}, ${i}, this.value)' placeholder="${esc(field.label)}…">${esc(v || '')}</textarea>
@@ -330,7 +553,7 @@
       }
       if (field.type === 'table') return renderTable(field, path);
       if (field.type === 'repeatable_group') return renderRepeatableGroup(field, path);
-      if (field.type === 'section') return renderSectionNode(field, path, (path.length || 1));
+      if (field.type === 'section') return renderSectionNode(field, path, Math.max(path.length - 1, 0));
       return '';
     }
 
@@ -339,7 +562,7 @@
       const cols = jsonArray(field.columns);
       return `
         <div class="tpl-field">
-          <label>${esc(field.label)}</label>
+          <label>${esc(labelWithNumber(field))}</label>
           ${field.note ? `<p class="tpl-field-note">${esc(field.note)}</p>` : ''}
           <div class="tpl-table-wrap">
             <table class="tpl-table">
@@ -364,7 +587,7 @@
       const itemFields = jsonArray(field.itemFields);
       return `
         <div class="tpl-field">
-          <label>${esc(field.label)}</label>
+          <label>${esc(labelWithNumber(field))}</label>
           ${items.map((item, i) => `
             <div class="tpl-group-item">
               <button type="button" class="tpl-row-remove" onclick='AYC_removeGroupItem(${attrJson(path)}, ${i})'>Retirer</button>
@@ -378,11 +601,11 @@
     }
 
     function renderSectionNode(node, path, depth) {
-      const d = Math.min(depth, 1);
-      const HTag = d === 0 ? 'h3' : 'h4';
+      const d = Math.min(depth, 3);
+      const HTag = ['h3', 'h4', 'h5', 'h6'][d];
       return `
         <div class="tpl-section depth-${d}">
-          <div class="tpl-section-head"><${HTag}>${esc(node.label)}</${HTag}></div>
+          <div class="tpl-section-head"><${HTag}>${esc(labelWithNumber(node))}</${HTag}></div>
           ${node.note ? `<p class="tpl-section-note">${esc(node.note)}</p>` : ''}
           ${jsonArray(node.children).map(child => renderField(child, [...path, child.key])).join('')}
         </div>`;
@@ -549,6 +772,7 @@
     function selectTemplate(slug, payload) {
       current = templates.find(t => t.slug === slug) || null;
       if (!current) return;
+      if (tabs[activeTab]) tabs[activeTab].templateSlug = slug;
       byId('form-card').hidden = false;
       byId('form-heading').textContent = current.name;
       if (!editing && !byId('reportRecipient').value && current.recipient) byId('reportRecipient').value = current.recipient;
@@ -556,6 +780,7 @@
       renderMeta();
       renderSections(payload);
       suggestDueDate();
+      renderTabs();
     }
 
     async function save(status) {
@@ -585,7 +810,11 @@
         byId('save-hint').textContent = 'Brouillon enregistré à ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '.';
         byId('form-status').textContent = STATUS_LABELS.draft;
         notice.innerHTML = '<div class="alert alert-success">Brouillon enregistré.</div>';
+        syncSavedStateToTab();
       } else {
+        // Submitted: nothing left to keep editing in this tab.
+        tabs.splice(activeTab, 1);
+        persistTabs();
         location.href = 'reports';
       }
     }
@@ -612,34 +841,44 @@
       axes = axesRes.axes || [];
 
       byId('reportProject').innerHTML = '<option value="">Aucun projet associé</option>' + projects.map(p => `<option value="${p.id}">${esc(p.title)}</option>`).join('');
-      fillAxis('reportAxis', 'À préciser', null);
-      syncSubAxes(null);
-      renderPicker();
 
-      // Editing an existing report: pull it from the club's report list
-      // (the same payload reports.html uses) and hydrate every field.
+      // Restore whatever tabs were open earlier in this browsing session.
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(TABS_KEY) || 'null');
+        if (saved && Array.isArray(saved.tabs) && saved.tabs.length) {
+          tabs = saved.tabs;
+          activeTab = Math.min(Number(saved.activeTab) || 0, tabs.length - 1);
+        }
+      } catch { /* ignore a corrupted/unavailable session entry */ }
+      if (!tabs.length) { tabs = [makeTab({})]; activeTab = 0; }
+
+      // A link into a specific report (?id=…) either switches to that
+      // report's already-open tab, or opens a new one for it. A link that
+      // presets a template (?template=…) opens a new tab UNLESS the active
+      // tab is still an empty, unstarted one — reusing it there avoids a
+      // stray blank tab every time someone starts a fresh report.
       if (editingId) {
-        const reportsRes = await AYCPortal.api('reports');
-        editing = (reportsRes.reports || []).find(r => String(r.id) === String(editingId)) || null;
-        if (!editing) throw new Error('Rapport introuvable ou hors de ton périmètre.');
-        byId('editor-title').textContent = 'Reprendre un rapport';
-        byId('editor-subtitle').textContent = 'Corrige le dossier puis soumets-le de nouveau à la validation.';
-        byId('form-status').textContent = STATUS_LABELS[editing.status] || editing.status || '';
-        byId('reportTitle').value = editing.title || '';
-        byId('reportRecipient').value = editing.recipient || '';
-        byId('reportProject').value = editing.project_id || '';
-        fillAxis('reportAxis', 'À préciser', editing.axis_slug || null);
-        syncSubAxes(editing.sub_axis_slug || null);
-        byId('reportEventDate').value = toDateInput(editing.event_date);
-        byId('reportDueAt').value = toDateTimeInput(editing.due_at);
-        byId('reportDescription').value = editing.description || '';
-        renderReviewFeedback();
-        selectTemplate(editing.template_slug || editing.report_type, editing.payload || {});
-        byId('picker-card').hidden = true;
+        let idx = tabs.findIndex(t => String(t.reportId) === String(editingId));
+        if (idx === -1) idx = await openReportInNewTab(editingId);
+        applyTab(idx);
       } else if (presetTemplate) {
-        selectTemplate(presetTemplate, null);
+        if (tabs[activeTab] && !tabs[activeTab].templateSlug) {
+          tabs[activeTab].templateSlug = presetTemplate;
+          applyTab(activeTab);
+        } else {
+          openNewTab({ templateSlug: presetTemplate });
+        }
+      } else {
+        applyTab(activeTab);
       }
 
+      byId('doc-tabs').addEventListener('click', e => {
+        const closeBtn = e.target.closest('[data-close-index]');
+        if (closeBtn) { e.stopPropagation(); closeTab(Number(closeBtn.dataset.closeIndex)); return; }
+        if (e.target.closest('#tab-add-btn')) { openNewTab({}); return; }
+        const tabEl = e.target.closest('[data-tab-index]');
+        if (tabEl) switchTab(Number(tabEl.dataset.tabIndex));
+      });
       byId('tpl-picker').addEventListener('click', e => {
         const card = e.target.closest('[data-tpl]');
         if (card) selectTemplate(card.dataset.tpl, collectPayload());
@@ -654,6 +893,9 @@
       });
       byId('reportAxis').addEventListener('change', () => syncSubAxes(null));
       byId('reportEventDate').addEventListener('change', suggestDueDate);
+      byId('report-form').addEventListener('input', onFormChanged);
+      byId('report-form').addEventListener('change', onFormChanged);
+      byId('dynamic-sections').addEventListener('click', e => { if (e.target.closest('button')) onFormChanged(); });
       byId('save-draft').addEventListener('click', async () => { try { await save('draft'); } catch (err) { showError(err); } });
       byId('report-form').addEventListener('submit', async e => {
         e.preventDefault();
