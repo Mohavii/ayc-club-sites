@@ -20,8 +20,30 @@
 
 const { sql } = require("./db");
 
-const DISPLAY_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc", "supco_regional"];
+const DISPLAY_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc", "supco_regional", "supco_local"];
 const BEL_ROLES = ["president", "tresorier", "secretaire", "vpi", "vpe", "vpc"];
+// Which BEL post owns which department (RI I.1.1 lists the seven
+// departments; I.1.12 seats six of them on the BEL, supervision being
+// the SupCo's). Used to resolve "whose workspace is this report/action".
+const BEL_ROLE_DEPARTMENTS = {
+  president: "coordination_strategique",
+  secretaire: "secretariat",
+  tresorier: "tresorerie",
+  vpi: "ressources_humaines",
+  vpe: "relations_externes",
+  vpc: "communication",
+  supco_local: "supervision",
+};
+const BEL_ROLE_LABELS = {
+  president: "Président(e) Local(e)",
+  secretaire: "Secrétaire Général(e) Local(e)",
+  tresorier: "Trésorier(e) Local(e)",
+  vpi: "VPI — Relations Internes",
+  vpe: "VPE — Relations Externes",
+  vpc: "VPC — Communication",
+  supco_local: "SupCo Local",
+  supco_regional: "SupCo Régional",
+};
 const CAPABILITIES = ["membership_approver", "report_validator", "pv_editor", "meeting_organizer", "project_manager", "supervision_editor", "cscy_reviewer"];
 // The Équipe Plénière Nationale (EPN) is seated via five distinct posts
 // rather than a single generic 'epn_member' flag — 'epn_president',
@@ -279,9 +301,19 @@ async function getCapabilityHolders(schoolId, capability) {
 
 // Membership requests are a club-governance workflow. National admins can
 // review every club; an explicit membership_approver grant or the club's
-// current VPC can review requests for that club. Keeping this rule in one
-// helper prevents the list, decision, session shell, and email notice from
-// drifting apart.
+// current VPI can review requests for that club.
+//
+// It is the VPI — not the VPC — on purpose: the règlement puts local
+// recruitment squarely in the VPI's hands ("Assurer le recrutement des
+// nouveaux adhérents", RI I.7.2.1) and makes the VPI define the
+// recruitment criteria, the parrains' evaluation criteria and the trial
+// period (RI I.7.7.2). The VPC's remit is communication only (RI I.9.2),
+// so it has no business approving adhésions. Any club that genuinely
+// wants someone else to approve should get an explicit
+// membership_approver grant — that capability exists for exactly this.
+//
+// Keeping this rule in one helper prevents the list, decision, session
+// shell, and email notice from drifting apart.
 async function canReviewMembership(memberId, schoolId) {
   const db = sql();
   const rows = await db`
@@ -299,7 +331,7 @@ async function canReviewMembership(memberId, schoolId) {
         or exists (
           select 1 from portal_club_display_roles r
           where r.member_id = m.id and r.school_id = ${schoolId}
-            and r.role = 'vpc' and r.ended_at is null
+            and r.role = 'vpi' and r.ended_at is null
         )
       )
     limit 1
@@ -333,7 +365,16 @@ async function getMemberPortalAccess(member) {
   const isEpnMember = isNationalAdmin || EPN_ROLES.some(role => nationalRoles.includes(role));
   const isNewAdherent = member.membership_status === "nouveau_adherent";
   const isOrdinaryMember = !isNationalAdmin && !BEL_ROLES.includes(displayRole) && capabilities.length === 0;
-  const canManageClubWork = isNationalAdmin || capabilities.some(capability => ["meeting_organizer", "pv_editor", "project_manager", "report_validator"].includes(capability));
+  const isBelOfficer = BEL_ROLES.includes(displayRole) || displayRole === "supco_local";
+  // Holding a BEL seat is itself a mandate to work on the club's files:
+  // RI I.1.28 makes EVERY member of the BEL submit a rapport de mise à
+  // jour to the ALOFM, and the Annexe assigns each post its own reports.
+  // Previously this was capability-only, so a freshly elected VPE/VPC/VPI
+  // with no grants was shown "réservé aux responsables désignés" while
+  // api/portal.js's own reports() guard would happily accept them
+  // (it tests `getCurrentDisplayRole(...) || hasCapability(...)`).
+  // That mismatch is the bug; the display role is now honoured here too.
+  const canManageClubWork = isNationalAdmin || isBelOfficer || capabilities.some(capability => ["meeting_organizer", "pv_editor", "project_manager", "report_validator"].includes(capability));
   return {
     displayRole,
     capabilities,
@@ -356,12 +397,32 @@ async function getMemberPortalAccess(member) {
     canAccessSecretariat: isNationalAdmin || isNationalSecretary || displayRole === "secretaire" || displayRole === "president" || has("pv_editor"),
     isTreasurer: displayRole === "tresorier" || nationalRoles.includes("tresorier_national"),
     canAccessTreasury: isNationalAdmin || nationalRoles.includes("tresorier_national") || displayRole === "tresorier",
+    // ---- The three BEL posts that had no workspace before -------------
+    // VPI (RI I.7.2), VPE (RI I.8.2), VPC (RI I.9.2). Each gets both an
+    // identity flag (am I this post?) and an access flag (may I open this
+    // workspace?). The access flag is deliberately wider than the
+    // identity flag: the président co-signs and arbitrates across all
+    // departments (RI I.4.2.3 répartition des tâches, I.4.2.4 mise à
+    // jour des acteurs), and a club whose post is vacant must still be
+    // able to work — RI I.1.21 puts filling a vacancy on the BEL as a
+    // body, and I.1.36 lets the bureau split a vacant post's tasks
+    // between its members or appoint an assistant.
+    isVpi: displayRole === "vpi",
+    isVpe: displayRole === "vpe",
+    isVpc: displayRole === "vpc",
+    canAccessInternalRelations: isNationalAdmin || displayRole === "vpi" || displayRole === "president" || nationalRoles.includes("vpa"),
+    canAccessExternalRelations: isNationalAdmin || displayRole === "vpe" || displayRole === "president" || nationalRoles.includes("vpr"),
+    canAccessCommunication: isNationalAdmin || displayRole === "vpc" || displayRole === "president" || nationalRoles.includes("vpcom"),
+    // The SupCo Local is now a real seat (portal_club_display_roles), not
+    // just an implication of the supervision capabilities — see the
+    // migration note in db/schema.sql.
+    isSupcoLocal: displayRole === "supco_local",
     isPresident: displayRole === "president" || nationalRoles.includes("president_national"),
     isClubLeader: isNationalAdmin || displayRole === "president" || displayRole === "secretaire",
     isEpnMember,
     canReviewReports: has("report_validator"),
-    canManageSupervision: has("supervision_editor"),
-    canReviewSupervision: has("supervision_editor") || has("cscy_reviewer"),
+    canManageSupervision: has("supervision_editor") || displayRole === "supco_local",
+    canReviewSupervision: has("supervision_editor") || has("cscy_reviewer") || displayRole === "supco_local",
     canCreateAssembly: has("meeting_organizer"),
     // A club's meeting_organizer can only ever prepare LOCAL assemblies
     // (ALOFM/ALE/ALOE) for their own club — national AGOMM/AGOFM/AGE are
@@ -373,7 +434,11 @@ async function getMemberPortalAccess(member) {
     canCloseAssembly: has("supervision_editor") || has("cscy_reviewer"),
     canEditTrainingRecord: isNationalAdmin || isVerifiedTrainer,
     canSubmitTrainingParticipation: !isNationalAdmin && !isVerifiedTrainer,
-    canCreateReport: isNationalAdmin || capabilities.includes("report_validator") || capabilities.includes("supervision_editor"),
+    // Mirrors api/portal.js reports(): any current display-role holder may
+    // draft their post's reports (RI I.1.28), plus supervision_editor.
+    canCreateReport: isNationalAdmin || isBelOfficer || Boolean(displayRole) || capabilities.includes("report_validator") || capabilities.includes("supervision_editor"),
+    department: BEL_ROLE_DEPARTMENTS[displayRole] || null,
+    roleLabel: BEL_ROLE_LABELS[displayRole] || null,
   };
 }
 
@@ -385,7 +450,7 @@ async function canReviewAnyMembership(memberId) {
       and (
         m.is_national_admin = true
         or exists (select 1 from portal_capability_grants g where g.member_id = m.id and g.capability = 'membership_approver' and g.revoked_at is null)
-        or exists (select 1 from portal_club_display_roles r where r.member_id = m.id and r.role = 'vpc' and r.ended_at is null)
+        or exists (select 1 from portal_club_display_roles r where r.member_id = m.id and r.role = 'vpi' and r.ended_at is null)
       )
     limit 1
   `;
@@ -408,7 +473,7 @@ async function getMembershipReviewers(schoolId) {
         or exists (
           select 1 from portal_club_display_roles r
           where r.member_id = m.id and r.school_id = ${schoolId}
-            and r.role = 'vpc' and r.ended_at is null
+            and r.role = 'vpi' and r.ended_at is null
         )
       )
     order by m.is_national_admin desc, m.display_name asc
@@ -661,7 +726,7 @@ async function getMemberRoleLabel(memberId) {
     db`select r.role, s.name as school_name from portal_club_display_roles r join portal_schools s on s.id = r.school_id where r.member_id = ${memberId} and r.ended_at is null limit 1`,
     db`select display_name, membership_status from portal_members where id = ${memberId} limit 1`,
   ]);
-  const clubRoleLabels = { president: "Président(e)", tresorier: "Trésorier(e)", secretaire: "Secrétaire", vpi: "VPI", vpe: "VPE", vpc: "VPC", supco_regional: "SupCo Régional" };
+  const clubRoleLabels = BEL_ROLE_LABELS;
   if (nationalRows[0]) return BEN_ROLE_LABELS[nationalRows[0].role] || EPN_ROLE_LABELS[nationalRows[0].role] || EPL_ROLE_LABELS[nationalRows[0].role] || nationalRows[0].role;
   if (clubRows[0]) return `${clubRoleLabels[clubRows[0].role] || clubRows[0].role} · ${clubRows[0].school_name}`;
   if (memberRows[0]?.membership_status === "senior") return "Conseil National des Seniors";
@@ -715,6 +780,8 @@ function requireDisplayRole(roles) {
 module.exports = {
   DISPLAY_ROLES,
   BEL_ROLES,
+  BEL_ROLE_LABELS,
+  BEL_ROLE_DEPARTMENTS,
   CAPABILITIES,
   NATIONAL_ROLES,
   EPN_ROLES,

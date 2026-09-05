@@ -7,6 +7,7 @@
             items: [
               ["home", "", "Accueil"],
               ["profile", "", "Mon profil"],
+              ["responsibilities", "", "Responsabilités"],
               ["meetings", "", "Réunions"],
               ["projects", "", "Projets"],
               ["training", "", "Cursus"],
@@ -21,6 +22,21 @@
           }
           if (access.canAccessTreasury || access.canViewClubWork || member?.isNationalAdmin) {
             clubItems.push(["tresorerie", "", "Trésorerie"]);
+          }
+          // VPI / VPE / VPC are the three BEL posts the règlement seats
+          // (RI I.1.12) and that previously had no space at all. Their
+          // nav entries show up the moment their access flag is true, so
+          // a member who briefly vacates the seat loses the entry, and
+          // the président (who co-signs all three departments) sees them
+          // too. Anyone without access sees nothing.
+          if (access.canAccessInternalRelations) {
+            clubItems.push(["vpi", "", "VPI · Relations internes"]);
+          }
+          if (access.canAccessExternalRelations) {
+            clubItems.push(["vpe", "", "VPE · Relations externes"]);
+          }
+          if (access.canAccessCommunication) {
+            clubItems.push(["vpc", "", "VPC · Communication"]);
           }
           if (access.isPresident || member?.isNationalAdmin) {
             clubItems.push(["president", "", "Président Local"]);

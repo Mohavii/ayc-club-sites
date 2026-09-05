@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Espace VPE · Portail YOUTHCLUBber</title>
+  <link rel="icon" href="../assets/favicon-32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <div id="topbar-root"></div>
+  <div class="workspace">
+    <div id="sidebar-root"></div>
+    <main class="portal-content">
+      <div class="portal-heading">
+        <div>
+          <p class="eyebrow">Vie du club · Relations Externes</p>
+          <h1>Espace VPE</h1>
+          <p>Volet local du Vice-Président aux relations extérieures : relations partenariales, collaboration et sponsoring, ainsi que la sélection et le suivi des délégations locales ou par domaine.</p>
+        </div>
+        <div class="heading-actions">
+          <a class="btn btn-secondary btn-sm" href="report-editor?template=partenariat_local">Rapport de partenariat</a>
+          <a class="btn btn-secondary btn-sm" href="report-editor?template=pre_delegation_local">Rapport pré-délégation</a>
+          <a class="btn btn-secondary btn-sm" href="report-editor?template=post_delegation_local">Rapport post-délégation</a>
+          <button class="btn btn-secondary btn-sm" id="btn-refresh">Actualiser</button>
+        </div>
+      </div>
+      <div id="notice"></div>
+
+      <section id="vpe-restricted" class="portal-card restricted-state" hidden>
+        <h2>Espace réservé au VPE</h2>
+        <p>Les relations extérieures du club sont gérées par le VPE, le Président Local et les administrateurs nationaux.</p>
+      </section>
+
+      <div id="vpe-shell" hidden>
+        <section class="duty-list" id="vpe-duties" style="margin-bottom:24px"></section>
+
+        <nav class="bel-tabs">
+          <button type="button" class="bel-tab active" data-tab="partnerships">Relations partenariales</button>
+          <button type="button" class="bel-tab" data-tab="delegations">Délégations</button>
+        </nav>
+
+        <section class="bel-panel active" id="panel-partnerships" data-resource="club_partnerships">
+          <div class="portal-grid">
+            <div class="portal-card card-span-8">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Partenaires du club</p>
+                  <h2>Collaboration, partenariat, sponsoring, arrangement</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="portal-table">
+                  <thead>
+                    <tr>
+                      <th>Partenaire</th>
+                      <th>Type</th>
+                      <th>Statut</th>
+                      <th>Début</th>
+                      <th>Fin</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody data-bw-rows></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="portal-card card-span-4">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Saisie</p>
+                  <h2 data-bw-form-title>Nouvelle relation partenariale</h2>
+                </div>
+              </div>
+              <form data-bw-form>
+                <div data-bw-fields></div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" type="submit" data-bw-submit>Enregistrer</button>
+                  <button class="btn btn-secondary" type="button" data-bw-cancel hidden>Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section class="bel-panel" id="panel-delegations" data-resource="club_delegations">
+          <div class="portal-grid">
+            <div class="portal-card card-span-8">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Délégations</p>
+                  <h2>Locales et par domaine</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="portal-table">
+                  <thead>
+                    <tr>
+                      <th>Titre</th>
+                      <th>Type</th>
+                      <th>Date</th>
+                      <th>Échéances ANVI</th>
+                      <th>Statut</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody data-bw-rows></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="portal-card card-span-4">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Saisie</p>
+                  <h2 data-bw-form-title>Nouvelle délégation</h2>
+                </div>
+              </div>
+              <form data-bw-form>
+                <div data-bw-fields></div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" type="submit" data-bw-submit>Enregistrer</button>
+                  <button class="btn btn-secondary" type="button" data-bw-cancel hidden>Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="portal-common.js"></script>
+  <script src="bel-workspace.js"></script>
+  <script>
+  (async () => {
+    const member = await AYCBelWorkspace.prepareShell();
+    if (!member) return;
+
+    const esc = AYCPortal.escapeHtml;
+    const duties = [
+      { ref: "I.8.2.1", title: "Stratégie de relation", desc: "Élaborer et exécuter la stratégie de relations extérieures du club, en cohérence avec le plan d’action." },
+      { ref: "I.8.2.2", title: "Convention & ANVI", desc: "Veiller au respect des conventions et à l’analyse ANVI (Analyse des besoins, Négociation, Validation, Implantation)." },
+      { ref: "I.8.2.3", title: "Représentation", desc: "Représenter le club auprès des partenaires, institutions et médias dans la limite de son mandat." },
+      { ref: "I.8.2.4", title: "Délégations", desc: "Organiser la sélection, l’encadrement et le suivi des délégations locales ou par domaine." },
+      { ref: "I.8.2.5", title: "Rapports & AL", desc: "Soumettre les rapports de partenariat et les comptes-rendus de délégation à l’assemblée locale compétente." },
+      { ref: "I.8.4.1.2", title: "Étude ANVI & critères", desc: "Pour chaque délégation, publier les critères de sélection J-7 et la liste des délégués J-4." },
+      { ref: "I.8.4.2.6", title: "Adoption en AL", desc: "Aucun partenariat n’est officiel avant l’adoption du rapport de partenariat en AL." },
+    ];
+    document.getElementById('vpe-duties').innerHTML = duties.map(d => `
+      <div class="duty-item">
+        <h3><span class="duty-ref">${esc(d.ref)}</span> ${esc(d.title)}</h3>
+        <p>${esc(d.desc)}</p>
+      </div>`).join('');
+
+    document.querySelectorAll('.bel-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.bel-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.bel-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    const allowed = Boolean(member.isNationalAdmin || member.access?.canAccessExternalRelations);
+    if (!allowed) {
+      document.getElementById('vpe-restricted').hidden = false;
+      document.getElementById('vpe-shell').hidden = true;
+      return;
+    }
+    document.getElementById('vpe-shell').hidden = false;
+
+    const relationTypeLabels = { collaboration: 'Collaboration', partenariat: 'Partenariat', sponsoring: 'Sponsoring', arrangement: 'Arrangement' };
+    const partnershipStatusLabels = {
+      draft: 'Brouillon', vpe_review: 'Revue VPE', al_pending: 'En attente d’AL',
+      active: 'Actif', dissolved: 'Dénoué', refused: 'Refusé',
+    };
+    const partnershipStatusTones = {
+      draft: 'neutral', vpe_review: 'info', al_pending: 'warn',
+      active: 'ok', dissolved: 'neutral', refused: 'danger',
+    };
+    const delegationTypeLabels = { locale: 'Locale', par_domaine: 'Par domaine' };
+    const delegationStatusLabels = {
+      draft: 'Brouillon', study: 'Étude ANVI', open: 'Ouverte',
+      delegates_selected: 'Délégués choisis', completed: 'Terminée', cancelled: 'Annulée',
+    };
+    const delegationStatusTones = {
+      draft: 'neutral', study: 'info', open: 'info',
+      delegates_selected: 'ok', completed: 'ok', cancelled: 'danger',
+    };
+    const fmtDate = v => v ? AYCPortal.formatDate(v) : '—';
+
+    AYCBelWorkspace.mount({
+      resource: 'club_partnerships',
+      accessFlag: 'canAccessExternalRelations',
+      root: 'panel-partnerships',
+      member,
+      noticeSelector: '#notice',
+      emptyText: 'Aucune relation partenariale enregistrée',
+      formTitle: 'Nouvelle relation partenariale',
+      editTitle: 'Modifier la relation',
+      fields: [
+        { key: 'partnerName', label: 'Nom du partenaire', type: 'text', required: true, full: true, placeholder: 'Ex. Association TuniBikes' },
+        { key: 'relationType', label: 'Type de relation', type: 'select', required: true, options: Object.entries(relationTypeLabels).map(([value, label]) => ({ value, label })), hint: 'RI I.8.4.2 — quatre régimes distincts.' },
+        { key: 'status', label: 'Statut', type: 'select', options: Object.entries(partnershipStatusLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'startsOn', label: 'Début', type: 'date' },
+        { key: 'endsOn', label: 'Fin', type: 'date' },
+        { key: 'contractUrl', label: 'Lien vers la convention', type: 'url', full: true, placeholder: 'https://…' },
+        { key: 'description', label: 'Description', type: 'textarea', full: true, placeholder: 'Objet de la relation, contexte, parties prenantes…' },
+        { key: 'needsAnalysis', label: 'Étude ANVI', type: 'textarea', full: true, placeholder: 'Besoins identifiés, impact, indicateurs, alternatives…', hint: 'RI I.8.4.1.2.2 — à joindre au rapport de partenariat.' },
+        { key: 'dissolutionNote', label: 'Motif de fin (le cas échéant)', type: 'textarea', full: true, placeholder: 'Pourquoi la relation a-t-elle pris fin ?' },
+      ],
+      columns: [
+        { label: 'Partenaire', render: (item) => `<strong>${esc(item.partner_name || item.partnerName || '—')}</strong>${item.description ? `<br><small>${esc(String(item.description).slice(0, 80))}${String(item.description).length > 80 ? '…' : ''}</small>` : ''}` },
+        { label: 'Type', render: (item) => AYCBelWorkspace.chip(item.relation_type || item.relationType, relationTypeLabels) },
+        { label: 'Statut', render: (item) => AYCBelWorkspace.chip(item.status, partnershipStatusLabels, partnershipStatusTones) },
+        { label: 'Début', render: (item) => fmtDate(item.starts_on || item.startsOn) },
+        { label: 'Fin', render: (item) => fmtDate(item.ends_on || item.endsOn) },
+      ],
+    });
+
+    AYCBelWorkspace.mount({
+      resource: 'club_delegations',
+      accessFlag: 'canAccessExternalRelations',
+      root: 'panel-delegations',
+      member,
+      noticeSelector: '#notice',
+      emptyText: 'Aucune délégation enregistrée',
+      formTitle: 'Nouvelle délégation',
+      editTitle: 'Modifier la délégation',
+      fields: [
+        { key: 'title', label: 'Titre de la délégation', type: 'text', required: true, full: true, placeholder: 'Ex. Délégation ALOE 2026' },
+        { key: 'delegationType', label: 'Type de délégation', type: 'select', allowEmpty: true, emptyLabel: 'À préciser', options: Object.entries(delegationTypeLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'hostOrganisation', label: 'Organisme d’accueil', type: 'text', full: true, placeholder: 'Ex. AYC Régional Sousse' },
+        { key: 'happensOn', label: 'Date de la délégation', type: 'date' },
+        { key: 'anviStudy', label: 'Étude ANVI', type: 'textarea', full: true, placeholder: 'Opportunité, analyse des besoins, risques, retombées…' },
+        { key: 'selectionCriteria', label: 'Critères de sélection des délégués', type: 'textarea', full: true, placeholder: 'Compétences, disponibilité, motivation, profil attendu…' },
+        { key: 'criteriaPublishedOn', label: 'Date de publication des critères (J-7)', type: 'date', hint: 'RI I.8.4.1.2.2 — sept jours avant la délégation.' },
+        { key: 'delegatesSelectedOn', label: 'Date de sélection des délégués (J-4)', type: 'date', hint: 'RI I.8.4.1.2.4 — quatre jours avant la délégation.' },
+        { key: 'status', label: 'Statut', type: 'select', options: Object.entries(delegationStatusLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'followupNote', label: 'Suivi / évaluation', type: 'textarea', full: true, placeholder: 'Déroulé, délégués, acquis, suites à donner…' },
+      ],
+      columns: [
+        { label: 'Titre', render: (item) => `<strong>${esc(item.title || '—')}</strong>${item.host_organisation || item.hostOrganisation ? `<br><small>${esc(item.host_organisation || item.hostOrganisation)}</small>` : ''}` },
+        { label: 'Type', render: (item) => AYCBelWorkspace.chip(item.delegation_type || item.delegationType, delegationTypeLabels) },
+        { label: 'Date', render: (item) => fmtDate(item.happens_on || item.happensOn) },
+        {
+          label: 'ANVI / Délégués',
+          render: (item) => {
+            const c = item.criteria_published_on || item.criteriaPublishedOn;
+            const d = item.delegates_selected_on || item.delegatesSelectedOn;
+            return `${c ? 'Critères : ' + esc(fmtDate(c)) + '<br>' : ''}${d ? 'Délégués : ' + esc(fmtDate(d)) : ''}` || '—';
+          },
+        },
+        { label: 'Statut', render: (item) => AYCBelWorkspace.chip(item.status, delegationStatusLabels, delegationStatusTones) },
+      ],
+    });
+  })();
+  </script>
+</body>
+</html>

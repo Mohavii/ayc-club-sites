@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Espace VPC · Portail YOUTHCLUBber</title>
+  <link rel="icon" href="../assets/favicon-32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <div id="topbar-root"></div>
+  <div class="workspace">
+    <div id="sidebar-root"></div>
+    <main class="portal-content">
+      <div class="portal-heading">
+        <div>
+          <p class="eyebrow">Vie du club · Communication</p>
+          <h1>Espace VPC</h1>
+          <p>Volet local du Vice-Président à la communication : planification médiatique avant chaque activité, bilan après, et tenue de l’identité visuelle du club sur tous les supports.</p>
+        </div>
+        <div class="heading-actions">
+          <a class="btn btn-secondary btn-sm" href="report-editor?template=plan_mediatique_local">Nouveau plan médiatique</a>
+          <a class="btn btn-secondary btn-sm" href="report-editor?template=bilan_mediatique_local">Nouveau bilan médiatique</a>
+          <button class="btn btn-secondary btn-sm" id="btn-refresh">Actualiser</button>
+        </div>
+      </div>
+      <div id="notice"></div>
+
+      <section id="vpc-restricted" class="portal-card restricted-state" hidden>
+        <h2>Espace réservé au VPC</h2>
+        <p>La communication médiatique du club est gérée par le VPC, le Président Local et les administrateurs nationaux.</p>
+      </section>
+
+      <div id="vpc-shell" hidden>
+        <section class="duty-list" id="vpc-duties" style="margin-bottom:24px"></section>
+
+        <nav class="bel-tabs">
+          <button type="button" class="bel-tab active" data-tab="plans">Plans &amp; bilans médiatiques</button>
+        </nav>
+
+        <section class="bel-panel active" id="panel-plans" data-resource="club_media">
+          <div class="portal-grid">
+            <div class="portal-card card-span-8">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Médiatisation</p>
+                  <h2>Plan et bilan de chaque activité</h2>
+                </div>
+                <div class="filter-tabs" id="vpc-filter">
+                  <button class="active" type="button" data-kind="all">Tous</button>
+                  <button type="button" data-kind="plan">Plans</button>
+                  <button type="button" data-kind="bilan">Bilans</button>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="portal-table">
+                  <thead>
+                    <tr>
+                      <th>Activité</th>
+                      <th>Document</th>
+                      <th>Phase</th>
+                      <th>Canal / support</th>
+                      <th>Conformité</th>
+                      <th>Statut</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody data-bw-rows></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="portal-card card-span-4">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Saisie</p>
+                  <h2 data-bw-form-title>Nouveau document médiatique</h2>
+                </div>
+              </div>
+              <form data-bw-form>
+                <div data-bw-fields></div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" type="submit" data-bw-submit>Enregistrer</button>
+                  <button class="btn btn-secondary" type="button" data-bw-cancel hidden>Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="portal-common.js"></script>
+  <script src="bel-workspace.js"></script>
+  <script>
+  (async () => {
+    const member = await AYCBelWorkspace.prepareShell();
+    if (!member) return;
+
+    const esc = AYCPortal.escapeHtml;
+    const duties = [
+      { ref: "I.9.2.1", title: "Stratégie de communication", desc: "Élaborer et tenir à jour la stratégie de communication du club, en cohérence avec la stratégie AYC." },
+      { ref: "I.9.2.2", title: "Visibilité des activités", desc: "Garantir la visibilité interne et externe des activités du club." },
+      { ref: "I.9.2.3", title: "Identité visuelle", desc: "Veiller à la conformité des supports diffusés à la charte graphique et à l’identité visuelle de l’association." },
+      { ref: "I.9.2.4", title: "Relations avec les médias", desc: "Entretenir la relation avec les médias et les partenaires de communication." },
+      { ref: "I.9.4.1.3", title: "Plan AVANT l’activité", desc: "Établir un plan médiatique avant chaque activité (cible, canaux, calendrier, contenus)." },
+      { ref: "I.9.4.1.4", title: "Bilan APRÈS l’activité", desc: "Produire un bilan médiatique de chaque activité (portée, engagement, écarts au plan, recommandations)." },
+    ];
+    document.getElementById('vpc-duties').innerHTML = duties.map(d => `
+      <div class="duty-item">
+        <h3><span class="duty-ref">${esc(d.ref)}</span> ${esc(d.title)}</h3>
+        <p>${esc(d.desc)}</p>
+      </div>`).join('');
+
+    const allowed = Boolean(member.isNationalAdmin || member.access?.canAccessCommunication);
+    if (!allowed) {
+      document.getElementById('vpc-restricted').hidden = false;
+      document.getElementById('vpc-shell').hidden = true;
+      return;
+    }
+    document.getElementById('vpc-shell').hidden = false;
+
+    const documentKindLabels = { plan: 'Plan', bilan: 'Bilan' };
+    const phaseLabels = { pre: 'Avant', pendant: 'Pendant', post: 'Après' };
+    const reachLabels = { externe: 'Externe', interne: 'Interne (site AYC)' };
+    const channelLabels = {
+      reseaux_sociaux: 'Réseaux sociaux', site_web: 'Site web',
+      television: 'Télévision', radio: 'Radio', papeterie: 'Papeterie', autre: 'Autre',
+    };
+    const contentTypeLabels = { audiovisuel: 'Audiovisuel', textuel: 'Textuel' };
+    const statusLabels = { draft: 'Brouillon', planned: 'Planifié', published: 'Publié', archived: 'Archivé' };
+    const statusTones = { draft: 'neutral', planned: 'info', published: 'ok', archived: 'neutral' };
+    const fmtDate = v => v ? AYCPortal.formatDate(v) : '—';
+
+    // Filter buttons (plan / bilan / all) — purely a local UI affordance.
+    // The server still returns the full list so the count and the
+    // stat-card totals stay correct.
+    let activeKind = 'all';
+    document.getElementById('vpc-filter').addEventListener('click', event => {
+      const btn = event.target.closest('[data-kind]');
+      if (!btn) return;
+      document.querySelectorAll('#vpc-filter [data-kind]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeKind = btn.dataset.kind;
+      // Ask the module to re-render using its currently-loaded items
+      // by dispatching a click on the refresh button.
+      document.getElementById('btn-refresh').click();
+    });
+
+    AYCBelWorkspace.mount({
+      resource: 'club_media',
+      accessFlag: 'canAccessCommunication',
+      root: 'panel-plans',
+      member,
+      noticeSelector: '#notice',
+      emptyText: 'Aucun plan ou bilan médiatique enregistré',
+      formTitle: 'Nouveau document médiatique',
+      editTitle: 'Modifier le document',
+      stats: [
+        { label: 'Plans', value: (items) => items.filter(i => (i.document_kind || i.documentKind) === 'plan').length },
+        { label: 'Bilans', value: (items) => items.filter(i => (i.document_kind || i.documentKind) === 'bilan').length },
+        { label: 'Publiés', value: (items) => items.filter(i => i.status === 'published').length },
+      ],
+      fields: [
+        { key: 'activityTitle', label: 'Titre de l’activité', type: 'text', required: true, full: true, placeholder: 'Ex. Forum santé du club' },
+        { key: 'projectId', label: 'Projet associé', type: 'text', full: true, placeholder: 'UUID de projet (optionnel)' },
+        { key: 'documentKind', label: 'Type de document', type: 'select', required: true, options: Object.entries(documentKindLabels).map(([value, label]) => ({ value, label })), hint: 'RI I.9.4.1.3 (plan) / I.9.4.1.4 (bilan).' },
+        { key: 'phase', label: 'Phase', type: 'select', allowEmpty: true, emptyLabel: 'Sans objet', options: Object.entries(phaseLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'reach', label: 'Portée', type: 'select', allowEmpty: true, emptyLabel: 'À préciser', options: Object.entries(reachLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'channel', label: 'Canal', type: 'select', allowEmpty: true, emptyLabel: 'À préciser', options: Object.entries(channelLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'contentType', label: 'Type de contenu', type: 'select', allowEmpty: true, emptyLabel: 'À préciser', options: Object.entries(contentTypeLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'summary', label: 'Résumé', type: 'textarea', full: true, placeholder: 'Cible, message, idée centrale, livrables…' },
+        { key: 'metrics', label: 'Portée & engagement', type: 'textarea', full: true, placeholder: 'Vues, partages, commentaires, leçons à tirer…' },
+        { key: 'status', label: 'Statut', type: 'select', options: Object.entries(statusLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'publishedOn', label: 'Date de publication', type: 'date' },
+        { key: 'identityCompliant', label: '', type: 'checkbox', checkboxLabel: 'Identité visuelle respectée (RI I.9.4.3.4.1.1)' },
+        { key: 'logoPresent', label: '', type: 'checkbox', checkboxLabel: 'Logo AYC présent sur les supports (RI I.9.4.1.9)' },
+      ],
+      columns: [
+        { label: 'Activité', render: (item) => `<strong>${esc(item.activity_title || item.activityTitle || '—')}</strong>${item.summary ? `<br><small>${esc(String(item.summary).slice(0, 80))}${String(item.summary).length > 80 ? '…' : ''}</small>` : ''}` },
+        { label: 'Document', render: (item) => AYCBelWorkspace.chip(item.document_kind || item.documentKind, documentKindLabels) },
+        { label: 'Phase', render: (item) => AYCBelWorkspace.chip(item.phase, phaseLabels) },
+        {
+          label: 'Canal / support',
+          render: (item) => {
+            const chan = AYCBelWorkspace.chip(item.channel, channelLabels);
+            const reach = item.reach ? `<br><small>${esc(item.reach)}</small>` : '';
+            return chan + reach;
+          },
+        },
+        {
+          label: 'Conformité',
+          render: (item) => {
+            const ok = item.identity_compliant ?? item.identityCompliant;
+            const logo = item.logo_present ?? item.logoPresent;
+            const labels = { null: '—', true: 'OK', false: 'À corriger' };
+            const tones = { null: 'neutral', true: 'ok', false: 'danger' };
+            return `Identité : ${AYCBelWorkspace.chip(ok === true, { true: 'OK', false: 'À corriger' }, { true: 'ok', false: 'danger' })}<br>Logo : ${AYCBelWorkspace.chip(logo === true, { true: 'OK', false: 'À corriger' }, { true: 'ok', false: 'danger' })}`;
+          },
+        },
+        { label: 'Statut', render: (item) => AYCBelWorkspace.chip(item.status, statusLabels, statusTones) },
+      ],
+    });
+  })();
+  </script>
+</body>
+</html>

@@ -1340,3 +1340,265 @@ create table if not exists portal_suspended_points (
 );
 create index if not exists idx_portal_suspended_points_school on portal_suspended_points(school_id, status);
 
+-- =======================================================================
+-- POSTES LOCAUX (BEL) — VPI / VPE / VPC + SUPCO LOCAL
+-- =======================================================================
+-- The règlement (Septembre 2026) seats SIX posts on every Bureau Exécutif
+-- Local (RI I.1.12): président, secrétaire général, trésorier, VPI, VPE,
+-- VPC. Three of them (VPI/VPE/VPC) had no data model at all before this
+-- block, so their statutory duties had nowhere to live. Each table below
+-- maps to a specific article rather than being a generic "notes" bucket.
+--
+-- The SupCo Local (RI II.1.6, three members) is also added as a real
+-- display role: it was previously only reachable through the
+-- supervision_editor / cscy_reviewer capabilities, which meant a club
+-- could not record WHO sits on its Conseil de Supervision, only who may
+-- act. Statut ch. IV.3 makes SupCo membership a responsabilité, i.e. a
+-- seat — so it belongs in portal_club_display_roles like the BEL posts.
+do $$
+begin
+  alter table portal_club_display_roles drop constraint if exists portal_club_display_roles_role_check;
+  alter table portal_club_display_roles add constraint portal_club_display_roles_role_check
+    check (role in ('president', 'tresorier', 'secretaire', 'vpi', 'vpe', 'vpc', 'supco_regional', 'supco_local'));
+exception when duplicate_object then null;
+end $$;
+
+-- The Annexe du système de mise à jour names report types the original
+-- seven-value enum could not express (plan d'action annuel, avancement
+-- stratégique, bilan financier, plan/bilan médiatique, pré/post
+-- délégation, recommandation des parrains, identification des besoins).
+-- Widening the CHECK is what lets every statutory local report exist as
+-- a real row instead of being crammed into 'mise_a_jour'.
+do $$
+begin
+  alter table portal_reports drop constraint if exists portal_reports_report_type_check;
+  alter table portal_reports add constraint portal_reports_report_type_check
+    check (report_type in (
+      'pre_projet','post_projet','proces_verbal','collaboration','mise_a_jour','supervision','investigation',
+      'plan_action','avancement_strategique','bilan_financier','plan_mediatique','bilan_mediatique',
+      'pre_delegation','post_delegation','partenariat','recommandation_parrains','identification_besoins'
+    ));
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter table portal_report_templates drop constraint if exists portal_report_templates_report_type_check;
+  alter table portal_report_templates add constraint portal_report_templates_report_type_check
+    check (report_type in (
+      'pre_projet','post_projet','proces_verbal','collaboration','mise_a_jour','supervision','investigation',
+      'plan_action','avancement_strategique','bilan_financier','plan_mediatique','bilan_mediatique',
+      'pre_delegation','post_delegation','partenariat','recommandation_parrains','identification_besoins'
+    ));
+exception when duplicate_object then null;
+end $$;
+
+-- Which BEL post owns each report, so a role workspace can list "the
+-- reports I am statutorily responsible for" without hardcoding the map
+-- in every page. Null = not owned by a single local post.
+alter table portal_report_templates add column if not exists owner_role text;
+alter table portal_report_templates add column if not exists scope text not null default 'local';
+
+-- ---- VPI (Relations Internes / RH) — RI I.7.2, I.7.7 ------------------
+-- 7.7.2: "Préalablement à toute ouverture de recrutement, le VPI
+-- détermine les critères de recrutement, les critères d'évaluation sur
+-- lesquels les parrains fondent leur validation, ainsi que la durée de
+-- la période d'essai." Those three things are columns, not prose: the
+-- ALOV that closes a campaign needs them to judge the parrains' report.
+create table if not exists portal_club_recruitment (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  title text not null,
+  procedure text not null default 'recrutement' check (procedure in ('recrutement', 'parrainage', 'transfert')),
+  recruitment_criteria text,
+  evaluation_criteria text,
+  trial_period_days integer,
+  opens_on date,
+  closes_on date,
+  -- 7.7.3: the campaign ends at an ALOV where the parrains' report is
+  -- put to adoption, hence the explicit 'alov_pending' state.
+  status text not null default 'draft' check (status in ('draft', 'open', 'closed', 'alov_pending', 'validated', 'cancelled')),
+  needs_justification text,
+  created_by uuid not null references portal_members(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_club_recruitment_school on portal_club_recruitment(school_id, status);
+
+-- 7.2.3 / 7.3.2.2: the club identifies a development need and sends a
+-- request to the regional internal-affairs officer, or to the VPA when
+-- the regional system is not active (RI I.1.38).
+create table if not exists portal_club_needs (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  title text not null,
+  need_type text not null default 'formation' check (need_type in ('formation', 'developpement', 'bien_etre', 'materiel', 'autre')),
+  description text,
+  target_audience text,
+  -- 7.3.2.2 routes local needs to the RR chargé des affaires internes if
+  -- one exists, else the VPA. Stored so the club can prove where it sent it.
+  sent_to text not null default 'vpa' check (sent_to in ('vpa', 'responsable_regional')),
+  status text not null default 'draft' check (status in ('draft', 'sent', 'accepted', 'refused', 'fulfilled')),
+  response_note text,
+  created_by uuid not null references portal_members(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_club_needs_school on portal_club_needs(school_id, status);
+
+-- ---- VPE (Relations Externes) — RI I.8.2, I.8.4 ----------------------
+-- 8.4.2 distinguishes four kinds of external relation with different
+-- rules, so 'relation_type' is a constrained enum rather than free text:
+-- 8.4.2.6 requires the partenariat report to be adopted in an AL BEFORE
+-- the relation is official, which is what 'al_pending' encodes.
+create table if not exists portal_club_partnerships (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  partner_name text not null,
+  relation_type text not null check (relation_type in ('collaboration', 'partenariat', 'sponsoring', 'arrangement')),
+  description text,
+  -- 8.4.2.4.1-2: research the need, then analyse the relation's impact
+  -- against the needs previously set (the "étude ANVI" of 8.4.1.2.2).
+  needs_analysis text,
+  contract_url text,
+  starts_on date,
+  ends_on date,
+  status text not null default 'draft' check (status in ('draft', 'vpe_review', 'al_pending', 'active', 'dissolved', 'refused')),
+  -- 8.4.2.5: locally, nothing is official until the VPE validates.
+  vpe_validated_at timestamptz,
+  dissolution_note text,
+  created_by uuid not null references portal_members(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_club_partnerships_school on portal_club_partnerships(school_id, status);
+
+-- 8.4.1.2: a délégation has a fixed timeline — the ANVI study and the
+-- delegate-selection criteria land 7 days before, the delegates
+-- themselves 4 days before. Both dates are stored so the deadlines can
+-- be checked instead of trusted.
+create table if not exists portal_club_delegations (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  title text not null,
+  delegation_type text not null default 'locale' check (delegation_type in ('locale', 'par_domaine')),
+  host_organisation text,
+  happens_on date,
+  anvi_study text,
+  selection_criteria text,
+  criteria_published_on date,
+  delegates_selected_on date,
+  status text not null default 'draft' check (status in ('draft', 'study', 'open', 'delegates_selected', 'completed', 'cancelled')),
+  followup_note text,
+  created_by uuid not null references portal_members(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_club_delegations_school on portal_club_delegations(school_id, status);
+
+-- ---- VPC (Communication Médiatique) — RI I.9.2, I.9.4 ----------------
+-- 9.4.1.3 requires a plan médiatique BEFORE every activity and 9.4.1.4 a
+-- bilan médiatique AFTER it, so one row per (activity, document kind).
+-- 9.4.1.5 splits the médiatisation itself into three phases, and
+-- 9.4.3.4 lists the validity criteria a content must satisfy — kept as
+-- explicit booleans so the VPC can self-check before publishing.
+create table if not exists portal_club_media_plans (
+  id uuid primary key default gen_random_uuid(),
+  school_id integer not null references portal_schools(id) on delete cascade,
+  activity_title text not null,
+  project_id uuid references portal_projects(id) on delete set null,
+  document_kind text not null default 'plan' check (document_kind in ('plan', 'bilan')),
+  phase text not null default 'pre' check (phase in ('pre', 'pendant', 'post')),
+  -- 9.4.1.6-7: external (digital / mass) vs internal (AYC website).
+  reach text not null default 'externe' check (reach in ('externe', 'interne')),
+  channel text not null default 'reseaux_sociaux' check (channel in ('reseaux_sociaux', 'site_web', 'television', 'radio', 'papeterie', 'autre')),
+  content_type text not null default 'audiovisuel' check (content_type in ('audiovisuel', 'textuel')),
+  summary text,
+  -- 9.4.3.4.1.1 / 9.4.1.9: logo + identité visuelle conformity.
+  identity_compliant boolean not null default false,
+  logo_present boolean not null default false,
+  status text not null default 'draft' check (status in ('draft', 'planned', 'published', 'archived')),
+  published_on date,
+  metrics text,
+  created_by uuid not null references portal_members(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_portal_club_media_plans_school on portal_club_media_plans(school_id, document_kind, status);
+
+-- ---- Report templates for the statutory local reports ----------------
+-- Sourced one-for-one from the Annexe du système de mise à jour (I.1.1,
+-- I.1.3, I.1.4, I.3.1.1, I.5.1.1, I.6.1.1, 3.1.3) plus the VPE/VPC
+-- reports named in RI I.8.4.2.4.4, I.8.4.4.5 and I.9.4.1.3-4.
+-- 'default_due_days' is negative when the deadline falls BEFORE the
+-- event (the existing pre_projet row already uses that convention).
+insert into portal_report_templates
+  (slug, name, report_type, description, recipient, deadline_rule, default_due_days, required_sections, validator_departments, owner_role, scope)
+values
+  ('plan_action_local', 'Rapport du plan d''action annuel du club', 'plan_action',
+   'Plan d''action annuel adopté à l''ALOFM (RI I.4.3.1.6). Rédigé par le président avec les parties de chaque membre du BEL.',
+   'Bureau Exécutif National', '7 jours après l''élection du BEL', 7,
+   '["methode_implementation", "methodologies_objectifs", "projets_phares", "budget_et_fonds", "methode_evaluation"]'::jsonb,
+   '["coordination_strategique"]'::jsonb, 'president', 'local'),
+
+  ('avancement_strategique_local', 'Rapport d''avancement stratégique local', 'avancement_strategique',
+   'Évaluation de l''avancement tactique du club (RI I.4.3.2.3), présentée à l''ALOFM.',
+   'CSCY local', '5 jours avant la première plénière de l''ALOFM', -5,
+   '["rappel_objectifs", "avancement_par_objectif", "ecarts", "evaluation", "recommandations"]'::jsonb,
+   '["coordination_strategique"]'::jsonb, 'president', 'local'),
+
+  ('bilan_financier_local', 'Bilan financier de mise à jour local', 'bilan_financier',
+   'Mise à jour de toutes les transactions du club (Annexe I.5.1.1). Non adopté à l''ALOFM ⇒ investigation du SupCo Local (RI I.1.19).',
+   'CSCY local', '5 jours avant la première plénière de l''ALOFM', -5,
+   '["situation_caisse", "encaissements", "decaissements", "cotisations", "dettes_et_creances", "justificatifs"]'::jsonb,
+   '["tresorerie"]'::jsonb, 'tresorier', 'local'),
+
+  ('identification_besoins_local', 'Rapport d''identification des besoins', 'identification_besoins',
+   'Besoin de développement identifié par le club, adressé au RR chargé des affaires internes ou au VPA (RI I.7.3.2.2).',
+   'VPA / Responsable Régional', 'Selon le système de mise à jour', -7,
+   '["besoin_identifie", "public_concerne", "justification", "resultat_attendu"]'::jsonb,
+   '["coordination_strategique"]'::jsonb, 'vpi', 'local'),
+
+  ('recommandation_parrains', 'Rapport de recommandation des parrains', 'recommandation_parrains',
+   'Recommandation des parrains sur chaque nouveau membre, soumise à l''adoption en ALOV (RI I.7.7.3-4).',
+   'CSCY local', '5 jours avant l''ALOV', -5,
+   '["nouveaux_membres", "criteres_evaluation", "evaluation_individuelle", "recommandation"]'::jsonb,
+   '["coordination_strategique"]'::jsonb, 'vpi', 'local'),
+
+  ('partenariat_local', 'Rapport de partenariat local', 'partenariat',
+   'Rapport de partenariat à adopter en AL avant d''officialiser la relation (RI I.8.4.2.6).',
+   'Assemblée Locale', 'Avant l''officialisation de la relation', -5,
+   '["partenaire", "besoin_et_recherche", "analyse_impact", "clauses", "engagements", "suite"]'::jsonb,
+   '["relations_exterieures", "coordination_strategique"]'::jsonb, 'vpe', 'local'),
+
+  ('pre_delegation_local', 'Rapport pré-délégation', 'pre_delegation',
+   'Étude ANVI et critères de sélection des délégués (RI I.8.4.1.2.2, I.8.4.4.5.1).',
+   'VPE / VPR', '7 jours avant la délégation', -7,
+   '["opportunite", "etude_anvi", "criteres_selection", "encadrement_prevu"]'::jsonb,
+   '["relations_exterieures"]'::jsonb, 'vpe', 'local'),
+
+  ('post_delegation_local', 'Rapport post-délégation', 'post_delegation',
+   'Suivi et évaluation post-session de la délégation (RI I.8.4.1.2.6, I.8.4.4.5.2).',
+   'VPE / VPR', '10 jours après la délégation', 10,
+   '["deroulement", "delegues", "acquis", "evaluation", "suivi"]'::jsonb,
+   '["relations_exterieures"]'::jsonb, 'vpe', 'local'),
+
+  ('plan_mediatique_local', 'Plan médiatique', 'plan_mediatique',
+   'Planification médiatique établie AVANT chaque activité (RI I.9.4.1.3).',
+   'Responsable Régional Communication / VPCom', 'Avant le début de l''activité', -7,
+   '["objectif_communication", "public_cible", "canaux", "calendrier", "contenus_prevus", "identite_visuelle"]'::jsonb,
+   '["communication"]'::jsonb, 'vpc', 'local'),
+
+  ('bilan_mediatique_local', 'Bilan médiatique', 'bilan_mediatique',
+   'Bilan de la médiatisation effectuée APRÈS chaque activité (RI I.9.4.1.4).',
+   'Responsable Régional Communication / VPCom', 'Après la fin de l''activité', 10,
+   '["contenus_publies", "portee_et_engagement", "ecarts_au_plan", "conformite_identite", "recommandations"]'::jsonb,
+   '["communication"]'::jsonb, 'vpc', 'local')
+on conflict (slug) do nothing;
+
+-- Attribute the pre-existing templates to their owning local post so the
+-- role workspaces can filter on owner_role uniformly.
+update portal_report_templates set owner_role = 'president' where slug in ('pre_projet', 'post_projet') and owner_role is null;
+update portal_report_templates set owner_role = 'secretaire' where slug = 'proces_verbal' and owner_role is null;
+update portal_report_templates set owner_role = 'vpe' where slug = 'collaboration' and owner_role is null;
+

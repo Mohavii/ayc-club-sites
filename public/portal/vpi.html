@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Espace VPI · Portail YOUTHCLUBber</title>
+  <link rel="icon" href="../assets/favicon-32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <div id="topbar-root"></div>
+  <div class="workspace">
+    <div id="sidebar-root"></div>
+    <main class="portal-content">
+      <div class="portal-heading">
+        <div>
+          <p class="eyebrow">Vie du club · Relations Internes</p>
+          <h1>Espace VPI</h1>
+          <p>Volet local du Vice-Président aux affaires internes : recrutement des nouveaux adhérents, parrains et période d’essai ; remontée des besoins de développement vers le niveau national ou régional.</p>
+        </div>
+        <div class="heading-actions">
+          <a class="btn btn-secondary btn-sm" href="report-editor?template=identification_besoins_local">Nouveau rapport de besoin</a>
+          <a class="btn btn-secondary btn-sm" href="report-editor?template=recommandation_parrains">Nouvelle recommandation</a>
+          <button class="btn btn-secondary btn-sm" id="btn-refresh">Actualiser</button>
+        </div>
+      </div>
+      <div id="notice"></div>
+
+      <section id="vpi-restricted" class="portal-card restricted-state" hidden>
+        <h2>Espace réservé au VPI</h2>
+        <p>La gestion des relations internes (recrutement, parrains, besoins) est confiée au VPI, au Président Local et aux administrateurs nationaux. Tu peux consulter ton parcours depuis la navigation.</p>
+      </section>
+
+      <div id="vpi-shell" hidden>
+        <section class="duty-list" id="vpi-duties" style="margin-bottom:24px"></section>
+
+        <nav class="bel-tabs">
+          <button type="button" class="bel-tab active" data-tab="recruitment">Recrutement &amp; parrains</button>
+          <button type="button" class="bel-tab" data-tab="needs">Besoins de développement</button>
+        </nav>
+
+        <section class="bel-panel active" id="panel-recruitment" data-resource="club_recruitment">
+          <div class="portal-grid">
+            <div class="portal-card card-span-8">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Campagnes de recrutement</p>
+                  <h2>Recrutement, parrainage et transferts</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="portal-table">
+                  <thead>
+                    <tr>
+                      <th>Titre</th>
+                      <th>Procédure</th>
+                      <th>Statut</th>
+                      <th>Ouverture</th>
+                      <th>Échéance</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody data-bw-rows></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="portal-card card-span-4">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Saisie</p>
+                  <h2 data-bw-form-title>Nouvelle campagne</h2>
+                </div>
+              </div>
+              <form data-bw-form>
+                <div data-bw-fields></div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" type="submit" data-bw-submit>Enregistrer</button>
+                  <button class="btn btn-secondary" type="button" data-bw-cancel hidden>Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section class="bel-panel" id="panel-needs" data-resource="club_needs">
+          <div class="portal-grid">
+            <div class="portal-card card-span-8">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Besoins identifiés</p>
+                  <h2>Besoins de développement du club</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="portal-table">
+                  <thead>
+                    <tr>
+                      <th>Besoin</th>
+                      <th>Type</th>
+                      <th>Destinataire</th>
+                      <th>Statut</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody data-bw-rows></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="portal-card card-span-4">
+              <div class="toolbar">
+                <div>
+                  <p class="eyebrow">Saisie</p>
+                  <h2 data-bw-form-title>Nouveau besoin</h2>
+                </div>
+              </div>
+              <form data-bw-form>
+                <div data-bw-fields></div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" type="submit" data-bw-submit>Enregistrer</button>
+                  <button class="btn btn-secondary" type="button" data-bw-cancel hidden>Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="portal-common.js"></script>
+  <script src="bel-workspace.js"></script>
+  <script>
+  (async () => {
+    // Render the topbar and sidebar once for the whole page; the
+    // bel-workspace instances below reuse this `member` so neither the
+    // topbar nor the loading screen is re-rendered for each one.
+    const member = await AYCBelWorkspace.prepareShell();
+    if (!member) return;
+
+    // Duties panel — straight from the règlement intérieur (RI I.7.2.1-7).
+    // Kept on the page (not in the module) so the three posts stay
+    // self-documenting: editing a duty here is a one-file change.
+    const esc = AYCPortal.escapeHtml;
+    const duties = [
+      { ref: "I.7.2.1", title: "Recrutement", desc: "Assurer le recrutement des nouveaux adhérents du club, dans le respect de la procédure interne." },
+      { ref: "I.7.2.2", title: "Pré-admission & parrainage", desc: "Coordonner la phase de pré-admission et la désignation des parrains pour chaque nouveau membre." },
+      { ref: "I.7.2.3", title: "Évaluation de l’essai", desc: "Centraliser les rapports de parrains et préparer leur soumission à l’ALOV." },
+      { ref: "I.7.2.4", title: "Besoins de développement", desc: "Identifier et transmettre au niveau national ou régional les besoins de formation et d’accompagnement." },
+      { ref: "I.7.2.5", title: "Cohésion interne", desc: "Veiller au bien-être des membres et à la qualité du climat interne du club." },
+      { ref: "I.7.2.6", title: "Rapport de mise à jour", desc: "Rédiger la partie « relations internes » du rapport de mise à jour de l’ALOFM." },
+      { ref: "I.7.7.2", title: "Critères de recrutement", desc: "Définir, avant chaque ouverture de recrutement, les critères de recrutement, les critères d’évaluation des parrains et la durée de la période d’essai." },
+    ];
+    document.getElementById('vpi-duties').innerHTML = duties.map(d => `
+      <div class="duty-item">
+        <h3><span class="duty-ref">${esc(d.ref)}</span> ${esc(d.title)}</h3>
+        <p>${esc(d.desc)}</p>
+      </div>`).join('');
+
+    // Tab switching — the two panels are completely independent; they
+    // do not share form state.
+    document.querySelectorAll('.bel-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.bel-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.bel-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    const allowed = Boolean(member.isNationalAdmin || member.access?.canAccessInternalRelations);
+    if (!allowed) {
+      document.getElementById('vpi-restricted').hidden = false;
+      document.getElementById('vpi-shell').hidden = true;
+      return;
+    }
+    document.getElementById('vpi-shell').hidden = false;
+
+    // Enums reused in both tables and forms.
+    const procedureLabels = { recrutement: 'Recrutement', parrainage: 'Parrainage', transfert: 'Transfert' };
+    const recruitmentStatusLabels = {
+      draft: 'Brouillon', open: 'Ouverte', closed: 'Fermée',
+      alov_pending: 'En attente d’ALOV', validated: 'Validée', cancelled: 'Annulée',
+    };
+    const recruitmentStatusTones = {
+      draft: 'neutral', open: 'info', closed: 'neutral',
+      alov_pending: 'warn', validated: 'ok', cancelled: 'danger',
+    };
+    const needTypeLabels = { formation: 'Formation', developpement: 'Développement', bien_etre: 'Bien-être', materiel: 'Matériel', autre: 'Autre' };
+    const sentToLabels = { vpa: 'VPA (niveau national)', responsable_regional: 'Responsable Régional' };
+    const needStatusLabels = {
+      draft: 'Brouillon', sent: 'Envoyé',
+      accepted: 'Accepté', refused: 'Refusé', fulfilled: 'Traité',
+    };
+    const needStatusTones = {
+      draft: 'neutral', sent: 'info',
+      accepted: 'ok', refused: 'danger', fulfilled: 'ok',
+    };
+    const fmtDate = v => v ? AYCPortal.formatDate(v) : '—';
+
+    // ---- recruitment panel -----------------------------------------
+    AYCBelWorkspace.mount({
+      resource: 'club_recruitment',
+      accessFlag: 'canAccessInternalRelations',
+      root: 'panel-recruitment',
+      member,
+      noticeSelector: '#notice',
+      emptyText: 'Aucune campagne de recrutement enregistrée',
+      formTitle: 'Nouvelle campagne',
+      editTitle: 'Modifier la campagne',
+      fields: [
+        { key: 'title', label: 'Titre de la campagne', type: 'text', required: true, full: true, placeholder: 'Ex. Recrutement niveau 1 — septembre' },
+        { key: 'procedure', label: 'Procédure', type: 'select', allowEmpty: true, emptyLabel: 'À préciser', options: Object.entries(procedureLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'status', label: 'Statut', type: 'select', options: Object.entries(recruitmentStatusLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'opensOn', label: 'Ouverture', type: 'date' },
+        { key: 'closesOn', label: 'Clôture', type: 'date' },
+        { key: 'trialPeriodDays', label: 'Période d’essai (jours)', type: 'number', min: 0, hint: 'RI I.7.7.2 — fixée par le VPI avant l’ouverture.' },
+        { key: 'recruitmentCriteria', label: 'Critères de recrutement', type: 'textarea', full: true, placeholder: 'Profil, prérequis, motivations attendues…' },
+        { key: 'evaluationCriteria', label: "Critères d’évaluation des parrains", type: 'textarea', full: true, placeholder: 'Grille d’observation, indicateurs, livrables…' },
+        { key: 'needsJustification', label: 'Justification / motif', type: 'textarea', full: true, placeholder: 'Pourquoi cette campagne, public visé, contexte…' },
+      ],
+      columns: [
+        { label: 'Titre', render: (item) => `<strong>${esc(item.title || '—')}</strong>${item.needs_justification ? `<br><small>${esc(String(item.needs_justification).slice(0, 80))}${String(item.needs_justification).length > 80 ? '…' : ''}</small>` : ''}` },
+        { label: 'Procédure', render: (item) => AYCBelWorkspace.chip(item.procedure, procedureLabels) },
+        { label: 'Statut', render: (item) => AYCBelWorkspace.chip(item.status, recruitmentStatusLabels, recruitmentStatusTones) },
+        { label: 'Ouverture', render: (item) => fmtDate(item.opens_on || item.opensOn) },
+        { label: 'Clôture', render: (item) => fmtDate(item.closes_on || item.closesOn) },
+      ],
+    });
+
+    // ---- needs panel -----------------------------------------------
+    AYCBelWorkspace.mount({
+      resource: 'club_needs',
+      accessFlag: 'canAccessInternalRelations',
+      root: 'panel-needs',
+      member,
+      noticeSelector: '#notice',
+      emptyText: 'Aucun besoin enregistré',
+      formTitle: 'Nouveau besoin',
+      editTitle: 'Modifier le besoin',
+      fields: [
+        { key: 'title', label: 'Intitulé du besoin', type: 'text', required: true, full: true, placeholder: 'Ex. Formation à la prise de parole en réunion' },
+        { key: 'needType', label: 'Type de besoin', type: 'select', options: Object.entries(needTypeLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'targetAudience', label: 'Public concerné', type: 'text', full: true, placeholder: 'Bénéficiaires directs et indirects' },
+        { key: 'sentTo', label: 'Adressé à', type: 'select', allowEmpty: true, emptyLabel: 'À préciser', options: Object.entries(sentToLabels).map(([value, label]) => ({ value, label })), hint: 'RI I.7.3.2.2 — VPA en l’absence de responsable régional.' },
+        { key: 'status', label: 'Statut', type: 'select', options: Object.entries(needStatusLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'description', label: 'Description', type: 'textarea', full: true, placeholder: 'Contexte, manifestations, ampleur, contraintes…' },
+        { key: 'responseNote', label: 'Réponse reçue', type: 'textarea', full: true, placeholder: 'Décision, ressources mobilisées, conditions…' },
+      ],
+      columns: [
+        { label: 'Besoin', render: (item) => `<strong>${esc(item.title || '—')}</strong>${item.target_audience || item.targetAudience ? `<br><small>${esc(item.target_audience || item.targetAudience)}</small>` : ''}` },
+        { label: 'Type', render: (item) => AYCBelWorkspace.chip(item.need_type || item.needType, needTypeLabels) },
+        { label: 'Destinataire', render: (item) => AYCBelWorkspace.chip(item.sent_to || item.sentTo, sentToLabels) },
+        { label: 'Statut', render: (item) => AYCBelWorkspace.chip(item.status, needStatusLabels, needStatusTones) },
+      ],
+    });
+  })();
+  </script>
+</body>
+</html>

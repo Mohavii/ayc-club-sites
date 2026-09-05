@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Éditeur de rapports · Portail YOUTHCLUBber</title>
+  <link rel="icon" href="../assets/favicon-32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="portal.css">
+  <style>
+    .tpl-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+    .tpl-card{border:1px solid var(--portal-line,#e2e7f0);border-radius:12px;padding:14px;background:#fff;cursor:pointer;text-align:left;transition:all .15s ease}
+    .tpl-card:hover{border-color:#b4c3de;transform:translateY(-1px)}
+    .tpl-card.active{border-color:var(--portal-navy,#1f2a5a);box-shadow:0 0 0 2px rgba(31,42,90,.12)}
+    .tpl-card strong{display:block;font-size:.9rem;color:#1f2a5a;margin-bottom:4px}
+    .tpl-card span{display:block;font-size:.76rem;color:#6a748b;line-height:1.45}
+    .tpl-owner{display:inline-block;margin-top:8px;padding:2px 8px;border-radius:999px;font-size:.68rem;font-weight:800;background:#f0f4ff;color:#3b5bdb}
+    .meta-strip{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+    .meta-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:.75rem;font-weight:700;background:#f1f4f9;color:#536387;border:1px solid #dbe2ef}
+    .meta-chip.warn{background:#fff8e6;color:#b27b00;border-color:#ffe69c}
+    .section-block{border:1px solid #e2e8f1;border-radius:12px;padding:14px;margin-bottom:12px;background:#fcfdff}
+    .section-block label{display:block;font-weight:800;font-size:.82rem;color:#1f2a5a;margin-bottom:6px;text-transform:capitalize}
+    .section-block textarea{width:100%;min-height:110px}
+    .review-note{border-left:3px solid #c02b2b;background:#fdf0f0;padding:10px 12px;border-radius:8px;margin-bottom:10px;font-size:.82rem;color:#7a2020}
+    .editor-sticky{position:sticky;bottom:0;background:#fff;border-top:1px solid #e2e8f1;padding:14px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  </style>
+</head>
+<body>
+  <div id="topbar-root"></div>
+  <div class="workspace">
+    <div id="sidebar-root"></div>
+    <main class="portal-content">
+      <div class="portal-heading">
+        <div>
+          <p class="eyebrow">Système de mise à jour · Rédaction</p>
+          <h1 id="editor-title">Éditeur de rapports</h1>
+          <p id="editor-subtitle">Choisis un modèle de rapport : les sections obligatoires, le destinataire et l’échéance viennent du système de mise à jour.</p>
+        </div>
+        <div class="heading-actions">
+          <a class="btn btn-secondary btn-sm" href="reports">Retour aux rapports</a>
+        </div>
+      </div>
+
+      <div id="notice"></div>
+
+      <section id="editor-restricted" class="portal-card restricted-state" hidden>
+        <h2>Espace réservé aux responsables</h2>
+        <p>La rédaction des rapports officiels est réservée aux responsables du club et aux personnes mandatées.</p>
+      </section>
+
+      <div id="editor-workspace" hidden>
+
+        <section class="portal-card" id="picker-card">
+          <div class="toolbar">
+            <div>
+              <p class="eyebrow">Étape 1</p>
+              <h2>Modèle de rapport</h2>
+            </div>
+            <div class="filter-tabs" id="scope-filters">
+              <button class="active" type="button" data-scope="mine">Mes rapports</button>
+              <button type="button" data-scope="local">Tous les rapports locaux</button>
+              <button type="button" data-scope="all">Tous</button>
+            </div>
+          </div>
+          <div class="tpl-picker" id="tpl-picker"></div>
+        </section>
+
+        <section class="portal-card" id="form-card" hidden>
+          <div class="toolbar">
+            <div>
+              <p class="eyebrow">Étape 2</p>
+              <h2 id="form-heading">Contenu du rapport</h2>
+            </div>
+            <span class="section-note" id="form-status"></span>
+          </div>
+
+          <div id="review-feedback"></div>
+          <div class="meta-strip" id="meta-strip"></div>
+
+          <form id="report-form" class="form-grid">
+            <div class="form-field">
+              <label for="reportTitle">Titre du dossier</label>
+              <input id="reportTitle" required placeholder="Titre du rapport">
+            </div>
+            <div class="form-field">
+              <label for="reportRecipient">Destinataire</label>
+              <input id="reportRecipient" placeholder="Instance ou responsable">
+            </div>
+            <div class="form-field">
+              <label for="reportProject">Projet associé</label>
+              <select id="reportProject"><option value="">Aucun projet associé</option></select>
+            </div>
+            <div class="form-field">
+              <label for="reportAxis">Axe stratégique</label>
+              <select id="reportAxis"><option value="">À préciser</option></select>
+            </div>
+            <div class="form-field">
+              <label for="reportSubAxis">Sous-axe</label>
+              <select id="reportSubAxis"><option value="">À préciser</option></select>
+            </div>
+            <div class="form-field">
+              <label for="reportEventDate">Date de l’action</label>
+              <input id="reportEventDate" type="date">
+            </div>
+            <div class="form-field">
+              <label for="reportDueAt">Échéance</label>
+              <input id="reportDueAt" type="datetime-local">
+            </div>
+            <div class="form-field full">
+              <label for="reportDescription">Résumé et contexte</label>
+              <textarea id="reportDescription" placeholder="Contexte, objectifs, actions, résultats ou points à examiner"></textarea>
+            </div>
+
+            <div class="full">
+              <p class="eyebrow" style="margin-bottom:8px">Sections imposées par le système de mise à jour</p>
+              <div id="dynamic-sections"></div>
+            </div>
+
+            <div class="editor-sticky full">
+              <button class="btn btn-secondary" type="button" id="save-draft">Enregistrer le brouillon</button>
+              <button class="btn btn-primary" type="submit" id="submit-report">Soumettre pour validation</button>
+              <span class="field-hint" id="save-hint"></span>
+            </div>
+          </form>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="portal-common.js"></script>
+  <script>
+  (async () => {
+    const notice = document.getElementById('notice');
+    const byId = id => document.getElementById(id);
+    const esc = v => AYCPortal.escapeHtml(v == null ? '' : v);
+    const showError = e => AYCPortal.renderError(notice, e);
+
+    const params = new URLSearchParams(location.search);
+    const editingId = params.get('id');
+    const presetTemplate = params.get('template');
+
+    let member = null;
+    let templates = [];
+    let projects = [];
+    let axes = [];
+    let current = null;      // the selected template row
+    let editing = null;      // the report row being edited, if any
+    let scope = 'mine';
+
+    const DEPARTMENT_LABELS = {
+      coordination_strategique: 'Coordination stratégique',
+      secretariat: 'Secrétariat',
+      tresorerie: 'Trésorerie',
+      ressources_humaines: 'Ressources humaines',
+      relations_externes: 'Relations externes',
+      relations_exterieures: 'Relations extérieures',
+      communication: 'Communication',
+      supervision: 'Supervision',
+      cscy: 'CSCY',
+    };
+    const ROLE_LABELS = {
+      president: 'Président Local',
+      secretaire: 'Secrétaire Général Local',
+      tresorier: 'Trésorier Local',
+      vpi: 'VPI',
+      vpe: 'VPE',
+      vpc: 'VPC',
+      supco_local: 'SupCo Local',
+    };
+    const STATUS_LABELS = {
+      draft: 'Brouillon', submitted: 'Soumis pour validation',
+      validated: 'Validé', invalidated: 'À reprendre',
+    };
+
+    const jsonArray = value => Array.isArray(value) ? value : [];
+    const humanSection = slug => String(slug).replaceAll('_', ' ');
+    const toDateInput = v => { if (!v) return ''; const d = new Date(v); return Number.isNaN(d.getTime()) ? String(v).slice(0, 10) : d.toISOString().slice(0, 10); };
+    const toDateTimeInput = v => { if (!v) return ''; const d = new Date(v); return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 16); };
+
+    // ---- template picker -------------------------------------------------
+    function visibleTemplates() {
+      const myRole = member?.access?.displayRole || null;
+      if (scope === 'mine' && myRole) {
+        const mine = templates.filter(t => t.owner_role === myRole);
+        // A member with no template of their own (or a national admin)
+        // should not be shown an empty page.
+        if (mine.length) return mine;
+      }
+      if (scope === 'local') return templates.filter(t => (t.scope || 'local') === 'local');
+      return templates;
+    }
+
+    function renderPicker() {
+      const list = visibleTemplates();
+      byId('tpl-picker').innerHTML = list.length ? list.map(t => `
+        <button type="button" class="tpl-card ${current && current.slug === t.slug ? 'active' : ''}" data-tpl="${esc(t.slug)}">
+          <strong>${esc(t.name)}</strong>
+          <span>${esc(t.description || 'Aucune description enregistrée.')}</span>
+          ${t.owner_role ? `<span class="tpl-owner">${esc(ROLE_LABELS[t.owner_role] || t.owner_role)}</span>` : ''}
+        </button>
+      `).join('') : AYCPortal.renderEmpty('Aucun modèle de rapport disponible');
+    }
+
+    // ---- dynamic sections ------------------------------------------------
+    function renderSections(payload) {
+      const sections = jsonArray(current?.required_sections);
+      const data = payload || {};
+      const container = byId('dynamic-sections');
+      if (!sections.length) {
+        container.innerHTML = `
+          <div class="section-block">
+            <label for="section-notes">Contenu du rapport</label>
+            <textarea id="section-notes" data-section="notes" placeholder="Ce modèle n’impose pas de sections : rédige le contenu ici.">${esc(data.notes || '')}</textarea>
+          </div>`;
+        return;
+      }
+      container.innerHTML = sections.map((section, index) => `
+        <div class="section-block">
+          <label for="section-${index}">${esc(humanSection(section))}</label>
+          <textarea id="section-${index}" data-section="${esc(section)}" placeholder="${esc(humanSection(section))}…">${esc(data[section] || '')}</textarea>
+        </div>
+      `).join('');
+    }
+
+    function collectPayload() {
+      const out = {};
+      document.querySelectorAll('#dynamic-sections textarea[data-section]').forEach(el => {
+        const value = el.value.trim();
+        if (value) out[el.dataset.section] = value;
+      });
+      return out;
+    }
+
+    function renderMeta() {
+      if (!current) { byId('meta-strip').innerHTML = ''; return; }
+      const departments = jsonArray(current.validator_departments);
+      const chips = [];
+      if (current.recipient) chips.push(`<span class="meta-chip">Destinataire : ${esc(current.recipient)}</span>`);
+      if (current.deadline_rule) chips.push(`<span class="meta-chip warn">Échéance : ${esc(current.deadline_rule)}</span>`);
+      if (departments.length) chips.push(`<span class="meta-chip">Validation : ${esc(departments.map(d => DEPARTMENT_LABELS[d] || d).join(' + '))}</span>`);
+      if (current.owner_role) chips.push(`<span class="meta-chip">Poste responsable : ${esc(ROLE_LABELS[current.owner_role] || current.owner_role)}</span>`);
+      byId('meta-strip').innerHTML = chips.join('');
+    }
+
+    function renderReviewFeedback() {
+      const target = byId('review-feedback');
+      const reviews = jsonArray(editing?.reviews).filter(r => r.status === 'invalid');
+      if (!editing || !reviews.length) { target.innerHTML = ''; return; }
+      target.innerHTML = reviews.map(r => `
+        <div class="review-note">
+          <strong>${esc(DEPARTMENT_LABELS[r.department] || r.department)} — à reprendre.</strong>
+          ${r.comment ? `<br>${esc(r.comment)}` : ''}
+        </div>`).join('');
+    }
+
+    // Prefill the échéance from the template rule when the field is empty.
+    // A negative default_due_days means the deadline falls BEFORE the event
+    // (that is the convention already used by the seeded templates), so we
+    // anchor on the action date whenever the user has given one.
+    function suggestDueDate() {
+      if (!current || byId('reportDueAt').value) return;
+      const days = Number(current.default_due_days);
+      if (!Number.isFinite(days) || days === 0) return;
+      const anchor = byId('reportEventDate').value ? new Date(byId('reportEventDate').value) : new Date();
+      if (Number.isNaN(anchor.getTime())) return;
+      anchor.setDate(anchor.getDate() + days);
+      byId('reportDueAt').value = anchor.toISOString().slice(0, 16);
+    }
+
+    function fillAxis(selectId, placeholder, selected) {
+      const el = byId(selectId);
+      el.innerHTML = `<option value="">${placeholder}</option>` + axes.map(a => `<option value="${esc(a.slug)}"${a.slug === selected ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+    }
+    function syncSubAxes(selected) {
+      const axis = axes.find(a => a.slug === byId('reportAxis').value);
+      byId('reportSubAxis').innerHTML = '<option value="">À préciser</option>' + jsonArray(axis?.sub_axes).map(s => `<option value="${esc(s.slug)}"${s.slug === selected ? ' selected' : ''}>${esc(s.name)}</option>`).join('');
+    }
+
+    function selectTemplate(slug, payload) {
+      current = templates.find(t => t.slug === slug) || null;
+      if (!current) return;
+      byId('form-card').hidden = false;
+      byId('form-heading').textContent = current.name;
+      if (!editing && !byId('reportRecipient').value && current.recipient) byId('reportRecipient').value = current.recipient;
+      renderPicker();
+      renderMeta();
+      renderSections(payload);
+      suggestDueDate();
+    }
+
+    async function save(status) {
+      if (!current) return showError(new Error('Choisis un modèle de rapport.'));
+      const title = byId('reportTitle').value.trim();
+      if (!title) return showError(new Error('Le titre est obligatoire.'));
+      const body = {
+        templateSlug: current.slug,
+        reportType: current.report_type,
+        title,
+        projectId: byId('reportProject').value || null,
+        axisSlug: byId('reportAxis').value || null,
+        subAxisSlug: byId('reportSubAxis').value || null,
+        recipient: byId('reportRecipient').value.trim(),
+        eventDate: byId('reportEventDate').value || null,
+        dueAt: byId('reportDueAt').value ? new Date(byId('reportDueAt').value).toISOString() : null,
+        description: byId('reportDescription').value.trim(),
+        payload: collectPayload(),
+        status,
+      };
+      if (editing) { body.action = 'update'; body.reportId = editing.id; }
+      const result = await AYCPortal.api('reports', { method: 'POST', body });
+      if (status === 'draft') {
+        // Staying on the page is the point of a draft: adopt the returned
+        // id so the next save updates instead of creating a duplicate.
+        editing = { ...(editing || {}), ...(result.report || {}), reviews: jsonArray(editing?.reviews) };
+        byId('save-hint').textContent = 'Brouillon enregistré à ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '.';
+        byId('form-status').textContent = STATUS_LABELS.draft;
+        notice.innerHTML = '<div class="alert alert-success">Brouillon enregistré.</div>';
+      } else {
+        location.href = 'reports';
+      }
+    }
+
+    // ---- boot ------------------------------------------------------------
+    try {
+      member = await AYCPortal.initPortalShell({ requireActive: true });
+      if (!member) return;
+
+      const canCompose = Boolean(member.access?.canCreateReport || member.isNationalAdmin);
+      if (!canCompose) {
+        byId('editor-restricted').hidden = false;
+        return;
+      }
+      byId('editor-workspace').hidden = false;
+
+      const [tplRes, projRes, axesRes] = await Promise.all([
+        AYCPortal.api('report_templates'),
+        AYCPortal.api('projects'),
+        AYCPortal.api('strategic_axes'),
+      ]);
+      templates = (tplRes.templates || []).filter(t => t.active !== false);
+      projects = projRes.projects || [];
+      axes = axesRes.axes || [];
+
+      byId('reportProject').innerHTML = '<option value="">Aucun projet associé</option>' + projects.map(p => `<option value="${p.id}">${esc(p.title)}</option>`).join('');
+      fillAxis('reportAxis', 'À préciser', null);
+      syncSubAxes(null);
+      renderPicker();
+
+      // Editing an existing report: pull it from the club's report list
+      // (the same payload reports.html uses) and hydrate every field.
+      if (editingId) {
+        const reportsRes = await AYCPortal.api('reports');
+        editing = (reportsRes.reports || []).find(r => String(r.id) === String(editingId)) || null;
+        if (!editing) throw new Error('Rapport introuvable ou hors de ton périmètre.');
+        byId('editor-title').textContent = 'Reprendre un rapport';
+        byId('editor-subtitle').textContent = 'Corrige le dossier puis soumets-le de nouveau à la validation.';
+        byId('form-status').textContent = STATUS_LABELS[editing.status] || editing.status || '';
+        byId('reportTitle').value = editing.title || '';
+        byId('reportRecipient').value = editing.recipient || '';
+        byId('reportProject').value = editing.project_id || '';
+        fillAxis('reportAxis', 'À préciser', editing.axis_slug || null);
+        syncSubAxes(editing.sub_axis_slug || null);
+        byId('reportEventDate').value = toDateInput(editing.event_date);
+        byId('reportDueAt').value = toDateTimeInput(editing.due_at);
+        byId('reportDescription').value = editing.description || '';
+        renderReviewFeedback();
+        selectTemplate(editing.template_slug || editing.report_type, editing.payload || {});
+        byId('picker-card').hidden = true;
+      } else if (presetTemplate) {
+        selectTemplate(presetTemplate, null);
+      }
+
+      byId('tpl-picker').addEventListener('click', e => {
+        const card = e.target.closest('[data-tpl]');
+        if (card) selectTemplate(card.dataset.tpl, collectPayload());
+      });
+      byId('scope-filters').addEventListener('click', e => {
+        const btn = e.target.closest('[data-scope]');
+        if (!btn) return;
+        byId('scope-filters').querySelectorAll('[data-scope]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        scope = btn.dataset.scope;
+        renderPicker();
+      });
+      byId('reportAxis').addEventListener('change', () => syncSubAxes(null));
+      byId('reportEventDate').addEventListener('change', suggestDueDate);
+      byId('save-draft').addEventListener('click', async () => { try { await save('draft'); } catch (err) { showError(err); } });
+      byId('report-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        try { await save('submitted'); } catch (err) { showError(err); }
+      });
+    } catch (err) {
+      showError(err);
+    }
+  })();
+  </script>
+</body>
+</html>

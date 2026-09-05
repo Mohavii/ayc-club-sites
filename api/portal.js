@@ -1537,6 +1537,271 @@ async function treasuryTransfers(req, res, member, body) {
   return json(res, 400, { error: "Action virements inconnue." });
 }
 
+// =======================================================================
+// POSTES LOCAUX — VPI / VPE / VPC
+// =======================================================================
+// One generic CRUD shape shared by the five BEL-domain resources below.
+// Each resource declares its table, its access flag, the columns a client
+// may write and how to validate them; everything else (club scoping,
+// permission check, author-or-admin rule on update/delete) is identical,
+// so it lives here once instead of five times.
+//
+// Access is intentionally checked against the access flags computed in
+// api/_lib/roles.js (canAccessInternalRelations / ...ExternalRelations /
+// ...Communication) rather than against a bare display role: the
+// président and the national counterpart legitimately reach into these
+// spaces, and a vacant post must not freeze the club (RI I.1.21, I.1.36).
+const BEL_RESOURCES = {
+  club_recruitment: {
+    table: "portal_club_recruitment",
+    accessFlag: "canAccessInternalRelations",
+    owner: "VPI",
+    orderBy: "coalesce(opens_on, created_at::date) desc",
+    fields: {
+      title: { type: "text", max: 200, required: true },
+      procedure: { type: "enum", values: ["recrutement", "parrainage", "transfert"] },
+      recruitmentCriteria: { column: "recruitment_criteria", type: "text", max: 4000 },
+      evaluationCriteria: { column: "evaluation_criteria", type: "text", max: 4000 },
+      trialPeriodDays: { column: "trial_period_days", type: "int", min: 0, max: 3650 },
+      opensOn: { column: "opens_on", type: "date" },
+      closesOn: { column: "closes_on", type: "date" },
+      status: { type: "enum", values: ["draft", "open", "closed", "alov_pending", "validated", "cancelled"] },
+      needsJustification: { column: "needs_justification", type: "text", max: 4000 },
+    },
+  },
+  club_needs: {
+    table: "portal_club_needs",
+    accessFlag: "canAccessInternalRelations",
+    owner: "VPI",
+    orderBy: "created_at desc",
+    fields: {
+      title: { type: "text", max: 200, required: true },
+      needType: { column: "need_type", type: "enum", values: ["formation", "developpement", "bien_etre", "materiel", "autre"] },
+      description: { type: "text", max: 6000 },
+      targetAudience: { column: "target_audience", type: "text", max: 500 },
+      sentTo: { column: "sent_to", type: "enum", values: ["vpa", "responsable_regional"] },
+      status: { type: "enum", values: ["draft", "sent", "accepted", "refused", "fulfilled"] },
+      responseNote: { column: "response_note", type: "text", max: 4000 },
+    },
+  },
+  club_partnerships: {
+    table: "portal_club_partnerships",
+    accessFlag: "canAccessExternalRelations",
+    owner: "VPE",
+    orderBy: "created_at desc",
+    fields: {
+      partnerName: { column: "partner_name", type: "text", max: 200, required: true },
+      relationType: { column: "relation_type", type: "enum", values: ["collaboration", "partenariat", "sponsoring", "arrangement"], required: true },
+      description: { type: "text", max: 6000 },
+      needsAnalysis: { column: "needs_analysis", type: "text", max: 6000 },
+      contractUrl: { column: "contract_url", type: "url", max: 1000 },
+      startsOn: { column: "starts_on", type: "date" },
+      endsOn: { column: "ends_on", type: "date" },
+      status: { type: "enum", values: ["draft", "vpe_review", "al_pending", "active", "dissolved", "refused"] },
+      dissolutionNote: { column: "dissolution_note", type: "text", max: 4000 },
+    },
+  },
+  club_delegations: {
+    table: "portal_club_delegations",
+    accessFlag: "canAccessExternalRelations",
+    owner: "VPE",
+    orderBy: "coalesce(happens_on, created_at::date) desc",
+    fields: {
+      title: { type: "text", max: 200, required: true },
+      delegationType: { column: "delegation_type", type: "enum", values: ["locale", "par_domaine"] },
+      hostOrganisation: { column: "host_organisation", type: "text", max: 200 },
+      happensOn: { column: "happens_on", type: "date" },
+      anviStudy: { column: "anvi_study", type: "text", max: 6000 },
+      selectionCriteria: { column: "selection_criteria", type: "text", max: 4000 },
+      criteriaPublishedOn: { column: "criteria_published_on", type: "date" },
+      delegatesSelectedOn: { column: "delegates_selected_on", type: "date" },
+      status: { type: "enum", values: ["draft", "study", "open", "delegates_selected", "completed", "cancelled"] },
+      followupNote: { column: "followup_note", type: "text", max: 4000 },
+    },
+  },
+  club_media: {
+    table: "portal_club_media_plans",
+    accessFlag: "canAccessCommunication",
+    owner: "VPC",
+    orderBy: "created_at desc",
+    fields: {
+      activityTitle: { column: "activity_title", type: "text", max: 200, required: true },
+      projectId: { column: "project_id", type: "uuid" },
+      documentKind: { column: "document_kind", type: "enum", values: ["plan", "bilan"], required: true },
+      phase: { type: "enum", values: ["pre", "pendant", "post"] },
+      reach: { type: "enum", values: ["externe", "interne"] },
+      channel: { type: "enum", values: ["reseaux_sociaux", "site_web", "television", "radio", "papeterie", "autre"] },
+      contentType: { column: "content_type", type: "enum", values: ["audiovisuel", "textuel"] },
+      summary: { type: "text", max: 6000 },
+      identityCompliant: { column: "identity_compliant", type: "bool" },
+      logoPresent: { column: "logo_present", type: "bool" },
+      status: { type: "enum", values: ["draft", "planned", "published", "archived"] },
+      publishedOn: { column: "published_on", type: "date" },
+      metrics: { type: "text", max: 4000 },
+    },
+  },
+};
+
+// Turns one client value into a DB-ready value, or throws a message meant
+// to be shown to the user. Returns undefined for "client did not send
+// this field", which the callers use to skip it on update (partial patch)
+// while still applying column defaults on insert.
+function coerceBelField(spec, raw) {
+  if (raw === undefined) return undefined;
+  if (raw === null || raw === "") return null;
+  switch (spec.type) {
+    case "int": {
+      const n = Number(raw);
+      if (!Number.isInteger(n)) throw new Error("Valeur numérique invalide.");
+      if (spec.min != null && n < spec.min) throw new Error(`La valeur doit être supérieure ou égale à ${spec.min}.`);
+      if (spec.max != null && n > spec.max) throw new Error(`La valeur doit être inférieure ou égale à ${spec.max}.`);
+      return n;
+    }
+    case "bool":
+      return raw === true || raw === "true" || raw === 1 || raw === "1";
+    case "date": {
+      const text = String(raw).slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error("Date invalide (format attendu AAAA-MM-JJ).");
+      if (Number.isNaN(new Date(text).getTime())) throw new Error("Date invalide.");
+      return text;
+    }
+    case "uuid": {
+      const text = String(raw).trim();
+      if (!/^[0-9a-fA-F-]{36}$/.test(text)) throw new Error("Identifiant invalide.");
+      return text;
+    }
+    case "enum": {
+      const text = String(raw).trim();
+      if (!spec.values.includes(text)) throw new Error(`Valeur non autorisée : ${text}.`);
+      return text;
+    }
+    case "url": {
+      const text = String(raw).trim().slice(0, spec.max || 1000);
+      try {
+        const parsed = new URL(text);
+        if (parsed.protocol !== "https:") throw new Error("https requis");
+      } catch {
+        throw new Error("Le lien doit être une URL HTTPS valide.");
+      }
+      return text;
+    }
+    default: {
+      const text = String(raw).trim().slice(0, spec.max || 1000);
+      return text || null;
+    }
+  }
+}
+
+async function belResource(req, res, member, body, resourceKey) {
+  const resource = BEL_RESOURCES[resourceKey];
+  if (!resource) return json(res, 404, { error: "Ressource inconnue." });
+
+  const schoolId = schoolScope(member, req.method === "GET" ? req.query?.schoolId : body.schoolId);
+  if (!schoolId) return json(res, 400, { error: "Club non spécifié." });
+
+  const access = await getMemberPortalAccess(member);
+  if (!(member.is_national_admin || access[resource.accessFlag])) {
+    return json(res, 403, { error: `Accès réservé au ${resource.owner}, au Président Local et aux administrateurs nationaux.` });
+  }
+
+  const db = sql();
+  // Table and order clause come from the frozen BEL_RESOURCES map above,
+  // never from the request, so this interpolation cannot be influenced by
+  // a client. Every client-supplied value goes through a tagged-template
+  // placeholder in the branches below.
+  const listAll = () => db.query(
+    `select r.*, m.display_name as created_by_name
+     from ${resource.table} r
+     join portal_members m on m.id = r.created_by
+     where r.school_id = $1
+     order by r.${resource.orderBy}`,
+    [schoolId]
+  );
+
+  if (req.method === "GET") {
+    return json(res, 200, { items: await listAll(), owner: resource.owner });
+  }
+
+  const action = body.action || "create";
+
+  if (action === "create") {
+    const columns = ["school_id", "created_by"];
+    const values = [schoolId, member.id];
+    try {
+      for (const [key, spec] of Object.entries(resource.fields)) {
+        const value = coerceBelField(spec, body[key]);
+        if (spec.required && (value === undefined || value === null)) {
+          return json(res, 400, { error: `Le champ « ${key} » est obligatoire.` });
+        }
+        if (value === undefined) continue;
+        columns.push(spec.column || key);
+        values.push(value);
+      }
+    } catch (err) {
+      return json(res, 400, { error: err.message });
+    }
+    const placeholders = values.map((_, index) => `$${index + 1}`).join(", ");
+    const rows = await db.query(
+      `insert into ${resource.table} (${columns.join(", ")}) values (${placeholders}) returning *`,
+      values
+    );
+    return json(res, 201, { item: rows[0] });
+  }
+
+  if (action === "update") {
+    const id = body.id;
+    if (!id) return json(res, 400, { error: "Identifiant requis." });
+    const existing = await db.query(
+      `select created_by from ${resource.table} where id = $1 and school_id = $2`,
+      [id, schoolId]
+    );
+    if (!existing.length) return json(res, 404, { error: "Élément introuvable." });
+    if (existing[0].created_by !== member.id && !member.is_national_admin && !access[resource.accessFlag]) {
+      return json(res, 403, { error: "Seul l'auteur ou un responsable du domaine peut modifier cet élément." });
+    }
+    const assignments = [];
+    const values = [];
+    try {
+      for (const [key, spec] of Object.entries(resource.fields)) {
+        const value = coerceBelField(spec, body[key]);
+        if (value === undefined) continue;
+        if (spec.required && value === null) {
+          return json(res, 400, { error: `Le champ « ${key} » est obligatoire.` });
+        }
+        values.push(value);
+        assignments.push(`${spec.column || key} = $${values.length}`);
+      }
+    } catch (err) {
+      return json(res, 400, { error: err.message });
+    }
+    if (!assignments.length) return json(res, 400, { error: "Aucune modification fournie." });
+    values.push(id, schoolId);
+    const rows = await db.query(
+      `update ${resource.table} set ${assignments.join(", ")}, updated_at = now()
+       where id = $${values.length - 1} and school_id = $${values.length} returning *`,
+      values
+    );
+    return json(res, 200, { item: rows[0] });
+  }
+
+  if (action === "delete") {
+    const id = body.id;
+    if (!id) return json(res, 400, { error: "Identifiant requis." });
+    const existing = await db.query(
+      `select created_by from ${resource.table} where id = $1 and school_id = $2`,
+      [id, schoolId]
+    );
+    if (!existing.length) return json(res, 404, { error: "Élément introuvable." });
+    if (existing[0].created_by !== member.id && !member.is_national_admin && !access[resource.accessFlag]) {
+      return json(res, 403, { error: "Seul l'auteur ou un responsable du domaine peut supprimer cet élément." });
+    }
+    await db.query(`delete from ${resource.table} where id = $1 and school_id = $2`, [id, schoolId]);
+    return json(res, 200, { success: true });
+  }
+
+  return json(res, 400, { error: "Action inconnue." });
+}
+
 function assemblyMotionSeed(assemblyType) {
   const opening = [
     "Présentation du rapport préliminaire du CSCY",
@@ -2521,6 +2786,8 @@ module.exports = async (req, res) => {
     if (action === "treasury_transactions") return treasuryTransactions(req, res, member, body);
     if (action === "treasury_dues") return treasuryDues(req, res, member, body);
     if (action === "treasury_transfers") return treasuryTransfers(req, res, member, body);
+    // VPI / VPE / VPC domains — one generic handler, see BEL_RESOURCES.
+    if (Object.prototype.hasOwnProperty.call(BEL_RESOURCES, action)) return belResource(req, res, member, body, action);
     return json(res, 404, { error: "Action portail inconnue." });
   } catch (err) {
     console.error("portal API error", action, err);
