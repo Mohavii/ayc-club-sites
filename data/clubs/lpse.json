@@ -13,7 +13,14 @@
   ],
   "events": [],
   "bel": [],
-  "partners": [],
+  "partners": [
+    {
+      "id": "ptn_vv9o1f",
+      "name": "qdqsd",
+      "description": "sd",
+      "logo": null
+    }
+  ],
   "forms": {
     "join": {
       "enabled": false,
