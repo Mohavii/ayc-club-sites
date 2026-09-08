@@ -86,8 +86,12 @@
 }
 .section-head p{ font-size:1rem; line-height:1.65; color:var(--ink-soft); margin:0; }
 
-.reveal{ opacity:0; transform:translateY(16px); animation:revealIn .6s var(--ease) forwards; }
-@keyframes revealIn{ to{ opacity:1; transform:translateY(0); } }
+/* Note: scroll-triggered reveals on pages using this stylesheet use
+   .reveal-on-scroll (see theme.css), driven by an IntersectionObserver.
+   A bare .reveal class used to exist here as a fixed on-load animation;
+   it was unused by every page and named identically to index.html's
+   unrelated (and correct) scroll-driven .reveal system, so it was removed
+   to avoid the naming collision. */
 
 /* ===================== CAROUSEL SHELL (shared) =====================
    Used by: 5H values, 5 Axes, BEN team, Événements.
