@@ -93,13 +93,13 @@ h1, h2, h3, h4, h5, h6 {
    SCROLLYTELLING HERO — untouched video/canvas system, refined chrome
    ===================================================================== */
 .hero-scroll-container {
-  height: 1600vh;
+  height: 650vh;
   background: var(--night-deep);
   position: relative;
 }
 
 @media (max-width: 900px) {
-  .hero-scroll-container { height: 1150vh; }
+  .hero-scroll-container { height: 480vh; }
 }
 
 .hero-sticky {
@@ -1083,15 +1083,20 @@ document.addEventListener("DOMContentLoaded", () => {
   loadFrame(1);
 
   // Next handful: enough runway for an eager scroller before the background
-  // queue catches up.
-  for (let i = 2; i <= Math.min(12, frameCount); i++) loadFrame(i);
+  // queue catches up. Widened vs. before since the scroll distance is now
+  // shorter (650vh instead of 1600vh) — a fast scroller reaches later
+  // frames sooner, so more of them need to already be in flight.
+  for (let i = 2; i <= Math.min(24, frameCount); i++) loadFrame(i);
 
   // Remaining frames stream in the background in small batches via
   // requestIdleCallback (falls back to a timer) so they never compete with
-  // first-paint or main-thread work.
-  let nextBatchStart = 13;
+  // first-paint or main-thread work. Larger batch + shorter timeout than
+  // before so the full sequence finishes loading sooner — with a shorter
+  // scrub distance, frames get requested faster and idle time is the
+  // limiting factor, not bandwidth.
+  let nextBatchStart = 25;
   function loadNextBatch(deadline) {
-    const batchSize = 8;
+    const batchSize = 14;
     let loaded = 0;
     while (nextBatchStart <= frameCount && loaded < batchSize) {
       loadFrame(nextBatchStart);
@@ -1105,16 +1110,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   function scheduleIdle(fn) {
     if ("requestIdleCallback" in window) {
-      requestIdleCallback(fn, { timeout: 500 });
+      requestIdleCallback(fn, { timeout: 300 });
     } else {
-      setTimeout(fn, 200);
+      setTimeout(fn, 100);
     }
   }
   scheduleIdle(loadNextBatch);
 
   function drawImage(img) {
     if (!img) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Capped at 1.5 rather than 2: this canvas shows full-bleed photographic
+    // footage (not text/UI), so the sharpness gain from full device
+    // resolution is barely visible, while canvas fill/blit cost scales with
+    // pixel count — 1.5 vs 2 is roughly a 40% smaller canvas to redraw.
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     const w = window.innerWidth;
     const h = window.innerHeight;
 
@@ -1235,8 +1244,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const fadeMargin = 0.1;
     const shift = 26;
+    const inRange = progress >= start - fadeMargin && progress <= end + fadeMargin;
 
-    if (progress >= start - fadeMargin && progress <= end + fadeMargin) {
+    // Beat is fully out of range and was already marked hidden last tick —
+    // nothing changed, so skip the style writes entirely. With 5 beats and
+    // only ~1 visible at a time, this avoids 3-4 redundant style/filter
+    // writes (and the paint work they trigger) on every scroll frame.
+    if (!inRange && el.dataset.hidden === '1') return;
+
+    if (inRange) {
       let opacity = 1;
       let phase = 0; // -1 entering, 0 settled, 1 leaving
 
@@ -1257,6 +1273,7 @@ document.addEventListener("DOMContentLoaded", () => {
       el.style.opacity = eased.toFixed(3);
       el.style.transform = `translateY(${translateY.toFixed(2)}px) scale(${scale.toFixed(3)})`;
       el.style.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : "none";
+      el.dataset.hidden = '0';
 
       if (opacity > 0) {
         el.classList.add('is-active');
@@ -1268,6 +1285,7 @@ document.addEventListener("DOMContentLoaded", () => {
       el.style.transform = `translateY(${shift}px) scale(0.97)`;
       el.style.filter = "blur(6px)";
       el.classList.remove('is-active');
+      el.dataset.hidden = '1';
     }
   }
 
