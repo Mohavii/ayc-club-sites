@@ -90,6 +90,121 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* =====================================================================
+   POST-HERO HEADER — hidden through the whole door sequence, then eases
+   into view once the scrollytelling finishes. Glass-on-dark by default;
+   gains a plaster backing once the user scrolls past the dark hero
+   entirely, so it stays legible over the light sections below.
+   ===================================================================== */
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.1rem clamp(1.25rem, 4vw, 3rem);
+  background: rgba(6, 21, 41, 0.32);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid rgba(251, 244, 231, 0.08);
+  opacity: 0;
+  transform: translateY(-100%);
+  pointer-events: none;
+  transition: opacity 0.7s var(--ease-soft), transform 0.7s var(--ease-soft), background 0.4s var(--ease), border-color 0.4s var(--ease);
+}
+.site-header.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.site-header.is-on-light {
+  background: rgba(251, 244, 231, 0.72);
+  border-bottom-color: rgba(15, 32, 54, 0.08);
+}
+.site-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: var(--plaster);
+  transition: color 0.4s var(--ease);
+}
+.site-header.is-on-light .site-header-brand { color: var(--night); }
+.site-header-brand img { height: 34px; width: auto; display: block; }
+.site-header-brand span {
+  font-family: var(--font-display);
+  font-weight: 560;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.site-header-nav {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.9rem, 2vw, 1.9rem);
+}
+.site-header-nav a {
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(251, 244, 231, 0.82);
+  text-decoration: none;
+  position: relative;
+  padding: 0.3rem 0;
+  transition: color 0.3s var(--ease);
+  white-space: nowrap;
+}
+.site-header.is-on-light .site-header-nav a { color: rgba(15, 32, 54, 0.75); }
+.site-header-nav a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 1.5px;
+  background: var(--ochre);
+  transition: width 0.3s var(--ease);
+}
+.site-header-nav a:hover { color: var(--plaster); }
+.site-header.is-on-light .site-header-nav a:hover { color: var(--night); }
+.site-header-nav a:hover::after { width: 100%; }
+.site-header-nav a.site-header-cta {
+  color: var(--night-deep);
+  background: var(--ochre);
+  padding: 0.55rem 1.2rem;
+  border-radius: 100px;
+  font-weight: 700;
+}
+.site-header-nav a.site-header-cta::after { display: none; }
+.site-header-nav a.site-header-cta:hover { background: var(--ochre-light); color: var(--night-deep); }
+
+.site-header-toggle {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(251, 244, 231, 0.3);
+  background: transparent;
+  color: var(--plaster);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.site-header.is-on-light .site-header-toggle { color: var(--night); border-color: rgba(15, 32, 54, 0.2); }
+
+@media (max-width: 860px) {
+  .site-header-nav { position: fixed; inset: 0 0 auto 0; top: 0; flex-direction: column; align-items: flex-start; gap: 0; background: var(--night-deep); padding: 5.5rem 1.5rem 2rem; transform: translateY(-100%); opacity: 0; transition: transform 0.4s var(--ease-soft), opacity 0.4s var(--ease-soft); pointer-events: none; }
+  .site-header-nav.is-open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+  .site-header-nav a { color: var(--plaster); width: 100%; padding: 0.9rem 0; border-bottom: 1px solid rgba(251, 244, 231, 0.1); }
+  .site-header-nav a.site-header-cta { margin-top: 1rem; text-align: center; justify-content: center; }
+  .site-header-toggle { display: flex; }
+}
+
+/* =====================================================================
    SCROLLYTELLING HERO — untouched video/canvas system, refined chrome
    ===================================================================== */
 .hero-scroll-container {
@@ -141,11 +256,15 @@ h1, h2, h3, h4, h5, h6 {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 34vh;
+  height: 40vh;
   background: linear-gradient(to bottom,
     rgba(6, 21, 41, 0) 0%,
-    rgba(6, 21, 41, 0.22) 40%,
-    rgba(147, 130, 102, 0.55) 72%,
+    rgba(9, 24, 44, 0.10) 30%,
+    rgba(21, 32, 48, 0.24) 46%,
+    rgba(58, 50, 55, 0.36) 58%,
+    rgba(110, 82, 78, 0.48) 68%,
+    rgba(172, 140, 108, 0.62) 78%,
+    rgba(222, 199, 163, 0.82) 88%,
     var(--plaster) 100%);
   pointer-events: none;
   z-index: 5;
@@ -446,13 +565,34 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .seam-dark {
-  height: 26vh;
-  background: linear-gradient(to bottom, var(--plaster-warm) 0%, var(--night-soft) 50%, var(--night-deep) 92%, var(--night-deep) 100%);
+  height: 32vh;
+  background: linear-gradient(to bottom,
+    var(--plaster-warm) 0%,
+    #DCCBAE 14%,
+    #B7A594 26%,
+    #85808A 38%,
+    #536080 50%,
+    #2C4568 62%,
+    var(--night-soft) 74%,
+    #0C1E38 88%,
+    var(--night-deep) 100%);
+  /* Dithered noise breaks up the remaining quantization steps on low-bit-depth
+     displays so the multi-stop gradient above reads as smooth, not banded. */
+  position: relative;
+}
+.seam-dark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 .seam-dark::before {
   background:
-    radial-gradient(55% 120% at 25% 100%, rgba(231, 169, 76, 0.16), transparent 70%),
-    radial-gradient(50% 120% at 80% 100%, rgba(30, 99, 184, 0.22), transparent 70%);
+    radial-gradient(55% 120% at 25% 100%, rgba(231, 169, 76, 0.12), transparent 70%),
+    radial-gradient(50% 120% at 80% 100%, rgba(30, 99, 184, 0.16), transparent 70%);
 }
 
 /* =====================================================================
@@ -782,10 +922,19 @@ h1, h2, h3, h4, h5, h6 {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(120% 40% at 50% 0%, rgba(231, 169, 76, 0.1), transparent 100%),
-    radial-gradient(50% 60% at 15% 20%, rgba(30, 99, 184, 0.35), transparent 70%),
-    radial-gradient(45% 55% at 85% 85%, rgba(194, 59, 74, 0.28), transparent 70%);
+    radial-gradient(120% 40% at 50% 0%, rgba(231, 169, 76, 0.08), transparent 100%),
+    radial-gradient(50% 60% at 15% 20%, rgba(30, 99, 184, 0.26), transparent 70%),
+    radial-gradient(45% 55% at 85% 85%, rgba(194, 59, 74, 0.20), transparent 70%);
   pointer-events: none;
+}
+.cta-section::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 .cta-centered {
@@ -836,9 +985,306 @@ h1, h2, h3, h4, h5, h6 {
   .beat-3 .beat-tag { flex-direction: row; }
   .beat-3 .lede { text-align: left; }
 }
+
+/* =====================================================================
+   ADDITIONAL MOTION — counters, magnetic buttons, ambient drift,
+   cursor-reactive card glow, word-reveal headings
+   ===================================================================== */
+
+/* Animated stat counters (beat 1) count up once the beat becomes active */
+.stats .stat-num { font-variant-numeric: tabular-nums; }
+
+/* Magnetic hover: buttons follow the cursor slightly within their box */
+.btn-primary, .btn-secondary, .cta-centered .btn-primary {
+  will-change: transform;
+}
+
+/* Word-by-word reveal for the big scrollytelling headings — each word is
+   wrapped in a span by JS and fades/rises in with a short stagger as its
+   beat becomes active, instead of appearing as one flat block. */
+.split-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.5em);
+  filter: blur(4px);
+  transition: opacity 0.6s var(--ease-soft), transform 0.6s var(--ease-soft), filter 0.6s var(--ease-soft);
+}
+.beat.is-active .split-word {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+/* Ambient drifting orbs behind the CTA section, purely decorative */
+.cta-orbs {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.cta-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(50px);
+  opacity: 0.35;
+  animation: orbDrift 22s ease-in-out infinite;
+}
+.cta-orb-1 { width: 340px; height: 340px; left: 6%; top: 10%; background: radial-gradient(circle, var(--door-blue-light), transparent 70%); animation-duration: 26s; }
+.cta-orb-2 { width: 260px; height: 260px; right: 10%; bottom: 8%; background: radial-gradient(circle, var(--bougainvillea), transparent 70%); animation-duration: 19s; animation-delay: -6s; }
+.cta-orb-3 { width: 200px; height: 200px; right: 30%; top: 18%; background: radial-gradient(circle, var(--ochre), transparent 70%); animation-duration: 31s; animation-delay: -12s; }
+@keyframes orbDrift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(4%, -6%) scale(1.08); }
+  66% { transform: translate(-5%, 5%) scale(0.94); }
+}
+@media (prefers-reduced-motion: reduce) { .cta-orb { animation: none; } }
+
+/* Cursor-reactive sheen on axis cards: a soft light following the pointer,
+   position set via --mx/--my custom properties from JS on pointermove */
+.axis-card { --mx: 50%; --my: 50%; }
+.axis-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  background: radial-gradient(220px circle at var(--mx) var(--my), rgba(255, 255, 255, 0.16), transparent 70%);
+  transition: opacity 0.3s var(--ease);
+}
+.axis-card:hover::after { opacity: 1; }
+
+/* Parallax tilt applied inline via JS transform on the axis-card icon;
+   kept smooth with a transition when the pointer leaves */
+.axis-icon { transition: transform 0.4s var(--ease-spring), background 0.3s var(--ease); }
+
+/* Scroll progress bar gets a soft glancing shimmer as it fills */
+.scroll-progress-bar {
+  position: relative;
+  overflow: hidden;
+}
+.scroll-progress-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shimmerSweep 2.2s linear infinite;
+}
+@keyframes shimmerSweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Eyebrow underline draws itself in on reveal, rather than appearing static */
+.eyebrow::before {
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.6s var(--ease) 0.2s;
+}
+.reveal.is-visible .eyebrow::before,
+.axes-header.reveal.is-visible .eyebrow::before { transform: scaleX(1); }
+
+/* History section number-style accent that counts as it scrolls into view */
+.history-title h2 { position: relative; }
+
+/* Subtle floating label reveal for the scroll cue text */
+.scroll-cue span { animation: cueTextFloat 3.4s ease-in-out infinite; }
+@keyframes cueTextFloat { 0%, 100% { opacity: 0.85; } 50% { opacity: 0.5; } }
+
+/* =====================================================================
+   FOOTER — built as its own thing: a closing "sign the door" moment
+   rather than a boilerplate link grid. Dark plaster-on-night, an oversized
+   watermark word, a single strong CTA row, and a slim credit line.
+   ===================================================================== */
+.site-footer {
+  position: relative;
+  background: var(--night-deep);
+  color: rgba(251, 244, 231, 0.72);
+  overflow: hidden;
+  padding-top: 6rem;
+}
+
+.footer-watermark {
+  position: absolute;
+  left: 50%;
+  bottom: -6vw;
+  transform: translateX(-50%);
+  width: 100%;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(4.5rem, 17vw, 13rem);
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(251, 244, 231, 0.08);
+  letter-spacing: -0.02em;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.footer-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem 2.5rem;
+}
+
+.footer-top {
+  display: grid;
+  grid-template-columns: 1.3fr 0.85fr 0.85fr 1fr;
+  gap: 3rem;
+  padding-bottom: 4rem;
+  border-bottom: 1px solid rgba(251, 244, 231, 0.1);
+}
+
+.footer-brand-col .footer-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.4rem;
+}
+.footer-brand-col img { height: 40px; width: auto; display: block; }
+.footer-brand-col .footer-brand-name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--plaster);
+  font-weight: 560;
+}
+.footer-brand-col p {
+  font-size: 0.94rem;
+  line-height: 1.7;
+  max-width: 32ch;
+  color: rgba(251, 244, 231, 0.6);
+}
+
+.footer-social {
+  display: flex;
+  gap: 0.65rem;
+  margin-top: 1.6rem;
+}
+.footer-social a {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(251, 244, 231, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--plaster);
+  transition: background 0.3s var(--ease), transform 0.3s var(--ease-spring), border-color 0.3s var(--ease);
+}
+.footer-social a:hover { background: var(--ochre); color: var(--night-deep); transform: translateY(-3px); border-color: var(--ochre); }
+.footer-social svg { width: 16px; height: 16px; }
+
+.footer-col h4 {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ochre-light);
+  margin-bottom: 1.35rem;
+}
+.footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 0.85rem; }
+.footer-col a {
+  font-size: 0.92rem;
+  color: rgba(251, 244, 231, 0.68);
+  text-decoration: none;
+  position: relative;
+  transition: color 0.3s var(--ease), padding-left 0.3s var(--ease);
+}
+.footer-col a:hover { color: var(--plaster); padding-left: 0.4rem; }
+.footer-col a:hover::before { opacity: 1; }
+.footer-col a::before {
+  content: "→";
+  position: absolute;
+  left: -1.1rem;
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+  color: var(--ochre-light);
+}
+
+.footer-contact-col address { font-style: normal; }
+.footer-contact-col p { font-size: 0.88rem; line-height: 1.7; color: rgba(251, 244, 231, 0.6); margin-bottom: 1rem; }
+.footer-contact-col a.footer-email {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--plaster);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(251, 244, 231, 0.3);
+  padding-bottom: 0.2rem;
+  transition: border-color 0.3s var(--ease), color 0.3s var(--ease), gap 0.3s var(--ease);
+}
+.footer-contact-col a.footer-email:hover { color: var(--ochre-light); border-color: var(--ochre-light); gap: 0.8rem; }
+
+.footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding-top: 1.75rem;
+  font-size: 0.8rem;
+  color: rgba(251, 244, 231, 0.4);
+}
+.footer-bottom-links { display: flex; gap: 1.5rem; }
+.footer-bottom-links a { color: inherit; text-decoration: none; transition: color 0.3s var(--ease); }
+.footer-bottom-links a:hover { color: var(--plaster); }
+
+.footer-back-to-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: rgba(251, 244, 231, 0.4);
+  font-size: 0.8rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: color 0.3s var(--ease);
+}
+.footer-back-to-top:hover { color: var(--ochre-light); }
+.footer-back-to-top svg { transition: transform 0.3s var(--ease-spring); }
+.footer-back-to-top:hover svg { transform: translateY(-3px); }
+
+@media (max-width: 900px) {
+  .footer-top { grid-template-columns: 1fr 1fr; row-gap: 2.75rem; }
+  .footer-brand-col { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .footer-top { grid-template-columns: 1fr; }
+  .footer-bottom { flex-direction: column; align-items: flex-start; }
+  .footer-watermark { font-size: 22vw; }
+}
 </style>
 </head>
 <body>
+
+<header class="site-header" id="site-header">
+  <a href="index" class="site-header-brand">
+    <img src="assets/logo-secondary-white.png" alt="Association YOUTH CLUBs">
+    <span>YOUTH CLUBs</span>
+  </a>
+  <button type="button" class="site-header-toggle" id="header-toggle" aria-label="Ouvrir le menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <nav class="site-header-nav" id="header-nav">
+    <a href="a-propos">À propos</a>
+    <a href="valeurs">Nos valeurs</a>
+    <a href="strategie">Notre stratégie</a>
+    <a href="evenements">Nos projets</a>
+    <a href="gouvernance">Notre équipe</a>
+    <a href="partenaires">Partenaires</a>
+    <a href="contact">Contact</a>
+    <a href="https://internes.associationyouthclubs.org/portal/login" class="site-header-cta">Espace membres</a>
+  </nav>
+</header>
 
 <div class="scroll-progress"><div class="scroll-progress-bar" id="scroll-progress-bar"></div></div>
 
@@ -1013,6 +1459,11 @@ h1, h2, h3, h4, h5, h6 {
 <div class="seam seam-dark"></div>
 
 <section class="section cta-section" id="rejoindre">
+  <div class="cta-orbs" aria-hidden="true">
+    <div class="cta-orb cta-orb-1"></div>
+    <div class="cta-orb cta-orb-2"></div>
+    <div class="cta-orb cta-orb-3"></div>
+  </div>
   <div class="container cta-centered">
     <div class="eyebrow reveal">Passe à l'action</div>
     <h2 class="reveal reveal-stagger" style="--d:0.08s">L'histoire s'écrit avec toi</h2>
@@ -1020,6 +1471,65 @@ h1, h2, h3, h4, h5, h6 {
     <a href="mailto:contact@youthclubs.org" class="btn-primary reveal reveal-stagger" style="--d:0.24s">Contacter l'association</a>
   </div>
 </section>
+
+<footer class="site-footer" id="site-footer">
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand-col reveal">
+        <div class="footer-logo-row">
+          <img src="assets/logo-secondary-white.png" alt="Association YOUTH CLUBs">
+          <span class="footer-brand-name">YOUTH CLUBs</span>
+        </div>
+        <p>Une jeunesse qui façonne son éducation. Un réseau de clubs dans les collèges, lycées et universités de Tunisie, porté par les jeunes eux-mêmes depuis 2013.</p>
+        <div class="footer-social">
+          <a href="#" aria-label="Facebook"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 21v-7.5h2.5l.5-3H13.5V8.5c0-.9.25-1.5 1.55-1.5H16.5V4.3C16.2 4.26 15.2 4.17 14 4.17c-2.4 0-4 1.46-4 4.15V10.5H7.5v3H10V21h3.5z"/></svg></a>
+          <a href="#" aria-label="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="3.6"/><circle cx="17.2" cy="6.8" r="1"/></svg></a>
+          <a href="#" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.94 8.5H4V20h2.94V8.5zM5.47 4a1.7 1.7 0 100 3.4 1.7 1.7 0 000-3.4zM20 13.3c0-3-1.6-4.4-3.75-4.4-1.73 0-2.5.95-2.93 1.62V8.5H10.4c.04.86 0 11.5 0 11.5h2.92v-6.42c0-.34.02-.68.12-.93.27-.68.9-1.38 1.94-1.38 1.37 0 1.92 1.04 1.92 2.58V20H20v-6.7z"/></svg></a>
+        </div>
+      </div>
+
+      <div class="footer-col reveal reveal-stagger" style="--d:0.05s">
+        <h4>L'association</h4>
+        <ul>
+          <li><a href="a-propos">À propos</a></li>
+          <li><a href="valeurs">Nos valeurs</a></li>
+          <li><a href="strategie">Notre stratégie</a></li>
+          <li><a href="gouvernance">Notre équipe</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col reveal reveal-stagger" style="--d:0.1s">
+        <h4>S'impliquer</h4>
+        <ul>
+          <li><a href="evenements">Nos projets</a></li>
+          <li><a href="partenaires">Nos partenaires</a></li>
+          <li><a href="rejoindre">Rejoindre un club</a></li>
+          <li><a href="https://internes.associationyouthclubs.org/portal/login">Espace membres</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col footer-contact-col reveal reveal-stagger" style="--d:0.15s">
+        <h4>Nous contacter</h4>
+        <a href="mailto:contact@youthclubs.org" class="footer-email">contact@youthclubs.org →</a>
+        <address style="margin-top:1.4rem;">
+          <p>Bureau 1.2, Immeuble Chebil<br>Avenue Farhat Hached, Megrine<br>Ben Arous, 2033, Tunisie</p>
+        </address>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span>&copy; <span id="footer-year">2026</span> Association YOUTH CLUBs. Tous droits réservés.</span>
+      <div class="footer-bottom-links">
+        <a href="contact">Contact</a>
+        <button type="button" class="footer-back-to-top" id="back-to-top">
+          Haut de page
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="footer-watermark" aria-hidden="true">YOUTH CLUBs</div>
+</footer>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -1424,7 +1934,134 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     updateUI();
   });
+
+  // ---------------------------------------------------------------------
+  // Transparent header: stays hidden through the whole door-scroll
+  // sequence, then eases in once it's done. Once the hero's dark
+  // background is scrolled past, it gains a light backing so it stays
+  // legible over the plaster sections.
+  // ---------------------------------------------------------------------
+  const siteHeader = document.getElementById('site-header');
+  const headerToggle = document.getElementById('header-toggle');
+  const headerNav = document.getElementById('header-nav');
+
+  if (siteHeader) {
+    let headerRafId = null;
+    function updateHeader() {
+      headerRafId = null;
+      const heroBottom = container.offsetHeight; // hero-scroll-container end
+      const scrollY = window.scrollY;
+      siteHeader.classList.toggle('is-visible', scrollProgressPastHero());
+      siteHeader.classList.toggle('is-on-light', scrollY > heroBottom - window.innerHeight * 0.4);
+    }
+    function scrollProgressPastHero() {
+      const rectTop = containerTop - window.scrollY;
+      const progress = Math.max(0, Math.min(1, -rectTop / maxScroll));
+      return progress >= 0.98;
+    }
+    window.addEventListener('scroll', () => {
+      if (!headerRafId) headerRafId = requestAnimationFrame(updateHeader);
+    }, { passive: true });
+    updateHeader();
+
+    if (headerToggle && headerNav) {
+      headerToggle.addEventListener('click', () => {
+        const open = headerNav.classList.toggle('is-open');
+        headerToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      headerNav.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => {
+        headerNav.classList.remove('is-open');
+        headerToggle.setAttribute('aria-expanded', 'false');
+      }));
+    }
+  }
+
+  // Back to top
+  const backToTop = document.getElementById('back-to-top');
+  if (backToTop) {
+    backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+
+  // Footer year, always accurate without a manual edit each year
+  const footerYear = document.getElementById('footer-year');
+  if (footerYear) footerYear.textContent = new Date().getFullYear();
+
+  // ---------------------------------------------------------------------
+  // Word-by-word split for the big scrollytelling headings, so beats
+  // reveal their text in a soft cascade instead of a single flat fade.
+  // ---------------------------------------------------------------------
+  document.querySelectorAll('.beat h1, .beat h2, .beat p.lede').forEach((el) => {
+    const words = el.textContent.trim().split(/\s+/);
+    el.innerHTML = words.map((w, i) => `<span class="split-word" style="transition-delay:${(i * 35)}ms">${w}</span>`).join(' ');
+  });
+
+  // ---------------------------------------------------------------------
+  // Animated stat counters (beat 1): count up once, the first time the
+  // beat becomes active.
+  // ---------------------------------------------------------------------
+  let statsAnimated = false;
+  function animateStats() {
+    if (statsAnimated) return;
+    statsAnimated = true;
+    document.querySelectorAll('.stat-num').forEach((el) => {
+      const raw = el.textContent.trim();
+      const match = raw.match(/^(\d+)(.*)$/);
+      if (!match) return;
+      const target = parseInt(match[1], 10);
+      const suffix = match[2] || '';
+      const duration = 1100;
+      const startTime = performance.now();
+      function tick(now) {
+        const t = Math.min(1, (now - startTime) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        el.textContent = Math.round(target * eased) + suffix;
+        if (t < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+  const beat1El = beatEls[1];
+  if (beat1El) {
+    const beat1Observer = new MutationObserver(() => {
+      if (beat1El.classList.contains('is-active')) animateStats();
+    });
+    beat1Observer.observe(beat1El, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  // ---------------------------------------------------------------------
+  // Magnetic buttons: nudge toward the cursor within a small radius.
+  // ---------------------------------------------------------------------
+  document.querySelectorAll('.btn-primary, .btn-secondary').forEach((btn) => {
+    let bounds = null;
+    btn.addEventListener('pointerenter', () => { bounds = btn.getBoundingClientRect(); });
+    btn.addEventListener('pointermove', (e) => {
+      if (!bounds) bounds = btn.getBoundingClientRect();
+      const relX = (e.clientX - bounds.left) / bounds.width - 0.5;
+      const relY = (e.clientY - bounds.top) / bounds.height - 0.5;
+      btn.style.transform = `translate(${relX * 10}px, ${relY * 10 - 2}px)`;
+    });
+    btn.addEventListener('pointerleave', () => { btn.style.transform = ''; bounds = null; });
+  });
+
+  // ---------------------------------------------------------------------
+  // Axis cards: subtle 3D tilt + cursor-position custom properties for
+  // the sheen defined in CSS.
+  // ---------------------------------------------------------------------
+  document.querySelectorAll('.axis-card').forEach((card) => {
+    card.addEventListener('pointermove', (e) => {
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width;
+      const py = (e.clientY - r.top) / r.height;
+      card.style.setProperty('--mx', (px * 100).toFixed(1) + '%');
+      card.style.setProperty('--my', (py * 100).toFixed(1) + '%');
+      const tiltX = (py - 0.5) * -6;
+      const tiltY = (px - 0.5) * 6;
+      card.style.transform = `translateY(-6px) perspective(600px) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+    });
+    card.addEventListener('pointerleave', () => { card.style.transform = ''; });
+  });
 });
 </script>
+<script type="module" src="smooth-scroll.js"></script>
 </body>
 </html>
