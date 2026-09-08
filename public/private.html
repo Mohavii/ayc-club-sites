@@ -1031,34 +1031,55 @@ document.addEventListener("DOMContentLoaded", () => {
   const scrollProgressBar = document.getElementById("scroll-progress-bar");
   const scrollCue = document.getElementById("scroll-cue");
 
-  // Preload images — the first frame paints immediately (high priority) so
-  // there's no blank hero on load. The rest stream in behind it, in small
-  // batches, so we're not firing 153 simultaneous requests and hogging
-  // bandwidth/CPU on page load; scrubbing still works against whatever has
-  // loaded so far via the `frames[i].complete` check in update().
-  for (let i = 1; i <= frameCount; i++) {
-    const img = new Image();
-    img.decoding = "async";
-    frames.push(img);
-  }
+  // Frames are stored as decoded ImageBitmaps, not <img> elements.
+  // Why: ctx.drawImage() on an HTMLImageElement forces the browser to
+  // synchronously decode that image on the main thread on every single
+  // call. With 153 AVIF frames being redrawn on every scroll tick, that
+  // per-frame decode cost is the #1 source of scroll jank. createImageBitmap()
+  // decodes once, off the main thread, when the frame finishes loading —
+  // after that, drawImage(bitmap) is just a cheap GPU blit, no decode.
+  const supportsBitmap = "createImageBitmap" in window;
 
   function loadFrame(i) {
-    const img = frames[i - 1];
-    if (!img || img.src) return; // already queued/loaded
+    if (frames[i - 1] || (i - 1) in frames) return; // already queued/loaded
+    frames[i - 1] = null; // reserve the slot so we don't re-queue it
     const frameNumber = i.toString().padStart(3, '0');
-    img.src = `door-frames/ezgif-frame-${frameNumber}.avif`;
-    img.onload = () => {
+    const url = `door-frames/ezgif-frame-${frameNumber}.avif`;
+
+    const onReady = (bitmapOrImg) => {
+      frames[i - 1] = bitmapOrImg;
       loadedCount++;
       if (!firstDrawn) {
         firstDrawn = true;
-        drawImage(img);
+        drawImage(bitmapOrImg);
         canvas.classList.add("is-ready");
       }
     };
+
+    if (supportsBitmap) {
+      fetch(url, { priority: i === 1 ? "high" : "low" })
+        .then((res) => res.blob())
+        .then((blob) => createImageBitmap(blob))
+        .then(onReady)
+        .catch(() => {
+          // Fallback for a failed fetch/decode: plain <img> still works,
+          // just without the async-decode benefit.
+          const img = new Image();
+          img.decoding = "async";
+          img.onload = () => onReady(img);
+          img.src = url;
+        });
+    } else {
+      // Older browsers without createImageBitmap support.
+      const img = new Image();
+      img.decoding = "async";
+      if (i === 1) img.fetchPriority = "high";
+      img.onload = () => onReady(img);
+      img.src = url;
+    }
   }
 
   // First frame: load right away, at high fetch priority, so the hero paints fast.
-  frames[0].fetchPriority = "high";
   loadFrame(1);
 
   // Next handful: enough runway for an eager scroller before the background
@@ -1141,13 +1162,24 @@ document.addEventListener("DOMContentLoaded", () => {
     5: document.querySelector('.beat-5'),
   };
 
+  // Cache layout-dependent values instead of reading offsetHeight/
+  // getBoundingClientRect on every scroll tick — those reads force a
+  // synchronous layout recalculation whenever anything on the page is
+  // "dirty", which adds up fast at 60fps. Recomputed only on resize.
+  let maxScroll = 0;
+  let containerTop = 0;
+  function recomputeLayout() {
+    containerTop = container.getBoundingClientRect().top + window.scrollY;
+    maxScroll = container.offsetHeight - window.innerHeight;
+  }
+  recomputeLayout();
+
   function update() {
     rafId = null;
 
     // Canvas scrub logic
-    const maxScroll = container.offsetHeight - window.innerHeight;
-    const rect = container.getBoundingClientRect();
-    let scrollProgress = Math.max(0, Math.min(1, -rect.top / maxScroll));
+    const rectTop = containerTop - window.scrollY;
+    let scrollProgress = Math.max(0, Math.min(1, -rectTop / maxScroll));
 
     // The door should be fully open by the time we hit the final beat (84%)
     let doorProgress = Math.min(1, scrollProgress / 0.84);
@@ -1156,8 +1188,12 @@ document.addEventListener("DOMContentLoaded", () => {
     doorProgress = Math.pow(doorProgress, 0.6);
 
     const frameIndex = Math.floor(doorProgress * (frameCount - 1));
-    if (frameIndex !== lastFrameIndex && frames[frameIndex] && frames[frameIndex].complete) {
-      drawImage(frames[frameIndex]);
+    // frames[i] is either an ImageBitmap (ready as soon as it's set — no
+    // .complete flag needed), a still-loading <img> (has .complete === false
+    // until decoded, fallback path only), or not yet requested.
+    const frame = frames[frameIndex];
+    if (frameIndex !== lastFrameIndex && frame && (frame instanceof Image ? frame.complete : true)) {
+      drawImage(frame);
       lastFrameIndex = frameIndex;
     }
 
@@ -1187,6 +1223,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("resize", () => {
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
+      recomputeLayout();
       lastFrameIndex = -1;
       update();
     }, 120);
