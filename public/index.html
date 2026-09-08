@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Association YOUTH CLUBs</title>
-<meta name="description" content="Une jeunesse qui façonne son éducation. L'Association YOUTH CLUBs fédère un réseau de clubs de jeunes dans les collèges, lycées et universités de Tunisie.">
+<title>Association YOUTH CLUBs · Éduquer, impliquer, faire grandir la jeunesse tunisienne</title>
+<meta name="description" content="L'Association YOUTH CLUBs (AYCs) fédère un réseau de clubs de jeunes dans les collèges, lycées et universités de Tunisie, autour de l'éducation, la santé, la citoyenneté et la vie active.">
 <link rel="icon" type="image/png" href="assets/favicon-32.png" sizes="32x32">
 <link rel="icon" type="image/png" href="assets/favicon-16.png" sizes="16x16">
 <link rel="icon" type="image/png" href="assets/favicon-192.png" sizes="192x192">
@@ -12,1277 +12,246 @@
 <link rel="shortcut icon" href="assets/favicon.ico">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Association YOUTH CLUBs">
-<meta property="og:title" content="Association YOUTH CLUBs">
-<meta property="og:description" content="Une jeunesse qui façonne son éducation. L'Association YOUTH CLUBs fédère un réseau de clubs de jeunes dans les collèges, lycées et universités de Tunisie.">
+<meta property="og:title" content="Association YOUTH CLUBs · Éduquer, impliquer, faire grandir la jeunesse tunisienne">
+<meta property="og:description" content="L'Association YOUTH CLUBs (AYCs) fédère un réseau de clubs de jeunes dans les collèges, lycées et universités de Tunisie.">
 <meta property="og:image" content="assets/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="fr_FR">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Association YOUTH CLUBs">
-<meta name="twitter:description" content="Une jeunesse qui façonne son éducation.">
+<meta name="twitter:description" content="Un réseau de clubs de jeunes dans les collèges, lycées et universités de Tunisie.">
 <meta name="twitter:image" content="assets/og-image.jpg">
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,340;9..144,460;9..144,560;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="preload" as="image" href="door-frames/ezgif-frame-001.jpg" fetchpriority="high">
-
-<style>
-/* =====================================================================
-   CORE VARIABLES & RESET
-   ===================================================================== */
-:root {
-  /* Sidi Bou Said inspired palette — deep dusk indigo to sun-washed plaster */
-  --night: #0A2340;
-  --night-deep: #061529;
-  --night-soft: #123761;
-  --plaster: #FBF4E7;
-  --plaster-warm: #F4E9D6;
-  --plaster-dim: #ECDFC7;
-  --door-blue: #1E63B8;
-  --door-blue-light: #3E86D6;
-  --bougainvillea: #C23B4A;
-  --bougainvillea-deep: #9E2E3C;
-  --ochre: #E7A94C;
-  --ochre-light: #F2C275;
-  --ink: #0F2036;
-
-  --font-display: 'Fraunces', 'Georgia', serif;
-  --font-sans: 'Inter', -apple-system, sans-serif;
-
-  --ease: cubic-bezier(.22, 1, .36, 1);
-  --ease-soft: cubic-bezier(.16, 1, .3, 1);
-  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-html {
-  scroll-behavior: auto;
-}
-
-body {
-  font-family: var(--font-sans);
-  background: var(--plaster);
-  color: var(--ink);
-  line-height: 1.6;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-display);
-  font-weight: 560;
-  line-height: 1.05;
-  letter-spacing: -0.01em;
-}
-
-::selection { background: var(--ochre); color: var(--night-deep); }
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-  }
-}
-
-/* =====================================================================
-   SCROLLYTELLING HERO — untouched video/canvas system, refined chrome
-   ===================================================================== */
-.hero-scroll-container {
-  height: 1600vh;
-  background: var(--night-deep);
-  position: relative;
-}
-
-@media (max-width: 900px) {
-  .hero-scroll-container { height: 1150vh; }
-}
-
-.hero-sticky {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  height: 100svh;
-  width: 100vw;
-  overflow: hidden;
-  background: var(--night-deep);
-}
-
-#door-canvas {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  position: absolute;
-  top: 0; left: 0;
-  opacity: 0;
-  transition: opacity 0.6s var(--ease-soft);
-}
-
-#door-canvas.is-ready { opacity: 1; }
-
-/* Fine film-grain overlay for texture without tinting the footage */
-.hero-grain {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-  opacity: 0.05;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-.hero-sticky::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 22vh;
-  background: linear-gradient(to bottom, rgba(6, 21, 41, 0) 0%, rgba(6, 21, 41, 0.5) 100%);
-  pointer-events: none;
-  z-index: 5;
-}
-
-.hero-vignette {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  pointer-events: none;
-  box-shadow: inset 0 0 18vw 2vw rgba(6, 21, 41, 0.38);
-}
-
-.scroll-progress {
-  position: fixed;
-  top: 0; left: 0;
-  height: 3px;
-  width: 100%;
-  z-index: 50;
-  pointer-events: none;
-}
-.scroll-progress-bar {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--ochre), var(--bougainvillea));
-  transform-origin: left;
-  transition: width 0.05s linear;
-}
-
-.scroll-cue {
-  position: absolute;
-  bottom: 2.75rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 6;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.6rem;
-  color: var(--plaster);
-  opacity: 0.85;
-  transition: opacity 0.5s var(--ease);
-}
-.scroll-cue span {
-  font-family: var(--font-sans);
-  font-size: 0.7rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-.scroll-cue .cue-line {
-  width: 1px;
-  height: 34px;
-  background: linear-gradient(to bottom, rgba(251, 244, 231, 0.9), rgba(251, 244, 231, 0));
-  animation: cueFlow 1.8s var(--ease) infinite;
-}
-@keyframes cueFlow {
-  0% { transform: scaleY(0.3); transform-origin: top; opacity: 0.4; }
-  50% { transform: scaleY(1); transform-origin: top; opacity: 1; }
-  100% { transform: scaleY(0.3); transform-origin: bottom; opacity: 0.4; }
-}
-.scroll-cue.is-hidden { opacity: 0; }
-
-.scroll-beats {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.beat {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 0 9%;
-  opacity: 0;
-  will-change: opacity, transform, filter;
-}
-
-.beat.is-active { pointer-events: auto; }
-
-/* Beat positioning */
-.beat-1 { align-items: center; text-align: center; }
-.beat-2 { align-items: flex-start; text-align: left; }
-.beat-3 { align-items: flex-end; text-align: right; }
-.beat-4 { align-items: flex-start; text-align: left; }
-.beat-5 { align-items: center; text-align: center; }
-
-.beat-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-family: var(--font-sans);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: var(--plaster);
-  margin-bottom: 1.1rem;
-}
-.beat-tag::before {
-  content: "";
-  width: 26px;
-  height: 2px;
-  background: var(--bougainvillea);
-  display: inline-block;
-}
-.beat-3 .beat-tag { flex-direction: row-reverse; }
-.beat-3 .beat-tag::before { background: var(--door-blue); }
-.beat-5 .beat-tag::before { background: var(--ochre); }
-
-/* Typography — Fraunces optical sizing gives large display type real character */
-.beat h1 {
-  font-family: var(--font-display);
-  font-optical-sizing: auto;
-  font-size: clamp(2.6rem, 6.4vw, 5rem);
-  font-weight: 460;
-  font-style: normal;
-  line-height: 1.04;
-  margin-bottom: 1.6rem;
-  max-width: 17ch;
-  color: var(--plaster);
-  text-shadow: 0 4px 24px rgba(6, 21, 41, 0.45);
-  letter-spacing: -0.015em;
-}
-
-.beat h2 {
-  font-family: var(--font-display);
-  font-size: clamp(2.1rem, 4.8vw, 3.75rem);
-  font-weight: 460;
-  line-height: 1.06;
-  margin-bottom: 1.5rem;
-  max-width: 18ch;
-  color: var(--plaster);
-  text-shadow: 0 4px 24px rgba(6, 21, 41, 0.45);
-  letter-spacing: -0.01em;
-}
-
-.beat p.lede {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 400;
-  font-size: clamp(1.4rem, 3.1vw, 2.15rem);
-  line-height: 1.35;
-  max-width: 21ch;
-  color: var(--plaster);
-  text-shadow: 0 4px 20px rgba(6, 21, 41, 0.4);
-}
-
-.beat-4 .beat-tag { color: var(--plaster); }
-
-.beat-4 ul {
-  list-style: none;
-  font-family: var(--font-display);
-  font-size: clamp(1.6rem, 3.7vw, 2.65rem);
-  font-weight: 460;
-  color: var(--plaster);
-  text-shadow: 0 4px 20px rgba(6, 21, 41, 0.4);
-  display: flex;
-  flex-direction: column;
-}
-
-.beat-4 li {
-  position: relative;
-  padding: 0.7rem 0 0.7rem 2.1rem;
-  border-bottom: 1px solid rgba(251, 244, 231, 0.18);
-  opacity: 0;
-  transform: translateX(-14px);
-  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
-}
-.beat-4 li::before {
-  content: "0" attr(data-index);
-  position: absolute;
-  left: 0;
-  top: 0.85rem;
-  font-family: var(--font-sans);
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--ochre-light);
-  letter-spacing: 0.05em;
-}
-.beat-4.is-active li {
-  opacity: 1;
-  transform: translateX(0);
-}
-.beat-4.is-active li:nth-child(1) { transition-delay: 0.05s; }
-.beat-4.is-active li:nth-child(2) { transition-delay: 0.13s; }
-.beat-4.is-active li:nth-child(3) { transition-delay: 0.21s; }
-.beat-4.is-active li:nth-child(4) { transition-delay: 0.29s; }
-.beat-4.is-active li:nth-child(5) { transition-delay: 0.37s; }
-.beat-4 li:last-child { border-bottom: none; }
-
-.stats {
-  display: flex;
-  gap: 3rem;
-  margin-top: 0.5rem;
-}
-
-.stats .stat-num {
-  display: block;
-  font-family: var(--font-display);
-  font-size: clamp(1.6rem, 3vw, 2.2rem);
-  color: var(--ochre-light);
-  line-height: 1;
-  margin-bottom: 0.3rem;
-  text-shadow: 0 4px 18px rgba(6, 21, 41, 0.4);
-}
-
-.stats .stat-label {
-  font-family: var(--font-sans);
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--plaster);
-  font-weight: 600;
-}
-
-.beat-actions {
-  display: flex;
-  gap: 1.25rem;
-  margin-top: 2.75rem;
-  justify-content: center;
-}
-
-.btn-primary,
-.btn-secondary {
-  font-family: var(--font-sans);
-  padding: 1rem 2.1rem;
-  border-radius: 100px;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 0.95rem;
-  letter-spacing: 0.01em;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: transform 0.35s var(--ease-spring), box-shadow 0.35s var(--ease), background 0.3s var(--ease), border-color 0.3s var(--ease), color 0.3s var(--ease);
-}
-
-.btn-primary {
-  background: var(--ochre);
-  color: var(--night-deep);
-  box-shadow: 0 14px 30px -12px rgba(6, 21, 41, 0.55);
-}
-.btn-primary:hover {
-  background: var(--ochre-light);
-  transform: translateY(-2px);
-  box-shadow: 0 18px 36px -12px rgba(6, 21, 41, 0.6);
-}
-
-.btn-secondary {
-  background: rgba(251, 244, 231, 0.06);
-  border: 1.5px solid rgba(251, 244, 231, 0.5);
-  color: var(--plaster);
-}
-.btn-secondary:hover {
-  border-color: var(--plaster);
-  background: rgba(251, 244, 231, 0.14);
-  transform: translateY(-2px);
-}
-
-/* =====================================================================
-   SHARED SCROLL-REVEAL SYSTEM FOR PAGE CONTENT
-   ===================================================================== */
-.reveal {
-  opacity: 0;
-  transform: translateY(36px);
-  transition: opacity 0.9s var(--ease-soft), transform 0.9s var(--ease-soft), filter 0.9s var(--ease-soft);
-  filter: blur(6px);
-}
-.reveal.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-  filter: blur(0);
-}
-.reveal-stagger.is-visible { transition-delay: var(--d, 0s); }
-
-/* =====================================================================
-   TRANSITION SEAM — hero melts into the page content
-   ===================================================================== */
-.seam {
-  position: relative;
-  height: 12vh;
-  background: var(--plaster);
-  margin-top: -1px;
-}
-.seam::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(60% 100% at 20% 0%, rgba(194, 59, 74, 0.07), transparent 70%),
-    radial-gradient(50% 100% at 85% 0%, rgba(30, 99, 184, 0.08), transparent 70%);
-}
-
-.seam-dark {
-  height: 22vh;
-  background: linear-gradient(to bottom, var(--plaster-warm) 0%, var(--night-soft) 55%, var(--night-deep) 100%);
-}
-.seam-dark::before {
-  background:
-    radial-gradient(55% 120% at 25% 100%, rgba(231, 169, 76, 0.16), transparent 70%),
-    radial-gradient(50% 120% at 80% 100%, rgba(30, 99, 184, 0.22), transparent 70%);
-}
-
-/* =====================================================================
-   PAGE CONTENT
-   ===================================================================== */
-.section {
-  padding: 9rem 0;
-  position: relative;
-}
-
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
-
-/* History Section */
-.history-section {
-  background: var(--plaster);
-  position: relative;
-  overflow: hidden;
-}
-
-.history-section::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -1px;
-  transform: translateX(-50%);
-  width: 92%;
-  max-width: 1100px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(15, 32, 54, 0.14), transparent);
-}
-
-.eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.65rem;
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--bougainvillea);
-  margin-bottom: 1.5rem;
-}
-.eyebrow::before {
-  content: "";
-  width: 30px;
-  height: 2px;
-  background: var(--bougainvillea);
-}
-
-.history-grid {
-  display: grid;
-  grid-template-columns: 0.9fr 1.1fr;
-  gap: 6rem;
-  align-items: start;
-}
-
-.history-title h2 {
-  font-size: clamp(2.5rem, 4.8vw, 3.75rem);
-  color: var(--night);
-  line-height: 1.08;
-}
-
-.history-content p {
-  font-size: 1.2rem;
-  margin-bottom: 1.6rem;
-  color: rgba(15, 32, 54, 0.82);
-  line-height: 1.75;
-}
-
-.history-content p:last-child { margin-bottom: 0; }
-
-.history-content strong {
-  color: var(--night);
-  font-weight: 600;
-}
-
-/* Axes Section */
-.axes-section {
-  background: var(--plaster-warm);
-  position: relative;
-  overflow: hidden;
-}
-
-.axes-section::before {
-  content: "";
-  position: absolute;
-  top: -20%;
-  right: -10%;
-  width: 55%;
-  padding-bottom: 55%;
-  background: radial-gradient(circle, rgba(231, 169, 76, 0.16), transparent 70%);
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.axes-header {
-  text-align: center;
-  max-width: 720px;
-  margin: 0 auto 5rem;
-}
-
-.axes-header .eyebrow { justify-content: center; }
-.axes-header .eyebrow::before { display: none; }
-
-.axes-header h2 {
-  font-size: clamp(2.4rem, 4.6vw, 3.4rem);
-  color: var(--night);
-  margin-bottom: 1.25rem;
-}
-
-.axes-header p {
-  font-size: 1.2rem;
-  color: rgba(15, 32, 54, 0.75);
-}
-
-/* ===================== AXES RAIL — carousel, hand-drawn icons =====================
-   Structure and behaviour copied 1:1 from strategie.html's 5-axis rail:
-   .rail-wrap > .rail-viewport > .rail-track > .rail-card* + .rail-controls.
-   ===================================================================== */
-.rail-wrap { position: relative; }
-.rail-card {
-  opacity: 0;
-  transform: translateY(22px) scale(0.98);
-  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
-  transition-delay: calc(var(--card-i, 0) * 70ms);
-}
-.rail-wrap.is-visible .rail-card { opacity: 1; transform: translateY(0) scale(1); }
-.rail-viewport {
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  margin: 0 -2rem;
-  padding: 6px 2rem 28px;
-  cursor: grab;
-}
-.rail-viewport.is-dragging { cursor: grabbing; scroll-snap-type: none; }
-.rail-viewport::-webkit-scrollbar { display: none; }
-.rail-track { display: flex; gap: 18px; width: max-content; }
-.rail-card { scroll-snap-align: start; flex: none; }
-.rail-controls {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 0.5rem;
-}
-.rail-arrows { display: flex; gap: 8px; flex: none; }
-.rail-arrow {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: 1px solid rgba(15, 32, 54, 0.14);
-  background: var(--plaster);
-  color: var(--night);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 0.2s var(--ease-spring), background 0.2s var(--ease), border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), color 0.2s var(--ease);
-  box-shadow: 0 6px 16px -10px rgba(15, 32, 54, 0.25);
-}
-.rail-arrow:hover { background: var(--night); color: var(--plaster); border-color: var(--night); transform: translateY(-2px); box-shadow: 0 12px 22px -12px rgba(15, 32, 54, 0.4); }
-.rail-arrow:active { transform: translateY(0) scale(0.94); }
-.rail-arrow:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: 0 6px 16px -10px rgba(15, 32, 54, 0.25); }
-.rail-arrow:disabled:hover { background: var(--plaster); color: var(--night); border-color: rgba(15, 32, 54, 0.14); }
-.rail-arrow svg { pointer-events: none; }
-
-.rail-progress {
-  flex: 1;
-  height: 4px;
-  background: rgba(15, 32, 54, 0.1);
-  border-radius: 100px;
-  position: relative;
-  overflow: hidden;
-}
-.rail-progress-bar {
-  position: absolute;
-  top: 0; left: 0;
-  height: 100%;
-  border-radius: 100px;
-  background: linear-gradient(135deg, var(--night) 0%, var(--door-blue) 55%, var(--door-blue-light) 100%);
-  width: 20%;
-  transition: width 0.35s var(--ease), transform 0.35s var(--ease);
-}
-.rail-count {
-  font-family: var(--font-display);
-  font-size: 0.9rem;
-  color: rgba(15, 32, 54, 0.6);
-  letter-spacing: 0.02em;
-  flex: none;
-  font-variant-numeric: tabular-nums;
-}
-.rail-count b { color: var(--night); font-weight: 560; }
-
-.axis-card {
-  width: 264px;
-  background: var(--plaster);
-  border: 1px solid rgba(15, 32, 54, 0.1);
-  border-radius: 20px;
-  padding: 28px 22px 24px;
-  box-shadow: 0 1px 2px rgba(15, 32, 54, 0.04), 0 8px 24px -12px rgba(15, 32, 54, 0.12);
-  text-align: left;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.3s var(--ease-spring), box-shadow 0.3s var(--ease), border-color 0.3s var(--ease);
-}
-.axis-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  background: linear-gradient(135deg, var(--night) 0%, var(--door-blue) 55%, var(--door-blue-light) 100%);
-  transition: opacity 0.35s var(--ease);
-  z-index: 0;
-}
-.axis-card:hover { transform: translateY(-6px); box-shadow: 0 24px 40px -18px rgba(15, 32, 54, 0.32); border-color: transparent; }
-.axis-card:hover::before { opacity: 1; }
-.axis-icon, .axis-num, .axis-card h3, .axis-card p { position: relative; z-index: 1; }
-.axis-icon {
-  width: 84px;
-  height: 84px;
-  border-radius: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--plaster-warm);
-  margin-bottom: 20px;
-  transition: transform 0.4s var(--ease-spring), background 0.3s var(--ease);
-  color: var(--axis-color, var(--door-blue));
-}
-.axis-card:hover .axis-icon { transform: scale(1.06); background: rgba(255, 255, 255, 0.16); box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.3); }
-.axis-icon svg { width: 58px; height: 58px; overflow: visible; }
-
-/* Per-axis brand colors, matched to each axis's real identity hue */
-.axis-icon--scolarite { --axis-color: #E8703A; }
-.axis-icon--education { --axis-color: #C22B3E; }
-.axis-icon--sante { --axis-color: #1E9350; }
-.axis-icon--citoyennete { --axis-color: #1D3A5F; }
-.axis-icon--vie-active { --axis-color: #F0A831; }
-
-/* Each icon is two overlaid copies of the same shape:
-   .axis-fill settles in behind, .axis-draw is a stroked outline revealed
-   via dasharray/dashoffset (measured by JS) so it looks hand-sketched. */
-.axis-fill {
-  fill: var(--axis-color);
-  opacity: 0;
-  transform-origin: 50% 50%;
-  transform: scale(0.82);
-  transition: opacity 0.5s var(--ease), transform 0.6s var(--ease-spring);
-  transition-delay: 0.55s;
-}
-.axis-draw {
-  stroke: var(--axis-color);
-  stroke-width: 1.6;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 1s var(--ease);
-}
-.rail-card.is-drawn .axis-fill { opacity: 1; transform: scale(1); }
-.axis-card:hover .axis-fill { fill: #fff; }
-.axis-card:hover .axis-draw { stroke: #fff; }
-
-/* Gentle idle breathing once drawn, so the mark stays alive rather than static */
-.rail-card.is-drawn .axis-icon svg { animation: axisBreathe 4.5s var(--ease) 1.5s infinite; }
-@keyframes axisBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-/* Re-draw briefly on hover, like the icon is retracing itself */
-.axis-card:hover .axis-draw { animation: axisRetrace 1s var(--ease) 1; }
-@keyframes axisRetrace {
-  0% { stroke-dashoffset: 0; }
-  50% { stroke-dashoffset: var(--len, 0); }
-  100% { stroke-dashoffset: 0; }
-}
-.axis-num {
-  position: absolute;
-  top: 22px;
-  right: 24px;
-  font-family: var(--font-display);
-  font-weight: 460;
-  font-size: 1.6rem;
-  color: rgba(15, 32, 54, 0.16);
-  letter-spacing: 0.02em;
-  transition: color 0.3s var(--ease);
-}
-.axis-card:hover .axis-num { color: rgba(255, 255, 255, 0.3); }
-.axis-card h3 {
-  font-family: var(--font-display);
-  font-weight: 460;
-  font-size: 1.2rem;
-  color: var(--night);
-  margin: 0 0 8px;
-  transition: color 0.3s var(--ease);
-  letter-spacing: 0.01em;
-}
-.axis-card:hover h3 { color: #fff; }
-.axis-card p {
-  font-size: 0.9rem;
-  line-height: 1.6;
-  color: rgba(15, 32, 54, 0.68);
-  margin: 0;
-  transition: color 0.3s var(--ease);
-}
-.axis-card:hover p { color: rgba(255, 255, 255, 0.85); }
-
-@media (max-width: 600px) {
-  .rail-viewport { margin: 0 -1.25rem; padding: 6px 1.25rem 24px; }
-  .axis-card { width: 230px; }
-}
-
-/* CTA Section */
-.cta-section {
-  background: var(--night-deep);
-  color: var(--plaster);
-  text-align: center;
-  padding: 11rem 0;
-  position: relative;
-  overflow: hidden;
-}
-
-.cta-section::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(50% 60% at 15% 20%, rgba(30, 99, 184, 0.35), transparent 70%),
-    radial-gradient(45% 55% at 85% 85%, rgba(194, 59, 74, 0.28), transparent 70%);
-  pointer-events: none;
-}
-
-.cta-centered {
-  max-width: 700px;
-  position: relative;
-  z-index: 1;
-}
-
-.cta-centered .eyebrow { justify-content: center; color: var(--ochre-light); }
-.cta-centered .eyebrow::before { background: var(--ochre-light); }
-
-.cta-centered h2 {
-  font-size: clamp(2.5rem, 5vw, 4.25rem);
-  margin-bottom: 1.5rem;
-  color: var(--plaster);
-  font-weight: 460;
-}
-
-.cta-centered p {
-  font-size: 1.25rem;
-  margin-bottom: 3rem;
-  color: rgba(251, 244, 231, 0.78);
-  line-height: 1.65;
-}
-
-.cta-centered .btn-primary {
-  background: var(--ochre);
-  color: var(--night-deep);
-  box-shadow: 0 16px 34px -12px rgba(231, 169, 76, 0.45);
-}
-.cta-centered .btn-primary:hover {
-  background: var(--ochre-light);
-  box-shadow: 0 20px 40px -12px rgba(231, 169, 76, 0.55);
-}
-
-/* Responsive adjustments */
-@media (max-width: 900px) {
-  .history-grid { grid-template-columns: 1fr; gap: 3rem; }
-  .section { padding: 6.5rem 0; }
-}
-
-@media (max-width: 600px) {
-  .beat-actions { flex-direction: column; width: 100%; }
-  .btn-primary, .btn-secondary { width: 100%; text-align: center; justify-content: center; }
-  .stats { justify-content: center; gap: 2rem; }
-  .beat { padding: 0 7%; }
-  .beat-3 { align-items: flex-start; text-align: left; }
-  .beat-3 .beat-tag { flex-direction: row; }
-  .beat-3 .lede { text-align: left; }
-}
-</style>
+<link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="home.css">
 </head>
 <body>
 
-<div class="scroll-progress"><div class="scroll-progress-bar" id="scroll-progress-bar"></div></div>
+<div class="pattern-veil"></div>
 
-<div class="hero-scroll-container" id="hero-scroll">
-  <div class="hero-sticky">
-    <canvas id="door-canvas"></canvas>
-    <div class="hero-grain"></div>
-    <div class="hero-vignette"></div>
-
-    <div class="scroll-beats">
-      <!-- Beat 1: 0-6% -->
-      <div class="beat beat-1">
-        <div class="beat-tag">Depuis 2013</div>
-        <h1>L'engagement des jeunes au cœur de la société</h1>
-        <div class="stats">
-          <div>
-            <span class="stat-num">2013</span>
-            <span class="stat-label">Année de création</span>
-          </div>
-          <div>
-            <span class="stat-num">15+</span>
-            <span class="stat-label">Clubs actifs</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Beat 2: 14-28% -->
-      <div class="beat beat-2">
-        <div class="beat-tag">Notre mission</div>
-        <p class="lede">Offrir aux étudiants des espaces pour s'exprimer, s'informer et s'engager activement au sein de leur environnement éducatif.</p>
-      </div>
-
-      <!-- Beat 3: 36-52% -->
-      <div class="beat beat-3">
-        <div class="beat-tag">Notre approche</div>
-        <p class="lede">Une gouvernance démocratique, portée par les étudiants eux-mêmes, qui cultive l'autonomie et l'esprit d'initiative.</p>
-      </div>
-
-      <!-- Beat 4: 58-74% -->
-      <div class="beat beat-4">
-        <div class="beat-tag">Domaines d'action</div>
-        <ul>
-          <li data-index="1">Scolarité</li>
-          <li data-index="2">Éducation formelle</li>
-          <li data-index="3">Santé</li>
-          <li data-index="4">Citoyenneté</li>
-          <li data-index="5">Vie active</li>
-        </ul>
-      </div>
-
-      <!-- Beat 5: 84-100% -->
-      <div class="beat beat-5">
-        <div class="beat-tag">Rejoignez le mouvement</div>
-        <h2>Développe ton potentiel avec notre réseau</h2>
-        <div class="beat-actions">
-          <a href="#rejoindre" class="btn-primary">Rejoindre l'association</a>
-          <a href="#axes" class="btn-secondary">Découvrir nos actions</a>
-        </div>
-      </div>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <img src="assets/logo-primary-blue.png" alt="Association YOUTH CLUBs" class="brand-logo">
+      <div class="brand-divider"></div>
+      <div class="brand-tag">Association YOUTH CLUBs</div>
     </div>
-
-    <div class="scroll-cue" id="scroll-cue">
-      <span>Défiler</span>
-      <div class="cue-line"></div>
+    <div class="menu" data-menu>
+      <button type="button" class="menu-btn" data-menu-btn aria-haspopup="true" aria-expanded="false">
+        <span class="menu-btn-label">Accueil</span>
+        <span class="menu-btn-icon">
+          <svg class="icon-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          <svg class="icon-close" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </span>
+      </button>
+      <nav class="menu-panel" data-menu-panel aria-label="Navigation principale">
+      <a href="index" class="is-active">Accueil</a>
+      <a href="a-propos">À propos</a>
+      <a href="valeurs">Nos Valeurs</a>
+      <a href="strategie">Notre Stratégie</a>
+      <a href="evenements">Nos Projets</a>
+      <a href="gouvernance">Notre Équipe</a>
+      <a href="partenaires">Nos Partenaires</a>
+      <a href="rejoindre">Rejoindre</a>
+      <a href="contact">Contact</a>
+      <a href="https://internes.associationyouthclubs.org/portal/login" class="nav-portal-link">Espace membres</a>
+      </nav>
     </div>
   </div>
-</div>
+</header>
 
-<div class="seam"></div>
+<main class="stage">
 
-<section class="section history-section" id="histoire">
-  <div class="container">
-    <div class="history-grid">
-      <div class="history-title reveal">
-        <div class="eyebrow">Notre histoire</div>
-        <h2>Une histoire de jeunesse et d'engagement</h2>
+  <!-- ===================== HERO ===================== -->
+  <section class="hero">
+    <div class="hero-copy">
+      <h1 class="hero-title">Une jeunesse qui <span>façonne</span> son éducation</h1>
+      <p class="hero-sub">L'Association YOUTH CLUBs fédère un réseau de clubs de jeunes dans les collèges, lycées et universités de Tunisie. Depuis 2013, nous outillons les apprenants pour qu'ils deviennent acteurs de leur scolarité, de leur santé et de leur avenir, plutôt que simples spectateurs.</p>
+      <div class="hero-actions">
+        <a href="strategie" class="btn btn-primary">Découvrir notre stratégie</a>
+        <a href="evenements" class="btn btn-secondary">Voir les événements</a>
       </div>
-      <div class="history-content">
-        <p class="reveal reveal-stagger" style="--d:0.05s">Depuis 2013, l'Association YOUTH CLUBs bâtit des ponts entre la jeunesse tunisienne et les espaces d'engagement civique. Ce qui a commencé comme une initiative locale est aujourd'hui un réseau dynamique qui fédère des clubs à travers les collèges, lycées et universités du pays.</p>
-        <p class="reveal reveal-stagger" style="--d:0.15s">Notre conviction est simple : il ne s'agit pas de dicter aux jeunes ce qu'ils doivent faire, mais de leur confier les clés et l'autonomie nécessaires pour qu'ils s'emparent pleinement de leur éducation, de leur santé et de leur rôle de citoyens.</p>
+      <div class="hero-stats">
+        <div class="hero-stat"><b>2013</b><span>Année de naissance</span></div>
+        <div class="hero-stat"><b>15+</b><span>Clubs à travers le pays</span></div>
+        <div class="hero-stat"><b>5</b><span>Axes stratégiques</span></div>
       </div>
     </div>
-  </div>
-</section>
-
-<section class="section axes-section" id="axes">
-  <div class="container">
-    <div class="axes-header reveal">
-      <div class="eyebrow">Nos axes stratégiques</div>
-      <h2>Cinq axes, un même engagement</h2>
-      <p>Nos clubs s'organisent autour de grandes thématiques pour permettre à chaque jeune de trouver sa voie d'engagement et d'impact au sein de sa communauté.</p>
-    </div>
-
-    <div class="rail-wrap" data-carousel>
-      <div class="rail-viewport" data-rail-viewport tabindex="0" aria-label="Les cinq axes stratégiques, défilement horizontal">
-        <div class="rail-track" data-rail-track>
-          <div class="axis-card rail-card">
-            <span class="axis-num">01</span>
-            <div class="axis-icon axis-icon--scolarite" data-axis-icon>
-              <svg viewBox="0 0 100 100">
-                <path class="axis-fill" fill-rule="evenodd" d="M27.4,22 L27.2,33.6 L33.2,36.1 L36,40 L34.6,52.8 L27.4,54.7 L28.4,60.1 L49.9,73.4 L74.5,61.7 L79,61.7 L80.4,65.4 L73,70.5 L49.3,78.5 L30.7,66.1 L20,61.8 L16.2,58.1 L23.3,60.9 L25.4,56.6 L18.6,47.7 L17.5,41.6 L19.9,37 L25.2,34.1 L24.7,32.8 L19.1,35.2 L16,40 L16.6,47.9 L23.6,57.4 L22.7,59.1 L15,56.3 L14.2,58.3 L16.6,61.6 L28.7,67.2 L49.2,80.4 L71.4,73.1 L80.9,67.9 L81.7,61.9 L76.2,59.4 L49.5,70.9 L69.6,58.3 L69.2,51.5 L61,54.5 L56.8,48.9 L57.9,42.3 L53.8,37.6 L56.8,33.9 L67.8,29.9 L68.5,45.8 L74.4,54.7 L80.9,52 L85.6,45.7 L77.1,32.2 L69.7,28 L69.3,21.5 L48.9,29.8 L31.3,20.4 L48.6,31.8 L67.8,23.9 L67.6,28 L57.5,31.4 L52,37.3 L56.2,43 L54.8,49.8 L60.1,56.2 L67.8,54.3 L67.7,58.1 L49.4,68.7 L48.8,35.1 Z M69.7,30.1 L71,30.3 L72.8,31.1 L74.4,32.2 L75.8,33.5 L79.4,38.3 L83.7,44.9 L83.7,45.5 L82.8,47.2 L81.7,48.7 L80.3,50.1 L78.4,51.6 L75.6,52.9 L75.1,52.9 L74.5,52.6 L73.2,51.3 L72.5,50.5 L71.4,48.6 L70.4,45.7 L69.9,43.4 L69.7,40.9 Z M29.1,24.2 L45.4,34.2 L47.2,36 L47.6,37.9 L47.5,68.8 L30.3,59.2 L29.1,58 L28.9,56.9 L29.4,56 L33.8,55.8 L35.5,54.8 L36.3,53.5 L36.9,50.8 L37.9,48.6 L36.7,47 L36.2,45.1 L36.5,43.3 L37.9,41 L37.5,38.7 L36.4,36.7 L34.8,35 L32.4,33.5 L29.5,32.6 L29.1,32.2 Z"/>
-                <path class="axis-draw" fill="none" d="M27.4,22 L27.2,33.6 L33.2,36.1 L36,40 L34.6,52.8 L27.4,54.7 L28.4,60.1 L49.9,73.4 L74.5,61.7 L79,61.7 L80.4,65.4 L73,70.5 L49.3,78.5 L30.7,66.1 L20,61.8 L16.2,58.1 L23.3,60.9 L25.4,56.6 L18.6,47.7 L17.5,41.6 L19.9,37 L25.2,34.1 L24.7,32.8 L19.1,35.2 L16,40 L16.6,47.9 L23.6,57.4 L22.7,59.1 L15,56.3 L14.2,58.3 L16.6,61.6 L28.7,67.2 L49.2,80.4 L71.4,73.1 L80.9,67.9 L81.7,61.9 L76.2,59.4 L49.5,70.9 L69.6,58.3 L69.2,51.5 L61,54.5 L56.8,48.9 L57.9,42.3 L53.8,37.6 L56.8,33.9 L67.8,29.9 L68.5,45.8 L74.4,54.7 L80.9,52 L85.6,45.7 L77.1,32.2 L69.7,28 L69.3,21.5 L48.9,29.8 L31.3,20.4 L48.6,31.8 L67.8,23.9 L67.6,28 L57.5,31.4 L52,37.3 L56.2,43 L54.8,49.8 L60.1,56.2 L67.8,54.3 L67.7,58.1 L49.4,68.7 L48.8,35.1 Z M69.7,30.1 L71,30.3 L72.8,31.1 L74.4,32.2 L75.8,33.5 L79.4,38.3 L83.7,44.9 L83.7,45.5 L82.8,47.2 L81.7,48.7 L80.3,50.1 L78.4,51.6 L75.6,52.9 L75.1,52.9 L74.5,52.6 L73.2,51.3 L72.5,50.5 L71.4,48.6 L70.4,45.7 L69.9,43.4 L69.7,40.9 Z M29.1,24.2 L45.4,34.2 L47.2,36 L47.6,37.9 L47.5,68.8 L30.3,59.2 L29.1,58 L28.9,56.9 L29.4,56 L33.8,55.8 L35.5,54.8 L36.3,53.5 L36.9,50.8 L37.9,48.6 L36.7,47 L36.2,45.1 L36.5,43.3 L37.9,41 L37.5,38.7 L36.4,36.7 L34.8,35 L32.4,33.5 L29.5,32.6 L29.1,32.2 Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            <h3>La Scolarité</h3>
-            <p>Assurer l'accès à l'éducation sans discrimination, et réduire l'absentéisme, l'abandon et l'échec scolaire.</p>
-          </div>
-          <div class="axis-card rail-card">
-            <span class="axis-num">02</span>
-            <div class="axis-icon axis-icon--education" data-axis-icon>
-              <svg viewBox="0 0 100 100">
-                <path class="axis-fill" fill-rule="evenodd" d="M78.1,39.5 L78,40.8 L78,45.9 L78.1,48.2 L85.6,43.9 L85.6,43.8 Z M49.5,23.3 L14.4,43.8 L34.8,55.7 L32.4,57.7 L32.3,66.2 L49.8,76.7 L68.1,65.8 L68.6,53.7 L75.8,49.6 L75.8,56.1 L76.9,56.6 L77.7,55.3 L77,36.5 L72.2,36.1 Z M63,57 L63,62.8 L62.8,63.2 L49.8,71.2 L37.9,64.1 L37.2,63.3 L37.3,60 L39.1,58.9 L39.9,58.7 L49.8,64.4 Z M76.7,43.8 L50.2,59 L44.3,55.9 L64.7,43.9 L60.2,41 L39.7,53 L23.3,43.9 L50.1,28.3 L55.8,31.6 L35.1,43.8 L39.8,46.4 L60.7,34.5 Z"/>
-                <path class="axis-draw" fill="none" d="M78.1,39.5 L78,40.8 L78,45.9 L78.1,48.2 L85.6,43.9 L85.6,43.8 Z M49.5,23.3 L14.4,43.8 L34.8,55.7 L32.4,57.7 L32.3,66.2 L49.8,76.7 L68.1,65.8 L68.6,53.7 L75.8,49.6 L75.8,56.1 L76.9,56.6 L77.7,55.3 L77,36.5 L72.2,36.1 Z M63,57 L63,62.8 L62.8,63.2 L49.8,71.2 L37.9,64.1 L37.2,63.3 L37.3,60 L39.1,58.9 L39.9,58.7 L49.8,64.4 Z M76.7,43.8 L50.2,59 L44.3,55.9 L64.7,43.9 L60.2,41 L39.7,53 L23.3,43.9 L50.1,28.3 L55.8,31.6 L35.1,43.8 L39.8,46.4 L60.7,34.5 Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            <h3>L'Éducation Formelle</h3>
-            <p>Contribuer aux objectifs éducatifs de l'établissement, en deux aspects : quantitatif et qualitatif.</p>
-          </div>
-          <div class="axis-card rail-card">
-            <span class="axis-num">03</span>
-            <div class="axis-icon axis-icon--sante" data-axis-icon>
-              <svg viewBox="0 0 100 100">
-                <path class="axis-fill" fill-rule="evenodd" d="M80,40.9 L76,36.2 L70.1,33.5 L64.3,33.3 L58.1,35.8 L53.8,40.4 L51.8,46.7 L52.6,53.3 L55.9,58.7 L49.8,61.2 L44.3,58.9 L47.3,53.8 L48.4,49.2 L47.7,43.7 L44.8,38.4 L40.5,35 L36.2,33.4 L30.9,33.4 L26.1,35 L21,39.9 L18.4,47.4 L18.7,51.2 L20,54.8 L25.2,61 L17.9,67.8 L15.7,72 L16,74.1 L17.5,75.4 L19.6,75.2 L24.3,68.7 L30.8,64.7 L36.8,63.6 L42.7,64.3 L44.9,65.5 L40.8,72.6 L40.7,75.6 L41.7,78.6 L44,81.5 L46.8,83.3 L52.6,83.9 L57.4,80.8 L59.6,75.9 L58.8,71 L55.2,65.2 L62.6,63.6 L67.6,64.3 L71.9,66 L76.4,69.7 L79.8,74.9 L81.2,75.6 L83,75.2 L84.4,73.3 L83.2,69.5 L80.1,65.3 L74.8,61 L79,56.9 L81.2,52.3 L81.7,46.4 Z M54.4,70.1 L55.4,70.7 L55.8,71.2 L56.2,71.9 L56.4,72.6 L56.4,73.5 L56.3,74 L55.9,74.7 L55.1,75.6 L50.5,80.4 L47.1,76.8 L45.1,74.6 L44.8,74.1 L44.6,73.5 L44.6,72.7 L44.8,72 L45.2,71.2 L45.7,70.6 L46.5,70.2 L47.1,70 L48.1,69.9 L49.1,70.2 L49.7,70.6 L50.5,71.5 L51.5,70.5 L52.3,70.1 L52.9,69.9 L53.8,69.9 Z M65.4,38.9 L67.6,38.8 L68.9,39 L70.4,39.5 L72.2,40.5 L73.9,42.1 L74.8,43.3 L75.6,44.7 L76.1,46.5 L76.2,48.9 L76,50.2 L75.4,51.9 L74.6,53.5 L73.4,54.9 L71.9,56.1 L70.5,56.9 L68.7,57.4 L65.9,57.5 L64.5,57.3 L63.1,56.8 L61.5,55.9 L60.1,54.8 L58.9,53.2 L58,51.4 L57.5,49.6 L57.5,47.6 L57.7,46.2 L58.3,44.4 L59.2,42.8 L60.6,41.1 L61.9,40.2 L63.6,39.4 Z M32.4,38.8 L34.4,38.8 L36.2,39.2 L38,40 L39.4,40.9 L40.7,42.2 L41.7,43.6 L42.5,45.6 L42.8,47.2 L42.8,49 L42.4,50.9 L41.6,52.9 L40.8,54.1 L39.4,55.5 L38.1,56.4 L36.2,57.2 L34.7,57.5 L32.5,57.5 L30.9,57.2 L29.6,56.8 L27.6,55.6 L26.3,54.4 L25.2,52.8 L24.5,51.2 L24.1,49.2 L24,47.4 L24.4,45.3 L25.1,43.8 L26.1,42.3 L27.2,41.1 L28.9,40 L30.8,39.1 Z"/>
-                <path class="axis-draw" fill="none" d="M80,40.9 L76,36.2 L70.1,33.5 L64.3,33.3 L58.1,35.8 L53.8,40.4 L51.8,46.7 L52.6,53.3 L55.9,58.7 L49.8,61.2 L44.3,58.9 L47.3,53.8 L48.4,49.2 L47.7,43.7 L44.8,38.4 L40.5,35 L36.2,33.4 L30.9,33.4 L26.1,35 L21,39.9 L18.4,47.4 L18.7,51.2 L20,54.8 L25.2,61 L17.9,67.8 L15.7,72 L16,74.1 L17.5,75.4 L19.6,75.2 L24.3,68.7 L30.8,64.7 L36.8,63.6 L42.7,64.3 L44.9,65.5 L40.8,72.6 L40.7,75.6 L41.7,78.6 L44,81.5 L46.8,83.3 L52.6,83.9 L57.4,80.8 L59.6,75.9 L58.8,71 L55.2,65.2 L62.6,63.6 L67.6,64.3 L71.9,66 L76.4,69.7 L79.8,74.9 L81.2,75.6 L83,75.2 L84.4,73.3 L83.2,69.5 L80.1,65.3 L74.8,61 L79,56.9 L81.2,52.3 L81.7,46.4 Z M54.4,70.1 L55.4,70.7 L55.8,71.2 L56.2,71.9 L56.4,72.6 L56.4,73.5 L56.3,74 L55.9,74.7 L55.1,75.6 L50.5,80.4 L47.1,76.8 L45.1,74.6 L44.8,74.1 L44.6,73.5 L44.6,72.7 L44.8,72 L45.2,71.2 L45.7,70.6 L46.5,70.2 L47.1,70 L48.1,69.9 L49.1,70.2 L49.7,70.6 L50.5,71.5 L51.5,70.5 L52.3,70.1 L52.9,69.9 L53.8,69.9 Z M65.4,38.9 L67.6,38.8 L68.9,39 L70.4,39.5 L72.2,40.5 L73.9,42.1 L74.8,43.3 L75.6,44.7 L76.1,46.5 L76.2,48.9 L76,50.2 L75.4,51.9 L74.6,53.5 L73.4,54.9 L71.9,56.1 L70.5,56.9 L68.7,57.4 L65.9,57.5 L64.5,57.3 L63.1,56.8 L61.5,55.9 L60.1,54.8 L58.9,53.2 L58,51.4 L57.5,49.6 L57.5,47.6 L57.7,46.2 L58.3,44.4 L59.2,42.8 L60.6,41.1 L61.9,40.2 L63.6,39.4 Z M32.4,38.8 L34.4,38.8 L36.2,39.2 L38,40 L39.4,40.9 L40.7,42.2 L41.7,43.6 L42.5,45.6 L42.8,47.2 L42.8,49 L42.4,50.9 L41.6,52.9 L40.8,54.1 L39.4,55.5 L38.1,56.4 L36.2,57.2 L34.7,57.5 L32.5,57.5 L30.9,57.2 L29.6,56.8 L27.6,55.6 L26.3,54.4 L25.2,52.8 L24.5,51.2 L24.1,49.2 L24,47.4 L24.4,45.3 L25.1,43.8 L26.1,42.3 L27.2,41.1 L28.9,40 L30.8,39.1 Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            <h3>La Santé</h3>
-            <p>Veiller au bien-être physique, mental et social des apprenants, ainsi qu'à leur santé sexuelle et reproductive.</p>
-          </div>
-          <div class="axis-card rail-card">
-            <span class="axis-num">04</span>
-            <div class="axis-icon axis-icon--citoyennete" data-axis-icon>
-              <svg viewBox="0 0 100 100">
-                <path class="axis-fill" fill-rule="evenodd" d="M74.1,30.6 L73.3,30.8 L72.5,31.1 L71.9,31.5 L71.3,32.2 L70.8,32.9 L70.5,33.7 L70.3,34.4 L70.3,35.6 L70.4,36.2 L70.7,37.2 L71.1,37.9 L71.5,38.5 L72.1,39 L72.9,39.5 L73.7,39.7 L74.4,39.8 L75.3,39.6 L76,39.3 L76.6,38.9 L77,38.4 L77.4,37.9 L77.8,37.2 L78.1,36.2 L78.1,35.3 L78.3,35.1 L77.7,33.1 L77.3,32.4 L76.9,31.8 L76.2,31.2 L75.5,30.9 L75,30.7 Z M38.5,19.8 L35.1,22.8 L32.4,27.5 L30.2,38.8 L31.8,53.7 L36.8,67.3 L29.2,62.8 L25,55 L24.4,45.5 L27.4,32 L22.8,35.1 L20.2,40.7 L19.1,50.6 L20.6,58.6 L24.7,67.3 L29.9,72.2 L35.4,74 L41.3,73.7 L49.4,79.3 L56.9,80.2 L60.4,77.9 L67.2,68.8 L70,57.1 L72.2,64.3 L69.5,71.6 L76.4,63.4 L80.5,52.7 L80.1,42.1 L75.6,42.8 L69.9,42.1 L67.6,32.1 L63.2,24.3 L56.9,19.7 L53.1,21.4 L51,29.2 L52.5,38.4 L56,43.8 L65.3,51.5 L64.6,59.1 L62.5,65.7 L58.8,72.6 L56.6,74.8 L47.4,68.1 L50.3,51.2 L49.7,38.5 L45.5,26.8 L40.9,20.7 Z M38.3,25.5 L41,29.6 L43.1,34.1 L44.7,38.8 L45.8,43.7 L46.3,48.9 L46.3,53.3 L45.8,58.1 L44.6,64.6 L44,63.9 L42.5,61.7 L40.4,57.5 L38.9,53 L38,48.9 L37.1,40.6 L36.8,33.5 L37.2,28.9 L37.9,26.3 Z M56.1,22.6 L57,23 L58.1,24.1 L59.5,26.1 L60.4,27.9 L61.2,29.7 L62.1,32.4 L63,35.8 L63.6,38.5 L63.6,38.6 L61.6,37.1 L60.1,35.7 L58.9,34.2 L58.2,33.1 L57.5,31.8 L56.8,29.9 L56.2,27.6 L56,25.7 Z"/>
-                <path class="axis-draw" fill="none" d="M74.1,30.6 L73.3,30.8 L72.5,31.1 L71.9,31.5 L71.3,32.2 L70.8,32.9 L70.5,33.7 L70.3,34.4 L70.3,35.6 L70.4,36.2 L70.7,37.2 L71.1,37.9 L71.5,38.5 L72.1,39 L72.9,39.5 L73.7,39.7 L74.4,39.8 L75.3,39.6 L76,39.3 L76.6,38.9 L77,38.4 L77.4,37.9 L77.8,37.2 L78.1,36.2 L78.1,35.3 L78.3,35.1 L77.7,33.1 L77.3,32.4 L76.9,31.8 L76.2,31.2 L75.5,30.9 L75,30.7 Z M38.5,19.8 L35.1,22.8 L32.4,27.5 L30.2,38.8 L31.8,53.7 L36.8,67.3 L29.2,62.8 L25,55 L24.4,45.5 L27.4,32 L22.8,35.1 L20.2,40.7 L19.1,50.6 L20.6,58.6 L24.7,67.3 L29.9,72.2 L35.4,74 L41.3,73.7 L49.4,79.3 L56.9,80.2 L60.4,77.9 L67.2,68.8 L70,57.1 L72.2,64.3 L69.5,71.6 L76.4,63.4 L80.5,52.7 L80.1,42.1 L75.6,42.8 L69.9,42.1 L67.6,32.1 L63.2,24.3 L56.9,19.7 L53.1,21.4 L51,29.2 L52.5,38.4 L56,43.8 L65.3,51.5 L64.6,59.1 L62.5,65.7 L58.8,72.6 L56.6,74.8 L47.4,68.1 L50.3,51.2 L49.7,38.5 L45.5,26.8 L40.9,20.7 Z M38.3,25.5 L41,29.6 L43.1,34.1 L44.7,38.8 L45.8,43.7 L46.3,48.9 L46.3,53.3 L45.8,58.1 L44.6,64.6 L44,63.9 L42.5,61.7 L40.4,57.5 L38.9,53 L38,48.9 L37.1,40.6 L36.8,33.5 L37.2,28.9 L37.9,26.3 Z M56.1,22.6 L57,23 L58.1,24.1 L59.5,26.1 L60.4,27.9 L61.2,29.7 L62.1,32.4 L63,35.8 L63.6,38.5 L63.6,38.6 L61.6,37.1 L60.1,35.7 L58.9,34.2 L58.2,33.1 L57.5,31.8 L56.8,29.9 L56.2,27.6 L56,25.7 Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            <h3>La Citoyenneté</h3>
-            <p>Pousser les apprenants vers une citoyenneté responsable, sur les plans économique, social et environnemental.</p>
-          </div>
-          <div class="axis-card rail-card">
-            <span class="axis-num">05</span>
-            <div class="axis-icon axis-icon--vie-active" data-axis-icon>
-              <svg viewBox="0 0 100 100">
-                <path class="axis-fill" fill-rule="evenodd" d="M35.2,44.8 L33,46.3 L31.9,48.1 L30.9,51.6 L30.8,55.1 L31.2,60 L32.3,65 L34,70.5 L36.2,75.6 L40,82.9 L42.2,84.8 L44.3,85.5 L52.9,85.5 L54.8,85 L56.2,84 L57.3,82.7 L64.8,69.4 L67.6,63.4 L68.7,59.7 L69.2,55.4 L69.1,51.1 L68.5,47.9 L67.7,46.6 L66.4,45.4 L63.6,44.4 L36.9,44.4 Z M55.4,47.8 L55.8,48.2 L55.7,48.7 L53.3,51.8 L54.4,64.8 L53.9,65.4 L45.9,69.7 L45.4,69.8 L45,69.5 L44.9,69.1 L46.5,52.5 L44,48.8 L43.9,48.3 L44.4,47.8 Z M48.7,14.6 L46.2,15.1 L44,16 L42.1,17.3 L40.2,19.2 L38.8,21.4 L37.9,23.4 L37.4,26 L37.4,28.4 L37.9,30.9 L38.9,33.3 L40.2,35.3 L41.7,36.8 L44,38.4 L46.4,39.4 L48.6,39.8 L51.2,39.9 L53.6,39.4 L56.2,38.3 L58.1,37.1 L59.8,35.4 L61.3,33.2 L62.3,30.8 L62.8,28.5 L62.8,25.9 L62.3,23.5 L61.2,21 L60.1,19.3 L58.2,17.4 L56.3,16.1 L53.8,15 L51.4,14.6 Z"/>
-                <path class="axis-draw" fill="none" d="M35.2,44.8 L33,46.3 L31.9,48.1 L30.9,51.6 L30.8,55.1 L31.2,60 L32.3,65 L34,70.5 L36.2,75.6 L40,82.9 L42.2,84.8 L44.3,85.5 L52.9,85.5 L54.8,85 L56.2,84 L57.3,82.7 L64.8,69.4 L67.6,63.4 L68.7,59.7 L69.2,55.4 L69.1,51.1 L68.5,47.9 L67.7,46.6 L66.4,45.4 L63.6,44.4 L36.9,44.4 Z M55.4,47.8 L55.8,48.2 L55.7,48.7 L53.3,51.8 L54.4,64.8 L53.9,65.4 L45.9,69.7 L45.4,69.8 L45,69.5 L44.9,69.1 L46.5,52.5 L44,48.8 L43.9,48.3 L44.4,47.8 Z M48.7,14.6 L46.2,15.1 L44,16 L42.1,17.3 L40.2,19.2 L38.8,21.4 L37.9,23.4 L37.4,26 L37.4,28.4 L37.9,30.9 L38.9,33.3 L40.2,35.3 L41.7,36.8 L44,38.4 L46.4,39.4 L48.6,39.8 L51.2,39.9 L53.6,39.4 L56.2,38.3 L58.1,37.1 L59.8,35.4 L61.3,33.2 L62.3,30.8 L62.8,28.5 L62.8,25.9 L62.3,23.5 L61.2,21 L60.1,19.3 L58.2,17.4 L56.3,16.1 L53.8,15 L51.4,14.6 Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            <h3>La Vie Active</h3>
-            <p>Préparer les apprenants à la vie professionnelle, à l'autonomie pratique et aux spécificités de leur communauté.</p>
-          </div>
+    <div class="hero-visual">
+      <div class="hero-visual-bg"></div>
+      <div class="hero-visual-tint"></div>
+      <div class="hero-visual-content">
+        <img src="assets/logo-primary-white.png" alt="" class="hero-visual-mark">
+        <div>
+          <p class="hero-visual-quote">« Une éducation de qualité qui implique activement les jeunes. »</p>
+          <div class="hero-visual-tag">Notre vision, en une phrase</div>
         </div>
       </div>
-      <div class="rail-controls">
-        <div class="rail-arrows">
-          <button type="button" class="rail-arrow" data-rail-prev aria-label="Axe précédent">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-          </button>
-          <button type="button" class="rail-arrow" data-rail-next aria-label="Axe suivant">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-          </button>
-        </div>
-        <div class="rail-progress"><div class="rail-progress-bar" data-rail-progress></div></div>
-        <div class="rail-count"><b data-rail-current>1</b>&nbsp;/&nbsp;<span data-rail-total>5</span></div>
+    </div>
+  </section>
+
+  <!-- ===================== QUI SOMMES-NOUS (teaser) ===================== -->
+  <section class="section" id="about">
+    <div class="section-head">
+      <h2>Une association née d'une conférence, devenue un réseau national</h2>
+      <p>L'Association YOUTH CLUBs (AYCs) est une organisation tunisienne à but non lucratif, reconnue par l'État, qui regroupe des adhérents à des YOUTH CLUBs implantés dans leurs établissements éducatifs. Elle coordonne ces clubs et réglemente leur organisation sur des principes de transparence et de démocratie, avec une vision axée sur la scolarité, l'éducation formelle, la santé, la citoyenneté et la vie active.</p>
+      <div class="hero-actions" style="margin-top:20px">
+        <a href="a-propos" class="btn btn-primary">Notre histoire et notre vision</a>
+        <a href="gouvernance" class="btn btn-primary">Découvrir le Bureau Exécutif National</a>
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<div class="seam seam-dark"></div>
+  <!-- ===================== CTA FINAL ===================== -->
+  <section class="section">
+    <div class="cta-band">
+      <div class="cta-band-tint"></div>
+      <div class="cta-band-content">
+        <h2>Envie de rejoindre l'aventure ?</h2>
+        <p>Chaque mandat, l'association ouvre ses portes à de nouveaux membres à travers tout le réseau de clubs. Contacte-nous pour savoir comment rejoindre un YOUTH CLUB près de chez toi.</p>
+        <a href="mailto:contact@youthclubs.tn" class="btn btn-third">Nous contacter</a>
+      </div>
+    </div>
+  </section>
 
-<section class="section cta-section" id="rejoindre">
-  <div class="container cta-centered">
-    <div class="eyebrow reveal">Passe à l'action</div>
-    <h2 class="reveal reveal-stagger" style="--d:0.08s">L'histoire s'écrit avec toi</h2>
-    <p class="reveal reveal-stagger" style="--d:0.16s">Rejoins un réseau de jeunes qui agissent concrètement pour leur avenir. Trouve le club le plus proche de chez toi ou crée-le dans ton établissement.</p>
-    <a href="mailto:contact@youthclubs.org" class="btn-primary reveal reveal-stagger" style="--d:0.24s">Contacter l'association</a>
+</main>
+
+<footer class="page-footer">
+  <div class="footer-affiliation">
+    <span class="footer-affiliation-label">Association</span>
+    <img src="assets/logo-secondary-color.png" alt="Association YOUTH CLUBs" class="footer-logo">
   </div>
-</section>
+  <span class="footer-meta">Bureau 1.2, Immeuble Chebil, avenue Farhat Hached, Megrine, Ben Arous, 2033</span>
+</footer>
 
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-  const canvas = document.getElementById("door-canvas");
-  const ctx = canvas.getContext("2d", { alpha: false });
-  const frameCount = 153;
-  const frames = [];
-  let loadedCount = 0;
-  let firstDrawn = false;
+(function(){
+  "use strict";
+  /* ---------- Header menu (button + dropdown panel) ---------- */
+  var menuRoot = document.querySelector('[data-menu]');
+  if (menuRoot){
+    var menuBtn = menuRoot.querySelector('[data-menu-btn]');
+    var menuPanel = menuRoot.querySelector('[data-menu-panel]');
 
-  const scrollProgressBar = document.getElementById("scroll-progress-bar");
-  const scrollCue = document.getElementById("scroll-cue");
+    function closeMenu(){
+      menuRoot.classList.remove('is-open');
+      menuBtn.setAttribute('aria-expanded', 'false');
+    }
+    function openMenu(){
+      menuRoot.classList.add('is-open');
+      menuBtn.setAttribute('aria-expanded', 'true');
+    }
+    function toggleMenu(){
+      if (menuRoot.classList.contains('is-open')) closeMenu(); else openMenu();
+    }
 
-  // Preload images — the first frame paints immediately (high priority) so
-  // there's no blank hero on load. The rest stream in behind it, in small
-  // batches, so we're not firing 153 simultaneous requests and hogging
-  // bandwidth/CPU on page load; scrubbing still works against whatever has
-  // loaded so far via the `frames[i].complete` check in update().
-  for (let i = 1; i <= frameCount; i++) {
-    const img = new Image();
-    img.decoding = "async";
-    frames.push(img);
+    menuBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      toggleMenu();
+    });
+    document.addEventListener('click', function(e){
+      if (!menuRoot.contains(e.target)) closeMenu();
+    });
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape') closeMenu();
+    });
+    menuPanel.querySelectorAll('a').forEach(function(a){
+      a.addEventListener('click', closeMenu);
+    });
   }
 
-  function loadFrame(i) {
-    const img = frames[i - 1];
-    if (!img || img.src) return; // already queued/loaded
-    const frameNumber = i.toString().padStart(3, '0');
-    img.src = `door-frames/ezgif-frame-${frameNumber}.jpg`;
-    img.onload = () => {
-      loadedCount++;
-      if (!firstDrawn) {
-        firstDrawn = true;
-        drawImage(img);
-        canvas.classList.add("is-ready");
-      }
-    };
-  }
 
-  // First frame: load right away, at high fetch priority, so the hero paints fast.
-  frames[0].fetchPriority = "high";
-  loadFrame(1);
-
-  // Next handful: enough runway for an eager scroller before the background
-  // queue catches up.
-  for (let i = 2; i <= Math.min(12, frameCount); i++) loadFrame(i);
-
-  // Remaining frames stream in the background in small batches via
-  // requestIdleCallback (falls back to a timer) so they never compete with
-  // first-paint or main-thread work.
-  let nextBatchStart = 13;
-  function loadNextBatch(deadline) {
-    const batchSize = 8;
-    let loaded = 0;
-    while (nextBatchStart <= frameCount && loaded < batchSize) {
-      loadFrame(nextBatchStart);
-      nextBatchStart++;
-      loaded++;
-      if (deadline && deadline.timeRemaining && deadline.timeRemaining() < 1) break;
-    }
-    if (nextBatchStart <= frameCount) {
-      scheduleIdle(loadNextBatch);
-    }
-  }
-  function scheduleIdle(fn) {
-    if ("requestIdleCallback" in window) {
-      requestIdleCallback(fn, { timeout: 500 });
-    } else {
-      setTimeout(fn, 200);
-    }
-  }
-  scheduleIdle(loadNextBatch);
-
-  function drawImage(img) {
-    if (!img) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-
-    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      canvas.style.width = w + "px";
-      canvas.style.height = h + "px";
-    }
-
-    const canvasRatio = canvas.width / canvas.height;
-    const imgRatio = img.width / img.height;
-
-    let drawWidth, drawHeight, x, y;
-
-    if (canvasRatio > imgRatio) {
-      drawWidth = canvas.width;
-      drawHeight = canvas.width / imgRatio;
-      x = 0;
-      y = (canvas.height - drawHeight) / 2;
-    } else {
-      drawWidth = canvas.height * imgRatio;
-      drawHeight = canvas.height;
-      x = (canvas.width - drawWidth) / 2;
-      y = 0;
-    }
-
-    // Fill with the deep night tone to match the palette during letterboxing
-    ctx.fillStyle = '#061529';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, x, y, drawWidth, drawHeight);
-  }
-
-  const container = document.getElementById("hero-scroll");
-  let rafId = null;
-  let lastFrameIndex = -1;
-
-  // Cache beat elements once instead of re-querying the DOM on every
-  // animation frame during scroll.
-  const beatEls = {
-    1: document.querySelector('.beat-1'),
-    2: document.querySelector('.beat-2'),
-    3: document.querySelector('.beat-3'),
-    4: document.querySelector('.beat-4'),
-    5: document.querySelector('.beat-5'),
-  };
-
-  function update() {
-    rafId = null;
-
-    // Canvas scrub logic
-    const maxScroll = container.offsetHeight - window.innerHeight;
-    const rect = container.getBoundingClientRect();
-    let scrollProgress = Math.max(0, Math.min(1, -rect.top / maxScroll));
-
-    // The door should be fully open by the time we hit the final beat (84%)
-    let doorProgress = Math.min(1, scrollProgress / 0.84);
-
-    // Ease-out curve to counteract the source footage's slow start / fast finish
-    doorProgress = Math.pow(doorProgress, 0.6);
-
-    const frameIndex = Math.floor(doorProgress * (frameCount - 1));
-    if (frameIndex !== lastFrameIndex && frames[frameIndex] && frames[frameIndex].complete) {
-      drawImage(frames[frameIndex]);
-      lastFrameIndex = frameIndex;
-    }
-
-    // Beats
-    updateBeat(1, 0, 0.06, scrollProgress);
-    updateBeat(2, 0.14, 0.28, scrollProgress);
-    updateBeat(3, 0.36, 0.52, scrollProgress);
-    updateBeat(4, 0.58, 0.74, scrollProgress);
-    updateBeat(5, 0.84, 1.00, scrollProgress);
-
-    // Global chrome tied to scroll
-    if (scrollProgressBar) {
-      scrollProgressBar.style.width = (scrollProgress * 100).toFixed(2) + "%";
-    }
-    if (scrollCue) {
-      scrollCue.classList.toggle("is-hidden", scrollProgress > 0.03);
-    }
-  }
-
-  window.addEventListener("scroll", () => {
-    if (!rafId) {
-      rafId = requestAnimationFrame(update);
-    }
-  }, { passive: true });
-
-  let resizeTimer = null;
-  window.addEventListener("resize", () => {
-    if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      lastFrameIndex = -1;
-      update();
-    }, 120);
-  }, { passive: true });
-
-  function updateBeat(num, start, end, progress) {
-    const el = beatEls[num];
-    if (!el) return;
-
-    const fadeMargin = 0.1;
-    const shift = 26;
-
-    if (progress >= start - fadeMargin && progress <= end + fadeMargin) {
-      let opacity = 1;
-      let phase = 0; // -1 entering, 0 settled, 1 leaving
-
-      if (progress < start) {
-        opacity = (progress - (start - fadeMargin)) / fadeMargin;
-        phase = -1;
-      } else if (progress > end) {
-        opacity = 1 - ((progress - end) / fadeMargin);
-        phase = 1;
-      }
-
-      opacity = Math.max(0, Math.min(1, opacity));
-      const eased = 1 - Math.pow(1 - opacity, 3); // ease-out cubic on the fade itself
-      const translateY = phase >= 0 ? shift * (1 - eased) : -shift * 0.4 * (1 - eased);
-      const blur = (1 - eased) * 6;
-      const scale = 0.97 + 0.03 * eased;
-
-      el.style.opacity = eased.toFixed(3);
-      el.style.transform = `translateY(${translateY.toFixed(2)}px) scale(${scale.toFixed(3)})`;
-      el.style.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : "none";
-
-      if (opacity > 0) {
-        el.classList.add('is-active');
-      } else {
-        el.classList.remove('is-active');
-      }
-    } else {
-      el.style.opacity = '0';
-      el.style.transform = `translateY(${shift}px) scale(0.97)`;
-      el.style.filter = "blur(6px)";
-      el.classList.remove('is-active');
-    }
-  }
-
-  // Initial draw
-  update();
-
-  // ---------------------------------------------------------------------
-  // Scroll-reveal for the content below the hero
-  // ---------------------------------------------------------------------
-  const revealEls = document.querySelectorAll(".reveal");
-  if ("IntersectionObserver" in window) {
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("is-visible");
-          io.unobserve(entry.target);
-        }
+  /* Hero visual: subtle pointer-driven parallax tilt (desktop only) */
+  var heroVisual = document.querySelector('.hero-visual');
+  if (heroVisual && window.matchMedia('(hover:hover) and (pointer:fine)').matches){
+    var rafId = null;
+    heroVisual.addEventListener('mousemove', function(e){
+      if (rafId) return;
+      rafId = requestAnimationFrame(function(){
+        var r = heroVisual.getBoundingClientRect();
+        var px = (e.clientX - r.left) / r.width - 0.5;
+        var py = (e.clientY - r.top) / r.height - 0.5;
+        heroVisual.style.transform = 'translateY(-2px) rotateX(' + (py * -2.5) + 'deg) rotateY(' + (px * 3) + 'deg)';
+        rafId = null;
       });
-    }, { threshold: 0.18, rootMargin: "0px 0px -8% 0px" });
-
-    revealEls.forEach((el) => io.observe(el));
-  } else {
-    revealEls.forEach((el) => el.classList.add("is-visible"));
+    });
+    heroVisual.addEventListener('mouseleave', function(){
+      heroVisual.style.transform = '';
+    });
   }
 
-  // ---------------------------------------------------------------------
-  // Axes rail — carousel + hand-drawn icon animation
-  // (same behaviour as the 5-axis rail on strategie.html)
-  // ---------------------------------------------------------------------
+  /* ---------- Scroll reveal ---------- */
+  var revealTargets = document.querySelectorAll(
+    '.section-head, .gov-card:not(.reveal-on-scroll), .history-timeline, .cta-band'
+  );
+  revealTargets.forEach(function(el){ el.classList.add('reveal-on-scroll'); });
+
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if (entry.isIntersecting){
+        entry.target.classList.add('is-visible');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.16, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.reveal-on-scroll').forEach(function(el){ io.observe(el); });
+
+  /* Rail-wraps (carousels) cascade their cards in once in view */
   var railWraps = document.querySelectorAll('.rail-wrap');
-  var railIo = new IntersectionObserver(function (entries) {
-    entries.forEach(function (entry) {
-      if (entry.isIntersecting) { entry.target.classList.add('is-visible'); railIo.unobserve(entry.target); }
+  var railIo = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if (entry.isIntersecting){
+        entry.target.classList.add('is-visible');
+        railIo.unobserve(entry.target);
+      }
     });
   }, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
-  railWraps.forEach(function (el) { railIo.observe(el); });
+  railWraps.forEach(function(el){ railIo.observe(el); });
 
-  /* Axis icons: draw themselves in once their card enters the viewport. */
-  document.querySelectorAll('[data-axis-icon] .axis-draw').forEach(function (path) {
+  /* Axis icons: draw themselves in once their card enters the viewport.
+     Each path's stroke-dasharray is set to its own measured length via
+     getTotalLength(), so the line draws smoothly with no gaps/snapping
+     regardless of how long or short the path actually is. */
+  document.querySelectorAll('[data-axis-icon] .axis-draw').forEach(function(path){
     var len = Math.ceil(path.getTotalLength());
     path.style.strokeDasharray = len;
     path.style.strokeDashoffset = len;
     path.style.setProperty('--len', len);
   });
   var axisCards = document.querySelectorAll('.axis-card');
-  var axisIo = new IntersectionObserver(function (entries) {
-    entries.forEach(function (entry) {
-      if (entry.isIntersecting) {
+  var axisIo = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if (entry.isIntersecting){
         entry.target.classList.add('is-drawn');
-        entry.target.querySelectorAll('.axis-draw').forEach(function (path) { path.style.strokeDashoffset = 0; });
+        entry.target.querySelectorAll('.axis-draw').forEach(function(path){
+          path.style.strokeDashoffset = 0;
+        });
         axisIo.unobserve(entry.target);
       }
     });
   }, { threshold: 0.4 });
-  axisCards.forEach(function (el) { axisIo.observe(el); });
+  axisCards.forEach(function(el){ axisIo.observe(el); });
 
-  /* ---------- Carousel ---------- */
+  /* History timeline items reveal individually + trigger the connecting line */
+  var hItems = document.querySelectorAll('.h-item');
+  var hIo = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if (entry.isIntersecting){
+        entry.target.classList.add('is-visible');
+        hIo.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.2 });
+  hItems.forEach(function(el){ hIo.observe(el); });
+
+  /* ---------- Carousels (5H, Axes, BEN, Events) ---------- */
   var carousels = document.querySelectorAll('[data-carousel]');
-  carousels.forEach(function (root) {
+
+  carousels.forEach(function(root){
     var viewport = root.querySelector('[data-rail-viewport]');
     var track = root.querySelector('[data-rail-track]');
     var prevBtn = root.querySelector('[data-rail-prev]');
@@ -1292,24 +261,28 @@ document.addEventListener("DOMContentLoaded", () => {
     var totalEl = root.querySelector('[data-rail-total]');
     var cards = Array.prototype.slice.call(track.children);
     if (totalEl) totalEl.textContent = cards.length;
-    cards.forEach(function (card, i) { card.style.setProperty('--card-i', i); });
+    cards.forEach(function(card, i){ card.style.setProperty('--card-i', i); });
 
-    function cardStep() {
+    function cardStep(){
       if (!cards.length) return 0;
       var style = window.getComputedStyle(track);
       var gap = parseFloat(style.columnGap || style.gap || 0) || 0;
       return cards[0].getBoundingClientRect().width + gap;
     }
-    function activeIndex() {
+
+    function activeIndex(){
       var step = cardStep();
       if (!step) return 0;
       return Math.round(viewport.scrollLeft / step);
     }
-    function updateUI() {
+
+    function updateUI(){
+      var step = cardStep();
       var idx = Math.min(cards.length - 1, Math.max(0, activeIndex()));
       var maxScroll = track.scrollWidth - viewport.clientWidth;
+
       if (currentEl) currentEl.textContent = idx + 1;
-      if (progressBar) {
+      if (progressBar){
         var pct = maxScroll > 0 ? (viewport.scrollLeft / maxScroll) * 100 : 100;
         pct = Math.max(6, Math.min(100, pct));
         progressBar.style.width = pct + '%';
@@ -1317,50 +290,64 @@ document.addEventListener("DOMContentLoaded", () => {
       if (prevBtn) prevBtn.disabled = viewport.scrollLeft <= 2;
       if (nextBtn) nextBtn.disabled = viewport.scrollLeft >= maxScroll - 2;
     }
-    function goTo(index) {
+
+    function goTo(index){
       var step = cardStep();
       index = Math.min(cards.length - 1, Math.max(0, index));
       viewport.scrollTo({ left: index * step, behavior: 'smooth' });
     }
-    if (prevBtn) prevBtn.addEventListener('click', function () { goTo(activeIndex() - 1); });
-    if (nextBtn) nextBtn.addEventListener('click', function () { goTo(activeIndex() + 1); });
+
+    if (prevBtn) prevBtn.addEventListener('click', function(){ goTo(activeIndex() - 1); });
+    if (nextBtn) nextBtn.addEventListener('click', function(){ goTo(activeIndex() + 1); });
 
     var scrollTimer = null;
-    viewport.addEventListener('scroll', function () {
+    viewport.addEventListener('scroll', function(){
       if (scrollTimer) window.cancelAnimationFrame(scrollTimer);
       scrollTimer = window.requestAnimationFrame(updateUI);
     }, { passive: true });
+
     window.addEventListener('resize', updateUI);
 
+    /* Drag-to-scroll (mouse) with momentum-friendly native scroll */
     var isDown = false, startX = 0, startScroll = 0, moved = false;
-    viewport.addEventListener('mousedown', function (e) {
+
+    viewport.addEventListener('mousedown', function(e){
       isDown = true; moved = false;
       viewport.classList.add('is-dragging');
       startX = e.pageX;
       startScroll = viewport.scrollLeft;
     });
-    window.addEventListener('mouseup', function () {
+    window.addEventListener('mouseup', function(){
       if (!isDown) return;
       isDown = false;
       viewport.classList.remove('is-dragging');
       updateUI();
     });
-    window.addEventListener('mousemove', function (e) {
+    window.addEventListener('mousemove', function(e){
       if (!isDown) return;
       var dx = e.pageX - startX;
       if (Math.abs(dx) > 4) moved = true;
       viewport.scrollLeft = startScroll - dx;
     });
-    viewport.addEventListener('click', function (e) {
-      if (moved) { e.preventDefault(); e.stopPropagation(); }
+    /* Prevent accidental link/card click after a real drag */
+    viewport.addEventListener('click', function(e){
+      if (moved){ e.preventDefault(); e.stopPropagation(); }
     }, true);
-    viewport.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowRight') { e.preventDefault(); goTo(activeIndex() + 1); }
-      if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(activeIndex() - 1); }
+
+    /* Keyboard support when the rail itself is focused */
+    viewport.addEventListener('keydown', function(e){
+      if (e.key === 'ArrowRight'){ e.preventDefault(); goTo(activeIndex() + 1); }
+      if (e.key === 'ArrowLeft'){ e.preventDefault(); goTo(activeIndex() - 1); }
     });
+
     updateUI();
   });
-});
+
+})();
 </script>
+
+<link rel="stylesheet" href="chat-widget.css">
+<script src="chat-widget.js" defer></script>
+<script src="smooth-scroll.js" defer></script>
 </body>
 </html>
