@@ -1641,13 +1641,21 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   scheduleIdle(loadNextBatch);
 
+  // Mobile fix: phones report devicePixelRatio 2-3, and every point of DPR
+  // squares the canvas fill/blit cost. Desktop keeps the existing 1.5 cap
+  // (unchanged); touch devices are capped lower so the scroll-linked
+  // redraw stays cheap enough for mobile GPUs to keep up every frame.
+  const isTouchDevice =
+    window.matchMedia && window.matchMedia("(pointer: coarse) and (hover: none)").matches;
+  const maxDpr = isTouchDevice ? 1 : 1.5;
+
   function drawImage(img) {
     if (!img) return;
     // Capped at 1.5 rather than 2: this canvas shows full-bleed photographic
     // footage (not text/UI), so the sharpness gain from full device
     // resolution is barely visible, while canvas fill/blit cost scales with
     // pixel count — 1.5 vs 2 is roughly a 40% smaller canvas to redraw.
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
     const w = window.innerWidth;
     const h = window.innerHeight;
 
@@ -2127,6 +2135,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   if (reducedMotion.matches) return; // leave the CSS fallback visible
+
+  // MOBILE FIX: this shader runs a 4-layer per-pixel fragment loop (sin/cos/
+  // atan/pow plus a 5-tap grain pass) at up to 60fps, on top of the
+  // scroll-linked door-frame canvas elsewhere on the page. Desktop GPUs
+  // shrug this off; phone GPUs — especially mid-range Android and thermally
+  // throttled iPhones — can't sustain it, and that's the dominant source of
+  // the mobile lag in this section. Route touch devices straight to the
+  // existing CSS orb fallback instead of ever creating the WebGL context.
+  // Desktop (fine pointer / mouse) is completely unaffected.
+  const isTouchDevice = window.matchMedia('(pointer: coarse) and (hover: none)').matches;
+  if (isTouchDevice) return; // leave the CSS fallback visible
 
   let Renderer, Program, Mesh, Triangle;
   try {
