@@ -1,0 +1,159 @@
+/* ==========================================================================
+   Accueil — Hero vidéo piloté par le scroll
+   ==========================================================================
+   Concept : la porte bleue du logo (filmée) s'ouvre au fil du scroll sur un
+   ciel/mer lumineux, puis la vidéo bascule sur une boucle ambiante du même
+   plan pendant que le contenu défile par-dessus. Tout le reste de la page
+   (axes, à-propos, CTA) reste sur le système .stage / .section existant.
+   ========================================================================== */
+
+/* The pinned stage needs room to scrub through — height controls how much
+   scroll distance maps to the door swinging open. Tuned so it doesn't feel
+   sluggish on a fast scroll or too abrupt on a slow one. */
+.video-hero{
+  position:relative;
+  height:340vh;
+  background:#0c1016;
+}
+@media (max-width:640px){
+  .video-hero{ height:280vh; }
+}
+
+.video-hero-stage{
+  position:sticky;
+  top:0;
+  height:100vh;
+  width:100%;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#0c1016;
+}
+
+/* Both videos fill the viewport, cropped like a real photo backdrop.
+   They're stacked; opacity crossfades between "door" and "loop" once the
+   door is fully open, so the seam is invisible. */
+.video-hero-media{
+  position:absolute; inset:0; width:100%; height:100%;
+  overflow:hidden;
+}
+.video-hero-media video,
+.video-hero-media img{
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  object-fit:cover; object-position:center 42%;
+  display:block;
+}
+.video-hero-media video{ opacity:0; }
+.video-hero-media video.is-active{ opacity:1; }
+#doorVideo{ opacity:1; }
+
+/* Warm color-grade + slight vignette so text sits comfortably on top
+   regardless of which frame of footage is showing. */
+.video-hero-tint{
+  position:absolute; inset:0;
+  background:
+    linear-gradient(180deg, rgba(10,16,26,0.55) 0%, rgba(10,16,26,0.08) 30%, rgba(10,16,26,0.12) 60%, rgba(8,13,22,0.62) 100%);
+  pointer-events:none;
+}
+.video-hero-grain{
+  position:absolute; inset:0; opacity:0.05; mix-blend-mode:overlay; pointer-events:none;
+  background-image:url('assets/Pattern.png'); background-size:480px;
+}
+
+/* ===================== STAGED CAPTIONS ===================== *
+ * Each .vh-beat is absolutely centered and fades/lifts in over a slice
+ * of the scroll-driven progress, then fades out before the next begins.
+ * Visibility is toggled purely via a --p (0..1 opacity) CSS var set by JS,
+ * so there's no layout thrash — only opacity/transform update per frame. */
+.video-hero-copy{
+  position:relative; z-index:2; width:100%; height:100%;
+  display:flex; align-items:center; justify-content:center;
+  text-align:center; color:#fff;
+  padding:0 24px;
+}
+.vh-beat{
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:14px;
+  opacity:0;
+  transform:translateY(22px);
+  will-change:opacity, transform;
+  pointer-events:none;
+}
+.vh-beat.is-active{ pointer-events:auto; }
+.vh-eyebrow{
+  font-family:var(--font-body); font-weight:700; font-size:0.72rem;
+  letter-spacing:0.18em; text-transform:uppercase; color:#bcd4ea; opacity:0.85;
+}
+.vh-beat h1, .vh-beat h2{
+  font-family:var(--font-display); font-weight:400; text-transform:none;
+  color:#fff; margin:0; letter-spacing:-0.005em;
+  text-shadow:0 6px 30px rgba(0,0,0,0.35);
+}
+.vh-beat h1{ font-size:clamp(2.2rem, 5.6vw, 4rem); line-height:1.05; max-width:16ch; }
+.vh-beat h2{ font-size:clamp(1.6rem, 3.6vw, 2.6rem); line-height:1.12; max-width:20ch; }
+.vh-beat p{
+  font-size:clamp(0.95rem, 1.4vw, 1.1rem); line-height:1.65; color:#e7eefb;
+  max-width:46ch; margin:0; opacity:0.92;
+}
+.vh-beat .hero-actions{
+  margin-top:10px; opacity:1; animation:none;
+}
+.vh-stats{
+  display:flex; gap:36px; margin-top:6px; flex-wrap:wrap; justify-content:center;
+}
+.vh-stat{ display:flex; flex-direction:column; align-items:center; gap:2px; }
+.vh-stat b{
+  font-family:var(--font-display); font-weight:400; font-size:2rem; color:#fff;
+  line-height:1; font-variant-numeric:tabular-nums; text-shadow:0 4px 20px rgba(0,0,0,0.35);
+}
+.vh-stat span{ font-size:0.74rem; color:#c7d9ee; letter-spacing:0.02em; }
+
+/* Scroll hint on the very first beat only */
+.vh-scrollhint{
+  position:absolute; left:50%; bottom:38px; transform:translateX(-50%);
+  z-index:2; color:#fff; opacity:0.75; display:flex; flex-direction:column;
+  align-items:center; gap:8px; font-size:0.72rem; letter-spacing:0.12em;
+  text-transform:uppercase; font-weight:600;
+  transition:opacity .4s var(--ease);
+}
+.vh-scrollhint .chevron{
+  width:9px; height:9px; border-right:2px solid currentColor; border-bottom:2px solid currentColor;
+  transform:rotate(45deg); animation:vhBob 1.6s ease-in-out infinite;
+}
+@keyframes vhBob{
+  0%,100%{ transform:translateY(0) rotate(45deg); }
+  50%{ transform:translateY(6px) rotate(45deg); }
+}
+
+/* Progress rail — thin indicator on the right edge of the pinned stage,
+   showing where we are across the whole scrubbed sequence. Subtle, not a
+   scrollbar replacement, just a wayfinding touch during a long pinned scroll. */
+.vh-rail{
+  position:absolute; top:50%; right:22px; transform:translateY(-50%);
+  z-index:2; width:3px; height:120px; border-radius:100px;
+  background:rgba(255,255,255,0.18); overflow:hidden;
+}
+.vh-rail-fill{
+  position:absolute; left:0; top:0; width:100%; height:0%;
+  background:linear-gradient(180deg, var(--gold), var(--gold-2));
+  border-radius:100px;
+}
+@media (max-width:780px){ .vh-rail{ display:none; } }
+
+@media (prefers-reduced-motion: reduce){
+  .video-hero{ height:auto; }
+  .video-hero-stage{ position:relative; height:88vh; }
+  .vh-beat{ position:relative; opacity:1 !important; transform:none !important; margin-bottom:14px; }
+  .vh-scrollhint{ display:none; }
+}
+
+/* ===================== SECTION THAT FOLLOWS THE HERO ===================== */
+/* Small connective tissue so the page doesn't feel like it "lands" abruptly
+   after the pinned video releases. */
+.post-hero-divider{
+  height:1px; background:linear-gradient(90deg, transparent, var(--line), transparent);
+  max-width:1180px; margin:0 auto;
+}
