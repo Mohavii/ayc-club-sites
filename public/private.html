@@ -222,7 +222,7 @@ h1, h2, h3, h4, h5, h6 {
   position: sticky;
   top: 0;
   height: 100vh;
-  height: 100svh;
+  height: 100dvh;
   width: 100vw;
   overflow: hidden;
   background: var(--night-deep);
@@ -1689,14 +1689,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // resolution is barely visible, while canvas fill/blit cost scales with
     // pixel count — 1.5 vs 2 is roughly a 40% smaller canvas to redraw.
     const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const w = viewportWidth;
+    const h = viewportHeight;
 
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
-      canvas.style.width = w + "px";
-      canvas.style.height = h + "px";
     }
 
     const canvasRatio = canvas.width / canvas.height;
@@ -1752,9 +1750,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // "dirty", which adds up fast at 60fps. Recomputed only on resize.
   let maxScroll = 0;
   let containerTop = 0;
+  let heroBottom = 0;
+  let viewportWidth = window.innerWidth;
+  let viewportHeight = window.innerHeight;
   function recomputeLayout() {
     containerTop = container.getBoundingClientRect().top + window.scrollY;
-    maxScroll = container.offsetHeight - window.innerHeight;
+    viewportWidth = window.innerWidth;
+    viewportHeight = window.innerHeight;
+    maxScroll = container.offsetHeight - viewportHeight;
+    heroBottom = container.offsetHeight;
   }
   recomputeLayout();
 
@@ -1853,6 +1857,7 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       onRefresh: (self) => {
         recomputeLayout();
+        lastFrameIndex = -1;
         runUpdateFromProgress(self.progress, performance.now());
       },
     });
@@ -2136,10 +2141,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let headerOnLight = false;
     function updateHeader() {
       headerRafId = null;
-      const heroBottom = container.offsetHeight; // hero-scroll-container end
       const scrollY = window.scrollY;
       siteHeader.classList.toggle('is-visible', scrollProgressPastHero());
-      const onLight = scrollY > heroBottom - window.innerHeight * 0.4;
+      const onLight = scrollY > heroBottom - viewportHeight * 0.4;
       siteHeader.classList.toggle('is-on-light', onLight);
       if (headerLogo && onLight !== headerOnLight) {
         headerOnLight = onLight;
