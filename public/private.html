@@ -209,13 +209,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @media (max-width: 900px) {
-  /* Slowed down vs. the previous 480vh: a shorter scroll distance on mobile
-     packed the same 153 frames and all 5 text beats into less physical
-     scroll, so the sequence blew past quickly, felt rushed, and produced
-     more frame-switches per second during a fast swipe (worsening the
-     canvas-redraw lag). Now longer than even desktop's 650vh so the mobile
-     scrub reads as deliberate rather than frantic. */
-  .hero-scroll-container { height: 780vh; }
+  .hero-scroll-container { height: 480vh; }
 }
 
 .hero-sticky {
@@ -1647,21 +1641,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   scheduleIdle(loadNextBatch);
 
-  // Mobile fix: phones report devicePixelRatio 2-3, and every point of DPR
-  // squares the canvas fill/blit cost. Desktop keeps the existing 1.5 cap
-  // (unchanged); touch devices are capped lower so the scroll-linked
-  // redraw stays cheap enough for mobile GPUs to keep up every frame.
-  const isTouchDevice =
-    window.matchMedia && window.matchMedia("(pointer: coarse) and (hover: none)").matches;
-  const maxDpr = isTouchDevice ? 1 : 1.5;
-
   function drawImage(img) {
     if (!img) return;
     // Capped at 1.5 rather than 2: this canvas shows full-bleed photographic
     // footage (not text/UI), so the sharpness gain from full device
     // resolution is barely visible, while canvas fill/blit cost scales with
     // pixel count — 1.5 vs 2 is roughly a 40% smaller canvas to redraw.
-    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     const w = window.innerWidth;
     const h = window.innerHeight;
 
@@ -1699,18 +1685,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let rafId = null;
   let lastFrameIndex = -1;
 
-  // Mobile fix: on a fast swipe, doorProgress can jump across many frame
-  // indices between two animation frames. Desktop redraws every one of
-  // those intermediate frames (cheap enough there); on touch devices we
-  // cap the canvas to a lower effective redraw rate so a fast swipe skips
-  // straight to the nearest frame instead of trying to paint each one —
-  // this is the main remaining lag source once the DPR cap and the WebGL
-  // shader skip are already in place.
-  const isTouchScrub =
-    window.matchMedia && window.matchMedia("(pointer: coarse) and (hover: none)").matches;
-  const minRedrawIntervalMs = isTouchScrub ? 33 : 0; // ~30fps cap on touch, uncapped on desktop
-  let lastDrawTime = -Infinity;
-
   // Cache beat elements once instead of re-querying the DOM on every
   // animation frame during scroll.
   const beatEls = {
@@ -1733,7 +1707,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   recomputeLayout();
 
-  function update(now) {
+  function update() {
     rafId = null;
 
     // Canvas scrub logic
@@ -1751,30 +1725,17 @@ document.addEventListener("DOMContentLoaded", () => {
     // .complete flag needed), a still-loading <img> (has .complete === false
     // until decoded, fallback path only), or not yet requested.
     const frame = frames[frameIndex];
-    const dueForRedraw = !minRedrawIntervalMs || (now || performance.now()) - lastDrawTime >= minRedrawIntervalMs;
-    if (frameIndex !== lastFrameIndex && frame && (frame instanceof Image ? frame.complete : true) && dueForRedraw) {
+    if (frameIndex !== lastFrameIndex && frame && (frame instanceof Image ? frame.complete : true)) {
       drawImage(frame);
       lastFrameIndex = frameIndex;
-      lastDrawTime = now || performance.now();
     }
 
-    // Beats — driven by doorProgress (the same value that picks the frame),
-    // not raw scrollProgress. Previously the beats used scrollProgress
-    // directly while the door used a reshaped/eased doorProgress, so the
-    // text and the frames were on two different curves: the door needs
-    // scrollProgress to reach 0.84 to be fully open, but a beat like #5
-    // (0.84-1.00) was keyed to that same raw scrollProgress range — which
-    // meant the text could reach its "settled" state before the door frame
-    // it was supposed to accompany had actually finished opening (worse the
-    // faster someone scrolls, since the eased curve and the linear one
-    // diverge most in the middle). Converting each breakpoint into
-    // doorProgress space (divide by 0.84, same reshaping the door uses)
-    // keeps text and frame locked together regardless of scroll speed.
-    updateBeat(1, 0, 0.0714, doorProgress);
-    updateBeat(2, 0.1667, 0.3333, doorProgress);
-    updateBeat(3, 0.4286, 0.6190, doorProgress);
-    updateBeat(4, 0.6905, 0.8810, doorProgress);
-    updateBeat(5, 0.9524, 1.0, doorProgress);
+    // Beats
+    updateBeat(1, 0, 0.06, scrollProgress);
+    updateBeat(2, 0.14, 0.28, scrollProgress);
+    updateBeat(3, 0.36, 0.52, scrollProgress);
+    updateBeat(4, 0.58, 0.74, scrollProgress);
+    updateBeat(5, 0.84, 1.00, scrollProgress);
 
     // Global chrome tied to scroll
     if (scrollProgressBar) {
@@ -2166,17 +2127,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   if (reducedMotion.matches) return; // leave the CSS fallback visible
-
-  // MOBILE FIX: this shader runs a 4-layer per-pixel fragment loop (sin/cos/
-  // atan/pow plus a 5-tap grain pass) at up to 60fps, on top of the
-  // scroll-linked door-frame canvas elsewhere on the page. Desktop GPUs
-  // shrug this off; phone GPUs — especially mid-range Android and thermally
-  // throttled iPhones — can't sustain it, and that's the dominant source of
-  // the mobile lag in this section. Route touch devices straight to the
-  // existing CSS orb fallback instead of ever creating the WebGL context.
-  // Desktop (fine pointer / mouse) is completely unaffected.
-  const isTouchDevice = window.matchMedia('(pointer: coarse) and (hover: none)').matches;
-  if (isTouchDevice) return; // leave the CSS fallback visible
 
   let Renderer, Program, Mesh, Triangle;
   try {
