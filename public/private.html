@@ -27,6 +27,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,340;9..144,460;9..144,560;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="preload" as="image" href="door-frames/ezgif-frame-001.avif" fetchpriority="high">
+<link rel="preload" as="image" href="assets/logo-secondary-color.png">
 
 <style>
 /* =====================================================================
@@ -226,6 +227,7 @@ h1, h2, h3, h4, h5, h6 {
   width: 100vw;
   overflow: hidden;
   background: var(--night-deep);
+  isolation: isolate;
 }
 
 #door-canvas {
@@ -291,10 +293,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 .scroll-progress-bar {
   height: 100%;
-  width: 0%;
+  width: 100%;
   background: linear-gradient(90deg, var(--ochre), var(--bougainvillea));
   transform-origin: left;
-  transition: width 0.05s linear;
+  /* transform instead of width: width changes are a layout property, so
+     animating it forces a layout recalc on this bar every single scroll
+     tick for the entire 650-780vh hero. scaleX is compositor-only. */
+  transform: scaleX(0);
+  transition: transform 0.05s linear;
 }
 
 .scroll-cue {
@@ -589,6 +595,7 @@ h1, h2, h3, h4, h5, h6 {
     var(--night-soft) 68%,
     var(--night-deep) 100%);
   position: relative;
+  isolation: isolate;
 }
 .seam-dark::after {
   content: "";
@@ -1405,8 +1412,6 @@ h1, h2, h3, h4, h5, h6 {
   </div>
 </section>
 
-<div class="seam"></div>
-
 <section class="section axes-section" id="axes">
   <div class="container">
     <div class="axes-header reveal">
@@ -1591,6 +1596,47 @@ document.addEventListener("DOMContentLoaded", () => {
   for (let i = 0; i < frameCount; i += frameStep) activeFrameIndices.push(i);
   const activeFrameCount = activeFrameIndices.length;
 
+  // Mobile fix: phones report devicePixelRatio 2-3, and every point of DPR
+  // squares the canvas fill/blit cost. Desktop keeps the existing 1.5 cap
+  // (unchanged); touch devices are capped lower so the scroll-linked
+  // redraw stays cheap enough for mobile GPUs to keep up every frame.
+  // (Moved above loadFrame/decodeTargetSize below, which now need it.)
+  const maxDpr = isMobileDevice ? 1 : 1.5;
+
+  // RESOURCE PRESSURE FIX: every source frame is a 1920x1080 photo. Held as
+  // a decoded ImageBitmap, that's ~8MB of raw pixel data PER FRAME — with
+  // 153 of them (77 on mobile) resident at once for scrubbing, that's
+  // 600MB-1.2GB of decoded image memory sitting in the tab by the time the
+  // sequence has fully loaded. That total only ever grows as more frames
+  // load in, so the browser is under the most memory/GPU-texture pressure
+  // right when someone reaches the END of the sequence — which reads as
+  // "it always lags near the end" even though every individual frame draw
+  // is cheap. createImageBitmap can decode-and-downscale in one step (off
+  // the main thread, same as a plain decode), so we size every frame to
+  // the resolution it will actually be drawn at — often much smaller than
+  // 1920x1080, especially on phones — instead of always keeping the full
+  // source resolution around.
+  const SOURCE_FRAME_WIDTH = 1920;
+  const SOURCE_FRAME_HEIGHT = 1080;
+  const SOURCE_FRAME_RATIO = SOURCE_FRAME_WIDTH / SOURCE_FRAME_HEIGHT;
+  function decodeTargetSize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
+    const cw = Math.max(1, Math.round(window.innerWidth * dpr));
+    const ch = Math.max(1, Math.round(window.innerHeight * dpr));
+    const canvasRatio = cw / ch;
+    // Same "cover" scale drawImage() uses below, so we never decode less
+    // detail than will actually be shown on screen, and never more.
+    const coverScale = canvasRatio > SOURCE_FRAME_RATIO
+      ? cw / SOURCE_FRAME_WIDTH
+      : ch / SOURCE_FRAME_HEIGHT;
+    const scale = Math.min(1, coverScale); // never upscale past native
+    if (scale >= 0.98) return null; // close enough to native, skip resizing
+    return {
+      width: Math.max(1, Math.round(SOURCE_FRAME_WIDTH * scale)),
+      height: Math.max(1, Math.round(SOURCE_FRAME_HEIGHT * scale)),
+    };
+  }
+
   // Frames are stored as decoded ImageBitmaps, not <img> elements.
   // Why: ctx.drawImage() on an HTMLImageElement forces the browser to
   // synchronously decode that image on the main thread on every single
@@ -1600,7 +1646,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // after that, drawImage(bitmap) is just a cheap GPU blit, no decode.
   const supportsBitmap = "createImageBitmap" in window;
 
-  function loadFrame(i) {
+  function loadFrame(i, urgent) {
     if (frames[i - 1] || (i - 1) in frames) return; // already queued/loaded
     frames[i - 1] = null; // reserve the slot so we don't re-queue it
     const frameNumber = i.toString().padStart(3, '0');
@@ -1617,9 +1663,14 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     if (supportsBitmap) {
-      fetch(url, { priority: i === 1 ? "high" : "low" })
+      fetch(url, { priority: (i === 1 || urgent) ? "high" : "low" })
         .then((res) => res.blob())
-        .then((blob) => createImageBitmap(blob))
+        .then((blob) => {
+          const target = decodeTargetSize();
+          return target
+            ? createImageBitmap(blob, { resizeWidth: target.width, resizeHeight: target.height, resizeQuality: "medium" })
+            : createImageBitmap(blob);
+        })
         .then(onReady)
         .catch(() => {
           // Fallback for a failed fetch/decode: plain <img> still works,
@@ -1642,45 +1693,42 @@ document.addEventListener("DOMContentLoaded", () => {
   // First frame: load right away, at high fetch priority, so the hero paints fast.
   loadFrame(1);
 
-  // Next handful: enough runway for an eager scroller before the background
-  // queue catches up. On mobile (frameStep=2) this is ~12 source frames;
-  // on desktop it's 23 — both giving the same scroll-distance runway.
+  // Next handful: enough runway for an eager scroller before the rest of
+  // the sequence (kicked off just below) arrives. On mobile (frameStep=2)
+  // this is ~12 source frames; on desktop it's 23 — both giving the same
+  // scroll-distance runway.
   const eagerCount = Math.min(24, activeFrameCount);
   for (let k = 1; k < eagerCount; k++) {
     loadFrame(activeFrameIndices[k] + 1); // loadFrame is 1-based
   }
 
-  // Remaining frames stream in the background in small batches via
-  // requestIdleCallback (falls back to a timer) so they never compete with
-  // first-paint or main-thread work.
-  let nextBatchIdx = eagerCount;
-  function loadNextBatch(deadline) {
-    const batchSize = isMobileDevice ? 8 : 14;
-    let loaded = 0;
-    while (nextBatchIdx < activeFrameCount && loaded < batchSize) {
-      loadFrame(activeFrameIndices[nextBatchIdx] + 1);
-      nextBatchIdx++;
-      loaded++;
-      if (deadline && deadline.timeRemaining && deadline.timeRemaining() < 1) break;
-    }
-    if (nextBatchIdx < activeFrameCount) {
-      scheduleIdle(loadNextBatch);
-    }
-  }
-  function scheduleIdle(fn) {
-    if ("requestIdleCallback" in window) {
-      requestIdleCallback(fn, { timeout: isMobileDevice ? 500 : 300 });
-    } else {
-      setTimeout(fn, isMobileDevice ? 200 : 100);
+  // LOADING-STRATEGY FIX: every remaining frame used to stream in via
+  // requestIdleCallback, a small batch (8-14) at a time, each batch waiting
+  // for the *next* idle gap to continue. fetch() itself doesn't block the
+  // main thread — the browser's own network stack handles concurrency —
+  // so there was never a good reason to trickle requests out one small
+  // batch at a time. The problem: while the page is being actively
+  // scrolled, the main thread is rarely idle, so that batch queue could
+  // stall for seconds at a time — and because frames near the END of the
+  // 153-frame sequence are, by definition, the last ones queued, a normal
+  // (not even especially fast) scroll-through could easily reach them
+  // before they'd been requested at all. That read as "it always lags at
+  // the end" — because it structurally always did. Firing every remaining
+  // request together (still at low priority, still deferred behind one
+  // idle/first-paint gap so it never competes with initial page load)
+  // finishes downloading the whole ~150-frame sequence in a couple of
+  // seconds on any real connection — comfortably before a multi-second
+  // scroll through 650-780vh of scroll track gets anywhere near frame 153.
+  function loadRemainingFrames() {
+    for (let k = eagerCount; k < activeFrameCount; k++) {
+      loadFrame(activeFrameIndices[k] + 1);
     }
   }
-  scheduleIdle(loadNextBatch);
-
-  // Mobile fix: phones report devicePixelRatio 2-3, and every point of DPR
-  // squares the canvas fill/blit cost. Desktop keeps the existing 1.5 cap
-  // (unchanged); touch devices are capped lower so the scroll-linked
-  // redraw stays cheap enough for mobile GPUs to keep up every frame.
-  const maxDpr = isMobileDevice ? 1 : 1.5;
+  if ("requestIdleCallback" in window) {
+    requestIdleCallback(loadRemainingFrames, { timeout: isMobileDevice ? 500 : 300 });
+  } else {
+    setTimeout(loadRemainingFrames, isMobileDevice ? 200 : 100);
+  }
 
   function drawImage(img) {
     if (!img) return;
@@ -1762,6 +1810,27 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   recomputeLayout();
 
+  // Ease-in-out (cubic) applied per scroll segment — see shapeDoorProgress.
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  // Splits the 0..1 scroll range into 5 equal segments (one per text beat)
+  // and eases playback within each segment independently: fast in the
+  // middle of a segment, slow (easing in/out) right around every beat
+  // change. The segment boundaries themselves (0, 0.2, 0.4, 0.6, 0.8, 1)
+  // are untouched, so segment N always plays exactly frames [N/5, (N+1)/5]
+  // of the footage while beat N is active — frame position and text never
+  // drift apart, only the speed *within* a segment is reshaped.
+  const DOOR_SEGMENTS = 5;
+  function shapeDoorProgress(t) {
+    t = Math.max(0, Math.min(1, t));
+    const segment = Math.min(DOOR_SEGMENTS - 1, Math.floor(t * DOOR_SEGMENTS));
+    const localT = t * DOOR_SEGMENTS - segment;
+    const easedLocal = easeInOutCubic(localT);
+    return (segment + easedLocal) / DOOR_SEGMENTS;
+  }
+
   function update(now) {
     rafId = null;
 
@@ -1771,11 +1840,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // containerTop/window.scrollY, right before calling update().
     let scrollProgress = lastScrollProgress;
 
-    // The door should be fully open by the time we hit the final beat (84%)
-    let doorProgress = Math.min(1, scrollProgress / 0.84);
-
-    // Ease-out curve to counteract the source footage's slow start / fast finish
-    doorProgress = Math.pow(doorProgress, 0.6);
+    // The 650vh/780vh scroll track is split into 5 equal 20% segments, one
+    // per text beat: segment N plays exactly the Nth 20% slice of the door
+    // footage while beat N is on screen (0-20% -> beat 1, 20-40% -> beat 2,
+    // ...80-100% -> beat 5). shapeDoorProgress() below eases the playback
+    // *within* each segment (slow-fast-slow) instead of playing it back
+    // linearly, so the door visibly settles right as each new text beat
+    // arrives instead of barrelling through the frames at a constant rate.
+    let doorProgress = shapeDoorProgress(scrollProgress);
 
     // Map doorProgress into whichever subset of frames was actually loaded
     // (all 153 on desktop, every 2nd on mobile via activeFrameIndices).
@@ -1785,6 +1857,13 @@ document.addEventListener("DOMContentLoaded", () => {
     // .complete flag needed), a still-loading <img> (has .complete === false
     // until decoded, fallback path only), or not yet requested.
     const frame = frames[frameIndex];
+    // Safety net: this should be a no-op in practice now that
+    // loadRemainingFrames() requests the whole sequence up front, but if
+    // the frame the current scroll position needs was somehow never
+    // requested (a dropped idle callback, an extremely early fast scroll,
+    // etc.), grab it now at high priority instead of leaving the canvas
+    // stuck until it happens to come up in the background queue.
+    if (frame === undefined) loadFrame(frameIndex + 1, true);
     const dueForRedraw = !minRedrawIntervalMs || (now || performance.now()) - lastDrawTime >= minRedrawIntervalMs;
     if (frameIndex !== lastFrameIndex && frame && (frame instanceof Image ? frame.complete : true) && dueForRedraw) {
       drawImage(frame);
@@ -1792,27 +1871,21 @@ document.addEventListener("DOMContentLoaded", () => {
       lastDrawTime = now || performance.now();
     }
 
-    // Beats — driven by doorProgress (the same value that picks the frame),
-    // not raw scrollProgress. Previously the beats used scrollProgress
-    // directly while the door used a reshaped/eased doorProgress, so the
-    // text and the frames were on two different curves: the door needs
-    // scrollProgress to reach 0.84 to be fully open, but a beat like #5
-    // (0.84-1.00) was keyed to that same raw scrollProgress range — which
-    // meant the text could reach its "settled" state before the door frame
-    // it was supposed to accompany had actually finished opening (worse the
-    // faster someone scrolls, since the eased curve and the linear one
-    // diverge most in the middle). Converting each breakpoint into
-    // doorProgress space (divide by 0.84, same reshaping the door uses)
-    // keeps text and frame locked together regardless of scroll speed.
-    updateBeat(1, 0, 0.0714, doorProgress);
-    updateBeat(2, 0.1667, 0.3333, doorProgress);
-    updateBeat(3, 0.4286, 0.6190, doorProgress);
-    updateBeat(4, 0.6905, 0.8810, doorProgress);
-    updateBeat(5, 0.9524, 1.0, doorProgress);
+    // Beats — driven by raw scrollProgress, one even 20% slice each. This
+    // lines up exactly with the 20% door-footage slice each segment plays
+    // (see shapeDoorProgress above), so the text change and the door frame
+    // it accompanies always land together regardless of scroll speed; only
+    // the door's playback rate *inside* a slice is eased, never its start
+    // or end point.
+    updateBeat(1, 0.0, 0.2, scrollProgress);
+    updateBeat(2, 0.2, 0.4, scrollProgress);
+    updateBeat(3, 0.4, 0.6, scrollProgress);
+    updateBeat(4, 0.6, 0.8, scrollProgress);
+    updateBeat(5, 0.8, 1.0, scrollProgress);
 
     // Global chrome tied to scroll
     if (scrollProgressBar) {
-      scrollProgressBar.style.width = (scrollProgress * 100).toFixed(2) + "%";
+      scrollProgressBar.style.transform = "scaleX(" + scrollProgress.toFixed(4) + ")";
     }
     if (scrollCue) {
       scrollCue.classList.toggle("is-hidden", scrollProgress > 0.03);
@@ -2137,10 +2210,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const headerLogo = document.getElementById('header-logo');
 
   if (siteHeader) {
-    let headerRafId = null;
     let headerOnLight = false;
     function updateHeader() {
-      headerRafId = null;
       const scrollY = window.scrollY;
       siteHeader.classList.toggle('is-visible', scrollProgressPastHero());
       const onLight = scrollY > heroBottom - viewportHeight * 0.4;
@@ -2155,9 +2226,32 @@ document.addEventListener("DOMContentLoaded", () => {
       const progress = Math.max(0, Math.min(1, -rectTop / maxScroll));
       return progress >= 0.98;
     }
-    window.addEventListener('scroll', () => {
-      if (!headerRafId) headerRafId = requestAnimationFrame(updateHeader);
-    }, { passive: true });
+    // LEFTOVER-BUG FIX: this used to run off its own raw `scroll` +
+    // requestAnimationFrame listener — exactly the pattern the big comment
+    // at the top of smooth-scroll.js explains was THE cause of "lag right
+    // when scrolling stops" for the door canvas (uneven event cadence as
+    // Lenis's/touch momentum's easing tail winds down). The canvas got
+    // migrated to GSAP's ScrollTrigger/ticker to fix that; this header
+    // toggle never did, so it kept the same stutter — landing right as
+    // the header fades in and the logo swaps color, i.e. right at the
+    // end of the door sequence. Driving it from GSAP's ticker instead (the
+    // same steady, rAF-synced heartbeat that already drives Lenis itself)
+    // gives it the identical fix with no separate ScrollTrigger needed.
+    if (window.__gsap) {
+      window.__gsap.ticker.add(updateHeader);
+    } else {
+      document.addEventListener('lenis-gsap-ready', (e) => {
+        e.detail.gsap.ticker.add(updateHeader);
+      }, { once: true });
+      // Graceful fallback if GSAP never loads at all (offline/CDN blocked):
+      // keep the header working via the old raw-scroll path rather than
+      // never updating.
+      setTimeout(() => {
+        if (!window.__gsap) {
+          window.addEventListener('scroll', () => requestAnimationFrame(updateHeader), { passive: true });
+        }
+      }, 2000);
+    }
     updateHeader();
 
     if (headerToggle && headerNav) {
