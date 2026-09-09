@@ -1660,53 +1660,158 @@ document.addEventListener("DOMContentLoaded", () => {
   // ---------------------------------------------------------------------
   const useSheets = isTouchDeviceEarly;
   let sheetManifest = null;
-  let sheetImages = []; // decoded ImageBitmap|Image per sheet, indexed by sheet number
-  let sheetsReady = false;
+  let sheetImages = []; // decoded ImageBitmap|Image per sheet, indexed by sheet number — only the "windowed" set is populated at any given time
+  let sheetBlobs = []; // downloaded (still-compressed) bytes per sheet, kept for the whole session
+  let sheetFetchPromises = []; // in-flight blob download per sheet index, so we never double-fetch
+  let sheetDecodePromises = []; // in-flight decode per sheet index, so we never double-decode
+  let sheetsReady = false; // true once the manifest is usable, not once every sheet is downloaded
+
+  // ---------------------------------------------------------------------
+  // MOBILE FIX (resident memory), rev. 2: the first version of this fix
+  // fetched sheets from the network only when the playhead got close to
+  // them. That solved the memory problem below but traded it for a new
+  // one — a normal-speed flick through the hero can easily outrun a
+  // 500-700KB network fetch on a real phone connection, so crossing into
+  // a not-yet-requested sheet showed a frozen frame until it arrived.
+  // That's the "glitchy" playback this revision fixes.
+  //
+  // The actual memory problem was never the DOWNLOAD, it was the DECODE:
+  // each sheet is 3856x3808px, and decoded to raw RGBA (what
+  // createImageBitmap holds) that's ~56MB per sheet — 6 resident at once
+  // is ~330MB held for as long as the hero is on the page, which is what
+  // risks texture eviction/re-decode stutter on a mid/low-RAM Android
+  // phone. The compressed bytes on the wire are tiny by comparison (the
+  // whole set is ~2.9MB total).
+  //
+  // So: every sheet's compressed bytes start downloading immediately, in
+  // parallel, right after the manifest loads — same network behavior and
+  // total transfer as the original bulk-load, so there is no fetch to
+  // wait on later no matter how fast someone scrolls. DECODING those
+  // bytes into a drawable bitmap is what stays windowed: only the sheet
+  // the playhead is in, plus one sheet of look-ahead, are ever decoded at
+  // once, and a decoded sheet outside that window gets its ImageBitmap
+  // explicitly closed (freeing the ~56MB immediately) once it's gone
+  // unused for a few seconds — but its downloaded bytes stay cached, so
+  // re-decoding it later if the user scrolls back is a fast local
+  // operation, not a second network round trip. Peak resident DECODED
+  // memory drops from ~330MB to ~110MB; peak network usage is unchanged.
+  // ---------------------------------------------------------------------
+  const MAX_SHEET_UNUSED_MS = 4000;
+  const sheetLastUsed = Object.create(null);
+
+  function markSheetUsed(idx) {
+    sheetLastUsed[idx] = performance.now();
+  }
+
+  function blobToImage(blob) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.decoding = "async";
+      const objectUrl = URL.createObjectURL(blob);
+      img.onload = () => { URL.revokeObjectURL(objectUrl); resolve(img); };
+      img.onerror = (err) => { URL.revokeObjectURL(objectUrl); reject(err); };
+      img.src = objectUrl;
+    });
+  }
+
+  // Downloads sheet `idx`'s compressed bytes, once, and keeps them cached
+  // in sheetBlobs for the rest of the session — evicting a DECODED sheet
+  // later (see evictSheet) never means a second network fetch.
+  function fetchSheetBlob(idx) {
+    if (!sheetManifest || idx < 0 || idx >= sheetManifest.numSheets) return Promise.reject(new Error("bad sheet index"));
+    if (sheetBlobs[idx]) return Promise.resolve(sheetBlobs[idx]);
+    if (sheetFetchPromises[idx]) return sheetFetchPromises[idx];
+    const url = `door-sheets/door-sheet-${String(idx).padStart(2, "0")}.avif`;
+    const promise = fetch(url, { priority: idx === 0 ? "high" : "low" })
+      .then((res) => res.blob())
+      .then((blob) => {
+        sheetBlobs[idx] = blob;
+        sheetFetchPromises[idx] = null;
+        return blob;
+      });
+    sheetFetchPromises[idx] = promise;
+    return promise;
+  }
+
+  // Decodes sheet `idx` into a drawable bitmap, reusing the cached blob
+  // if it's already downloaded (no network involved) or downloading it
+  // first if not (e.g. a very early, very fast scroll outrunning the
+  // background prefetch below — rare, but handled the same way either
+  // way).
+  function decodeSheet(idx) {
+    if (sheetImages[idx]) return Promise.resolve(sheetImages[idx]);
+    if (sheetDecodePromises[idx]) return sheetDecodePromises[idx];
+    const promise = fetchSheetBlob(idx)
+      .then((blob) => (supportsBitmap ? createImageBitmap(blob).catch(() => blobToImage(blob)) : blobToImage(blob)))
+      .then((bitmapOrImg) => {
+        sheetImages[idx] = bitmapOrImg;
+        sheetDecodePromises[idx] = null;
+        if (idx === 0 && !firstDrawn) {
+          firstDrawn = true;
+          drawImage(getSheetFrameRef(1));
+          canvas.classList.add("is-ready");
+        }
+        return bitmapOrImg;
+      });
+    sheetDecodePromises[idx] = promise;
+    return promise;
+  }
+
+  // Frees a decoded sheet's pixel memory right away. ImageBitmap.close()
+  // is the only deterministic way to do that — dropping the reference
+  // alone just leaves it to the browser's own GC schedule, which is the
+  // uncertainty this fix exists to remove. The downloaded blob is left
+  // in sheetBlobs untouched, so a later re-decode is cheap. The rare
+  // <img> fallback path (createImageBitmap unsupported/failed) has no
+  // equivalent handle, so that case is just dereferenced.
+  function evictSheet(idx) {
+    const img = sheetImages[idx];
+    if (!img) return;
+    if (typeof img.close === "function") img.close();
+    sheetImages[idx] = null;
+  }
+
+  // Keeps only the sheet the playhead is currently inside, plus one
+  // sheet of look-ahead in the scroll direction, actually decoded. Cheap
+  // to call on every scroll update — a scan over at most 6 entries plus,
+  // at most, one local decode (bytes are already cached — see loadSheets)
+  // when crossing into a sheet for the first time.
+  function updateSheetWindow(currentSheetIdx, direction) {
+    if (!sheetManifest) return;
+    markSheetUsed(currentSheetIdx);
+    decodeSheet(currentSheetIdx);
+
+    const lookahead = direction < 0 ? currentSheetIdx - 1 : currentSheetIdx + 1;
+    const wanted = new Set([currentSheetIdx]);
+    if (lookahead >= 0 && lookahead < sheetManifest.numSheets) {
+      markSheetUsed(lookahead);
+      decodeSheet(lookahead);
+      wanted.add(lookahead);
+    }
+
+    const now = performance.now();
+    for (let i = 0; i < sheetManifest.numSheets; i++) {
+      if (wanted.has(i)) continue;
+      if (sheetImages[i] && now - (sheetLastUsed[i] || 0) > MAX_SHEET_UNUSED_MS) {
+        evictSheet(i);
+      }
+    }
+  }
 
   function loadSheets() {
     fetch("door-sheets/manifest.json")
       .then((res) => { if (!res.ok) throw new Error("manifest missing"); return res.json(); })
       .then((manifest) => {
         sheetManifest = manifest;
-        let loadedSheets = 0;
-
-        const onSheetReady = (sheetIdx, bitmapOrImg) => {
-          sheetImages[sheetIdx] = bitmapOrImg;
-          loadedSheets++;
-          if (sheetIdx === 0 && !firstDrawn) {
-            firstDrawn = true;
-            drawImage(getSheetFrameRef(1));
-            canvas.classList.add("is-ready");
-          }
-          if (loadedSheets === manifest.numSheets) sheetsReady = true;
-        };
-
-        // Load sheet 0 first (covers the opening of the sequence, which is
-        // what an eager scroller reaches soonest) at high priority; the
-        // rest follow immediately after since 6 total requests is cheap
-        // enough not to need idle-batching the way 153 individual frames
-        // did.
-        for (let s = 0; s < manifest.numSheets; s++) {
-          const url = `door-sheets/door-sheet-${String(s).padStart(2, "0")}.avif`;
-          if (supportsBitmap) {
-            fetch(url, { priority: s === 0 ? "high" : "low" })
-              .then((res) => res.blob())
-              .then((blob) => createImageBitmap(blob))
-              .then((bmp) => onSheetReady(s, bmp))
-              .catch(() => {
-                const img = new Image();
-                img.decoding = "async";
-                img.onload = () => onSheetReady(s, img);
-                img.src = url;
-              });
-          } else {
-            const img = new Image();
-            img.decoding = "async";
-            if (s === 0) img.fetchPriority = "high";
-            img.onload = () => onSheetReady(s, img);
-            img.src = url;
-          }
-        }
+        sheetsReady = true;
+        // Sheet 0 needs to be decoded right away for the first paint.
+        decodeSheet(0);
+        // Every other sheet's BYTES start downloading now too, at low
+        // priority — same ~2.9MB total transfer, same timing, as the
+        // original bulk-load. Only their DECODE is deferred to
+        // updateSheetWindow, since decode-into-resident-memory was the
+        // actual cost driving the mobile lag, not the download.
+        for (let s = 1; s < manifest.numSheets; s++) fetchSheetBlob(s);
       })
       .catch(() => {
         // Manifest missing entirely (sheets not deployed to this server
@@ -1717,7 +1822,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Returns { img, sx, sy, sw, sh } describing where frame `i` (1-indexed)
-  // lives within its sheet, or null if that sheet hasn't loaded yet.
+  // lives within its sheet, or null if that sheet isn't decoded right
+  // now (evicted, or the rare case of still downloading) — the caller
+  // keeps showing the last drawn frame until it resolves.
   function getSheetFrameRef(i) {
     if (!sheetManifest) return null;
     const entry = sheetManifest.frames[i - 1];
@@ -1982,6 +2089,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // of redundant redraw work mobile GPUs feel most.
   const minRedrawIntervalMs = isTouchDevice ? 33 : 0; // ~30fps cap on touch, uncapped on desktop
   let lastDrawTime = -Infinity;
+  let lastPlayheadFloatForWindow = 0;
 
   function drawFrame(floatIndex) {
     const now = performance.now();
@@ -1989,6 +2097,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const clamped = Math.max(0, Math.min(frameCount - 1, floatIndex));
     const roundedIndex = Math.round(clamped);
+
+    // Sprite-sheet windowing: runs on every accepted tick (already
+    // throttled to ~30fps on touch above) regardless of whether the
+    // rounded frame changed, so a sheet in active use doesn't get evicted
+    // out from under someone who's paused mid-scroll on it. Direction is
+    // derived from the playhead's own movement so this works identically
+    // whether GSAP ScrollTrigger or the raw-scroll fallback is driving it.
+    if (useSheets && sheetManifest) {
+      const direction = clamped >= lastPlayheadFloatForWindow ? 1 : -1;
+      lastPlayheadFloatForWindow = clamped;
+      const entry = sheetManifest.frames[roundedIndex];
+      if (entry) updateSheetWindow(entry.sheet, direction);
+    }
+
     if (roundedIndex === lastFrameIndex && clamped === roundedIndex) return false;
 
     let drew = false;
