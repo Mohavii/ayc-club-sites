@@ -1655,16 +1655,34 @@ document.addEventListener("DOMContentLoaded", () => {
   const isTouchDevice =
     window.matchMedia && window.matchMedia("(pointer: coarse) and (hover: none)").matches;
   const maxDpr = isTouchDevice ? 1 : 1.5;
+  const prefersReducedMotion =
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  function drawImage(img) {
+  // MOBILE FIX: this used to size the canvas from window.innerWidth/
+  // innerHeight, but .hero-sticky is sized with CSS `100svh` (the *small*
+  // viewport, i.e. address-bar-visible height). On mobile, innerHeight
+  // grows/shrinks live as the address bar hides/shows during scroll, while
+  // svh stays fixed at the small value — so the two disagree continuously.
+  // The canvas is also only resized on a 120ms-debounced `resize` listener
+  // (see below), so for stretches of scroll the canvas buffer is drawn at
+  // a stale/mismatched size relative to the actual .hero-sticky box. Any
+  // gap between the two exposes .hero-sticky's own background-color
+  // (var(--night-deep), the same dark navy as the canvas fill) as a solid
+  // band under/around the image. Reading the size straight from
+  // .hero-sticky's own rendered box instead of window.innerHeight ties the
+  // canvas to the same source of truth the container itself uses, so
+  // there's nothing for it to disagree with.
+  const heroSticky = document.querySelector(".hero-sticky");
+  function drawImage(img, alpha) {
     if (!img) return;
     // Capped at 1.5 rather than 2: this canvas shows full-bleed photographic
     // footage (not text/UI), so the sharpness gain from full device
     // resolution is barely visible, while canvas fill/blit cost scales with
     // pixel count — 1.5 vs 2 is roughly a 40% smaller canvas to redraw.
     const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const rect = heroSticky ? heroSticky.getBoundingClientRect() : null;
+    const w = (rect && rect.width) || window.innerWidth;
+    const h = (rect && rect.height) || window.innerHeight;
 
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
       canvas.width = Math.round(w * dpr);
@@ -1690,27 +1708,136 @@ document.addEventListener("DOMContentLoaded", () => {
       y = 0;
     }
 
-    // Fill with the deep night tone to match the palette during letterboxing
-    ctx.fillStyle = '#061529';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, x, y, drawWidth, drawHeight);
+    if (alpha === undefined || alpha >= 1) {
+      // Opaque draw: fill with the deep night tone first (matches the
+      // palette during letterboxing), then paint the frame over it.
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#061529';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, x, y, drawWidth, drawHeight);
+    } else {
+      // Crossfade layer: painted on top of whatever's already there
+      // (the base frame drawn opaque just before this call), at partial
+      // alpha, without re-clearing the canvas — see drawCrossfade below.
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(img, x, y, drawWidth, drawHeight);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Desktop-only sub-frame crossfade: when the damped frame position sits
+  // between two integer frames (e.g. 42.6), draw frame 42 opaque then
+  // frame 43 on top at 60% alpha. This makes the 153-frame sequence read
+  // as noticeably denser without exporting more frames. Skipped on touch
+  // devices — it roughly doubles the per-tick canvas blit cost, and the
+  // DPR/redraw-rate caps already in place there exist specifically to
+  // keep that cost down, so doubling it back is a net loss on mobile
+  // GPUs. Mobile instead gets frame damping without the crossfade.
+  function drawCrossfade(floatIndex) {
+    const lo = Math.max(0, Math.min(frameCount - 1, Math.floor(floatIndex)));
+    const hi = Math.max(0, Math.min(frameCount - 1, Math.ceil(floatIndex)));
+    const t = floatIndex - lo;
+    const loFrame = frames[lo];
+    const hiFrame = frames[hi];
+    const loReady = loFrame && (loFrame instanceof Image ? loFrame.complete : true);
+    const hiReady = hiFrame && (hiFrame instanceof Image ? hiFrame.complete : true);
+
+    if (!loReady) return false;
+    drawImage(loFrame, 1);
+    if (hi !== lo && t > 0.01 && hiReady) {
+      drawImage(hiFrame, t);
+    }
+    return true;
+  }
+
+  // ---------------------------------------------------------------------
+  // Canvas frame drawing, keyed off a single tweened value.
+  //
+  // Ported to match GSAP's own reference pattern for this technique
+  // (the "imageSequence" scrub helper GreenSock publishes and every
+  // Apple-style scroll sequence on the web is descended from): instead of
+  // reading a raw scroll-derived progress number and hand-rolling a
+  // separate requestAnimationFrame loop to ease/damp it toward that target
+  // (two animation systems layered on top of each other, running forever
+  // even when nothing is moving), there is now exactly one animated value —
+  // playhead.frame — and GSAP's own scrub tween owns the easing. scrub: 0.35
+  // below IS the "catch up / settle after scroll stops" feel; it replaces
+  // the old renderLoop()/FRAME_DAMPING logic entirely rather than sitting
+  // alongside it. GSAP only calls onUpdate when playhead.frame actually
+  // changes, so there's no redraw work at all while the tween is settled —
+  // where the old renderLoop ran an empty rAF check on every frame forever.
+  // ---------------------------------------------------------------------
+  let playhead = { frame: 0 };
+
+  // Mobile fix: same reasoning as GSAP's own reference helper skipping a
+  // redraw when the rounded frame hasn't changed (`frame !== curFrame`) —
+  // here extended with a small min-interval on touch devices specifically,
+  // since a fast swipe can still produce several onUpdate calls per rounded
+  // frame at high scrub speed, and painting every one of those is the kind
+  // of redundant redraw work mobile GPUs feel most.
+  const minRedrawIntervalMs = isTouchDevice ? 33 : 0; // ~30fps cap on touch, uncapped on desktop
+  let lastDrawTime = -Infinity;
+
+  function drawFrame(floatIndex) {
+    const now = performance.now();
+    if (minRedrawIntervalMs && now - lastDrawTime < minRedrawIntervalMs) return false;
+
+    const clamped = Math.max(0, Math.min(frameCount - 1, floatIndex));
+    const roundedIndex = Math.round(clamped);
+    if (roundedIndex === lastFrameIndex && clamped === roundedIndex) return false;
+
+    let drew = false;
+    if (isTouchDevice || prefersReducedMotion) {
+      // Touch/reduced-motion: snap to the nearest whole frame, no crossfade
+      // (see drawCrossfade's comment — crossfade roughly doubles blit cost,
+      // which is exactly what the DPR/redraw caps elsewhere exist to avoid
+      // on mobile GPUs).
+      const frame = frames[roundedIndex];
+      if (frame && (frame instanceof Image ? frame.complete : true)) {
+        drawImage(frame, 1);
+        drew = true;
+      }
+    } else {
+      drew = drawCrossfade(clamped);
+    }
+
+    if (drew) {
+      lastFrameIndex = roundedIndex;
+      lastDrawTime = now;
+    }
+    return drew;
+  }
+
+  function updateBeatsAndChrome(doorProgress, scrollProgress) {
+    // Beats — driven by doorProgress (the same reshaped curve that picks
+    // the frame), not raw scrollProgress. The door needs scrollProgress to
+    // reach 0.84 to be fully open, so beats are keyed in doorProgress space
+    // (divide breakpoints by 0.84) to stay locked to the frame regardless
+    // of scroll speed.
+    updateBeat(1, 0, 0.0714, doorProgress);
+    updateBeat(2, 0.1667, 0.3333, doorProgress);
+    updateBeat(3, 0.4286, 0.6190, doorProgress);
+    updateBeat(4, 0.6905, 0.8810, doorProgress);
+    updateBeat(5, 0.9524, 1.0, doorProgress);
+
+    if (scrollProgressBar) {
+      scrollProgressBar.style.width = (scrollProgress * 100).toFixed(2) + "%";
+    }
+    if (scrollCue) {
+      scrollCue.classList.toggle("is-hidden", scrollProgress > 0.03);
+    }
+  }
+
+  // doorProgress: the eased 0..1 curve the door-opening frame count maps
+  // onto (fully open by 84% scroll, eased to counteract the source
+  // footage's slow start / fast finish). Beats read this directly and
+  // instantly — only the canvas playhead is scrubbed/damped below.
+  function doorProgressFromScroll(scrollProgress) {
+    return Math.pow(Math.min(1, scrollProgress / 0.84), 0.6);
   }
 
   const container = document.getElementById("hero-scroll");
-  let rafId = null;
   let lastFrameIndex = -1;
-
-  // Mobile fix: on a fast swipe, doorProgress can jump across many frame
-  // indices between two animation frames. Desktop redraws every one of
-  // those intermediate frames (cheap enough there); on touch devices we
-  // cap the canvas to a lower effective redraw rate so a fast swipe skips
-  // straight to the nearest frame instead of trying to paint each one —
-  // this is the main remaining lag source once the DPR cap and the WebGL
-  // shader skip are already in place.
-  const isTouchScrub =
-    window.matchMedia && window.matchMedia("(pointer: coarse) and (hover: none)").matches;
-  const minRedrawIntervalMs = isTouchScrub ? 33 : 0; // ~30fps cap on touch, uncapped on desktop
-  let lastDrawTime = -Infinity;
 
   // Cache beat elements once instead of re-querying the DOM on every
   // animation frame during scroll.
@@ -1722,133 +1849,95 @@ document.addEventListener("DOMContentLoaded", () => {
     5: document.querySelector('.beat-5'),
   };
 
-  // Cache layout-dependent values instead of reading offsetHeight/
-  // getBoundingClientRect on every scroll tick — those reads force a
-  // synchronous layout recalculation whenever anything on the page is
-  // "dirty", which adds up fast at 60fps. Recomputed only on resize.
-  let maxScroll = 0;
-  let containerTop = 0;
-  function recomputeLayout() {
-    containerTop = container.getBoundingClientRect().top + window.scrollY;
-    maxScroll = container.offsetHeight - window.innerHeight;
-  }
-  recomputeLayout();
-
-  function update(now) {
-    rafId = null;
-
-    // Canvas scrub logic. When driven by ScrollTrigger, lastScrollProgress
-    // is set from its interpolated onUpdate progress (see attachScrollTrigger
-    // below); the raw-scroll fallback path sets it the old way, from
-    // containerTop/window.scrollY, right before calling update().
-    let scrollProgress = lastScrollProgress;
-
-    // The door should be fully open by the time we hit the final beat (84%)
-    let doorProgress = Math.min(1, scrollProgress / 0.84);
-
-    // Ease-out curve to counteract the source footage's slow start / fast finish
-    doorProgress = Math.pow(doorProgress, 0.6);
-
-    const frameIndex = Math.floor(doorProgress * (frameCount - 1));
-    // frames[i] is either an ImageBitmap (ready as soon as it's set — no
-    // .complete flag needed), a still-loading <img> (has .complete === false
-    // until decoded, fallback path only), or not yet requested.
-    const frame = frames[frameIndex];
-    const dueForRedraw = !minRedrawIntervalMs || (now || performance.now()) - lastDrawTime >= minRedrawIntervalMs;
-    if (frameIndex !== lastFrameIndex && frame && (frame instanceof Image ? frame.complete : true) && dueForRedraw) {
-      drawImage(frame);
-      lastFrameIndex = frameIndex;
-      lastDrawTime = now || performance.now();
-    }
-
-    // Beats — driven by doorProgress (the same value that picks the frame),
-    // not raw scrollProgress. Previously the beats used scrollProgress
-    // directly while the door used a reshaped/eased doorProgress, so the
-    // text and the frames were on two different curves: the door needs
-    // scrollProgress to reach 0.84 to be fully open, but a beat like #5
-    // (0.84-1.00) was keyed to that same raw scrollProgress range — which
-    // meant the text could reach its "settled" state before the door frame
-    // it was supposed to accompany had actually finished opening (worse the
-    // faster someone scrolls, since the eased curve and the linear one
-    // diverge most in the middle). Converting each breakpoint into
-    // doorProgress space (divide by 0.84, same reshaping the door uses)
-    // keeps text and frame locked together regardless of scroll speed.
-    updateBeat(1, 0, 0.0714, doorProgress);
-    updateBeat(2, 0.1667, 0.3333, doorProgress);
-    updateBeat(3, 0.4286, 0.6190, doorProgress);
-    updateBeat(4, 0.6905, 0.8810, doorProgress);
-    updateBeat(5, 0.9524, 1.0, doorProgress);
-
-    // Global chrome tied to scroll
-    if (scrollProgressBar) {
-      scrollProgressBar.style.width = (scrollProgress * 100).toFixed(2) + "%";
-    }
-    if (scrollCue) {
-      scrollCue.classList.toggle("is-hidden", scrollProgress > 0.03);
-    }
-  }
-
   // ---------------------------------------------------------------------
   // Scroll driver: GSAP ScrollTrigger when available, raw scroll events
   // as a fallback if GSAP failed to load (e.g. offline/CDN blocked).
   //
-  // Why ScrollTrigger fixes the "lag right when scrolling stops" issue:
-  // a native `scroll` listener only fires when the browser actually moves
-  // scrollTop, so its cadence is tied 1:1 to whatever is producing that
-  // scroll (Lenis's easing tail on desktop, touch momentum on mobile).
-  // Right as that easing/momentum tail winds down, events get sparser and
-  // uneven, and the update() work below (canvas blit + 5 style writes)
-  // ends up landing at those uneven moments — read as a stutter right at
-  // the stop. ScrollTrigger instead samples current scroll position once
-  // per GSAP ticker tick (steady, rAF-driven, independent of how scroll
-  // itself is being produced) and calls onUpdate with an interpolated
-  // progress value, so update() runs on a steady cadence the whole time,
-  // including through the stop.
+  // The ScrollTrigger itself no longer redraws the canvas directly. It
+  // just reports progress; a gsap.to() tween (built in attachScrollTrigger
+  // below) owns playhead.frame and the actual canvas draw happens in that
+  // tween's onUpdate, exactly like GSAP's reference imageSequence() helper.
+  // Beats/chrome, which should track scroll instantly rather than ease,
+  // are still updated directly from ScrollTrigger's onUpdate.
   // ---------------------------------------------------------------------
-  function runUpdateFromProgress(rawProgress, now) {
-    // ScrollTrigger gives us 0..1 progress directly — recompute the same
-    // scrollProgress the old rectTop/maxScroll math produced, then reuse
-    // the existing update() body unchanged below it.
-    lastScrollProgress = rawProgress;
-    update(now);
-  }
+  // Structured the way GreenSock's own seamless-loop reference demo builds
+  // a retargeted scrub tween: a standalone ScrollTrigger.create() (not
+  // attached to the tween via the `scrollTrigger:` shorthand) drives a
+  // separate, reusable scrub tween by mutating its `vars` target and
+  // calling invalidate().restart() — per GreenSock's own comment on that
+  // technique, this is cheap ("no need for overwrites or creating a new
+  // tween on each update"): invalidate() only clears the tween's cached
+  // *start* values so it re-reads playhead.frame's current live position
+  // as the new starting point; restart() then re-plays toward the (just
+  // updated) target over the tween's fixed duration. Nothing is reset to
+  // time zero and no easing state is lost — this is the intended,
+  // documented way to keep retargeting one running scrub tween.
+  let scrollTween = null;
 
-  let lastScrollProgress = 0;
+  function attachScrollTrigger(ScrollTrigger, gsap) {
+    scrollTween = gsap.to(playhead, {
+      frame: 0,
+      duration: prefersReducedMotion ? 0 : (isTouchDevice ? 0.5 : 0.35),
+      ease: "power2",
+      paused: true,
+      onUpdate: () => drawFrame(playhead.frame),
+    });
 
-  function attachScrollTrigger(ScrollTrigger) {
     ScrollTrigger.create({
       trigger: container,
       start: "top top",
       end: "bottom bottom",
-      scrub: true, // tie progress to the smoothed ticker, not raw scroll events
+      scrub: true,
       onUpdate: (self) => {
-        runUpdateFromProgress(self.progress, performance.now());
+        const doorProgress = doorProgressFromScroll(self.progress);
+        scrollTween.vars.frame = doorProgress * (frameCount - 1);
+        scrollTween.invalidate().restart();
+        updateBeatsAndChrome(doorProgress, self.progress);
       },
       onRefresh: (self) => {
-        recomputeLayout();
-        runUpdateFromProgress(self.progress, performance.now());
+        const doorProgress = doorProgressFromScroll(self.progress);
+        updateBeatsAndChrome(doorProgress, self.progress);
       },
     });
   }
 
   function attachRawScrollFallback() {
-    window.addEventListener("scroll", () => {
-      if (!rafId) {
-        rafId = requestAnimationFrame((now) => {
-          rafId = null;
-          const rectTop = containerTop - window.scrollY;
-          const p = Math.max(0, Math.min(1, -rectTop / maxScroll));
-          runUpdateFromProgress(p, now);
-        });
-      }
+    let maxScroll = 0;
+    let containerTop = 0;
+    function recomputeLayout() {
+      containerTop = container.getBoundingClientRect().top + window.scrollY;
+      maxScroll = container.offsetHeight - window.innerHeight;
+    }
+    recomputeLayout();
+
+    let rafId = null;
+    function onScroll() {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const rectTop = containerTop - window.scrollY;
+        const scrollProgress = Math.max(0, Math.min(1, -rectTop / maxScroll));
+        const doorProgress = doorProgressFromScroll(scrollProgress);
+        // No GSAP available in this fallback path, so no scrub/tween —
+        // draw the target frame directly.
+        playhead.frame = doorProgress * (frameCount - 1);
+        drawFrame(playhead.frame);
+        updateBeatsAndChrome(doorProgress, scrollProgress);
+      });
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", () => {
+      recomputeLayout();
+      onScroll();
     }, { passive: true });
+    onScroll();
   }
 
-  if (window.__ScrollTrigger) {
-    attachScrollTrigger(window.__ScrollTrigger);
+  if (window.__ScrollTrigger && window.__gsap) {
+    attachScrollTrigger(window.__ScrollTrigger, window.__gsap);
   } else {
     document.addEventListener("lenis-gsap-ready", (e) => {
-      attachScrollTrigger(e.detail.ScrollTrigger);
+      attachScrollTrigger(e.detail.ScrollTrigger, e.detail.gsap);
     }, { once: true });
     // If GSAP/ScrollTrigger never shows up (CDN blocked, offline, etc.),
     // fall back to the original raw-scroll driver after a short grace
@@ -1858,19 +1947,41 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 2000);
   }
 
+  // Canvas resize on window resize (layout-only; ScrollTrigger.refresh()
+  // handles re-measuring scroll distances on its own resize listener).
   let resizeTimer = null;
   window.addEventListener("resize", () => {
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      recomputeLayout();
       if (window.__ScrollTrigger) {
         window.__ScrollTrigger.refresh();
-      } else {
-        lastFrameIndex = -1;
-        update();
       }
     }, 120);
   }, { passive: true });
+
+  // MOBILE FIX (see drawImage above): redraw the canvas immediately
+  // whenever .hero-sticky's own rendered box changes size — e.g. the
+  // address bar showing/hiding as the user scrolls — instead of waiting on
+  // the 120ms-debounced window `resize` listener below. That debounce is
+  // fine for the heavier ScrollTrigger.refresh(), but leaving the canvas
+  // stale for up to 120ms every time the viewport height changes is
+  // exactly what let .hero-sticky's own background color show through as
+  // a visible band. This forces a redraw at the tween's current frame
+  // (playhead.frame), which now reads size from .hero-sticky directly, so
+  // canvas and container can't drift apart even mid-scroll.
+  if (heroSticky && "ResizeObserver" in window) {
+    let lastW = 0, lastH = 0;
+    const heroResizeObserver = new ResizeObserver((entries) => {
+      const box = entries[0].contentRect;
+      if (Math.round(box.width) === lastW && Math.round(box.height) === lastH) return;
+      lastW = Math.round(box.width);
+      lastH = Math.round(box.height);
+      lastFrameIndex = -1; // force drawFrame to redraw even if the rounded frame didn't change
+      lastDrawTime = -Infinity; // bypass the touch min-redraw-interval cap for this forced redraw
+      drawFrame(playhead.frame);
+    });
+    heroResizeObserver.observe(heroSticky);
+  }
 
   function updateBeat(num, start, end, progress) {
     const el = beatEls[num];
@@ -2100,6 +2211,17 @@ document.addEventListener("DOMContentLoaded", () => {
   if (siteHeader) {
     let headerRafId = null;
     let headerOnLight = false;
+    // Own layout measurement, independent of the door-canvas scroll driver
+    // above (that one's containerTop/maxScroll are now scoped to
+    // attachRawScrollFallback and not always present, since GSAP's
+    // ScrollTrigger owns progress tracking in the normal path instead).
+    let headerContainerTop = 0;
+    let headerMaxScroll = 0;
+    function recomputeHeaderLayout() {
+      headerContainerTop = container.getBoundingClientRect().top + window.scrollY;
+      headerMaxScroll = container.offsetHeight - window.innerHeight;
+    }
+    recomputeHeaderLayout();
     function updateHeader() {
       headerRafId = null;
       const heroBottom = container.offsetHeight; // hero-scroll-container end
@@ -2113,12 +2235,16 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     function scrollProgressPastHero() {
-      const rectTop = containerTop - window.scrollY;
-      const progress = Math.max(0, Math.min(1, -rectTop / maxScroll));
+      const rectTop = headerContainerTop - window.scrollY;
+      const progress = Math.max(0, Math.min(1, headerMaxScroll > 0 ? -rectTop / headerMaxScroll : 1));
       return progress >= 0.98;
     }
     window.addEventListener('scroll', () => {
       if (!headerRafId) headerRafId = requestAnimationFrame(updateHeader);
+    }, { passive: true });
+    window.addEventListener('resize', () => {
+      recomputeHeaderLayout();
+      updateHeader();
     }, { passive: true });
     updateHeader();
 
