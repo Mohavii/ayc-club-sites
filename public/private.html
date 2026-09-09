@@ -346,7 +346,10 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
   padding: 0 9%;
   opacity: 0;
-  will-change: opacity, transform, filter;
+  will-change: opacity, transform;
+}
+@media (min-width: 901px) {
+  .beat { will-change: opacity, transform, filter; }
 }
 
 .beat.is-active { pointer-events: auto; }
@@ -541,6 +544,12 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateY(36px);
   transition: opacity 0.9s var(--ease-soft), transform 0.9s var(--ease-soft), filter 0.9s var(--ease-soft);
   filter: blur(6px);
+}
+@media (max-width: 900px) {
+  .reveal {
+    filter: none;
+    transition: opacity 0.9s var(--ease-soft), transform 0.9s var(--ease-soft);
+  }
 }
 .reveal.is-visible {
   opacity: 1;
@@ -1010,6 +1019,12 @@ h1, h2, h3, h4, h5, h6 {
   filter: blur(4px);
   transition: opacity 0.6s var(--ease-soft), transform 0.6s var(--ease-soft), filter 0.6s var(--ease-soft);
 }
+@media (max-width: 900px) {
+  .split-word {
+    filter: none;
+    transition: opacity 0.6s var(--ease-soft), transform 0.6s var(--ease-soft);
+  }
+}
 .beat.is-active .split-word {
   opacity: 1;
   transform: translateY(0);
@@ -1027,9 +1042,11 @@ h1, h2, h3, h4, h5, h6 {
 .cta-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(50px);
   opacity: 0.35;
   animation: orbDrift 22s ease-in-out infinite;
+}
+@media (min-width: 901px) {
+  .cta-orb { filter: blur(50px); }
 }
 .cta-orb-1 { width: 340px; height: 340px; left: 6%; top: 10%; background: radial-gradient(circle, var(--door-blue-light), transparent 70%); animation-duration: 26s; }
 .cta-orb-2 { width: 260px; height: 260px; right: 10%; bottom: 8%; background: radial-gradient(circle, var(--bougainvillea), transparent 70%); animation-duration: 19s; animation-delay: -6s; }
@@ -1562,6 +1579,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const scrollProgressBar = document.getElementById("scroll-progress-bar");
   const scrollCue = document.getElementById("scroll-cue");
 
+  // MOBILE PERF: On touch devices, only load every Nth frame to halve
+  // bandwidth, decode work, and memory. The visual difference between
+  // adjacent frames is imperceptible on a phone screen. Desktop loads all.
+  const isMobileDevice =
+    window.matchMedia && window.matchMedia("(pointer: coarse) and (hover: none)").matches;
+  const frameStep = isMobileDevice ? 2 : 1;
+  // Build an ordered list of which source frame indices we actually load.
+  // On desktop this is [0,1,2,...,152]; on mobile it's [0,2,4,...,152].
+  const activeFrameIndices = [];
+  for (let i = 0; i < frameCount; i += frameStep) activeFrameIndices.push(i);
+  const activeFrameCount = activeFrameIndices.length;
+
   // Frames are stored as decoded ImageBitmaps, not <img> elements.
   // Why: ctx.drawImage() on an HTMLImageElement forces the browser to
   // synchronously decode that image on the main thread on every single
@@ -1614,36 +1643,35 @@ document.addEventListener("DOMContentLoaded", () => {
   loadFrame(1);
 
   // Next handful: enough runway for an eager scroller before the background
-  // queue catches up. Widened vs. before since the scroll distance is now
-  // shorter (650vh instead of 1600vh) — a fast scroller reaches later
-  // frames sooner, so more of them need to already be in flight.
-  for (let i = 2; i <= Math.min(24, frameCount); i++) loadFrame(i);
+  // queue catches up. On mobile (frameStep=2) this is ~12 source frames;
+  // on desktop it's 23 — both giving the same scroll-distance runway.
+  const eagerCount = Math.min(24, activeFrameCount);
+  for (let k = 1; k < eagerCount; k++) {
+    loadFrame(activeFrameIndices[k] + 1); // loadFrame is 1-based
+  }
 
   // Remaining frames stream in the background in small batches via
   // requestIdleCallback (falls back to a timer) so they never compete with
-  // first-paint or main-thread work. Larger batch + shorter timeout than
-  // before so the full sequence finishes loading sooner — with a shorter
-  // scrub distance, frames get requested faster and idle time is the
-  // limiting factor, not bandwidth.
-  let nextBatchStart = 25;
+  // first-paint or main-thread work.
+  let nextBatchIdx = eagerCount;
   function loadNextBatch(deadline) {
-    const batchSize = 14;
+    const batchSize = isMobileDevice ? 8 : 14;
     let loaded = 0;
-    while (nextBatchStart <= frameCount && loaded < batchSize) {
-      loadFrame(nextBatchStart);
-      nextBatchStart++;
+    while (nextBatchIdx < activeFrameCount && loaded < batchSize) {
+      loadFrame(activeFrameIndices[nextBatchIdx] + 1);
+      nextBatchIdx++;
       loaded++;
       if (deadline && deadline.timeRemaining && deadline.timeRemaining() < 1) break;
     }
-    if (nextBatchStart <= frameCount) {
+    if (nextBatchIdx < activeFrameCount) {
       scheduleIdle(loadNextBatch);
     }
   }
   function scheduleIdle(fn) {
     if ("requestIdleCallback" in window) {
-      requestIdleCallback(fn, { timeout: 300 });
+      requestIdleCallback(fn, { timeout: isMobileDevice ? 500 : 300 });
     } else {
-      setTimeout(fn, 100);
+      setTimeout(fn, isMobileDevice ? 200 : 100);
     }
   }
   scheduleIdle(loadNextBatch);
@@ -1652,9 +1680,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // squares the canvas fill/blit cost. Desktop keeps the existing 1.5 cap
   // (unchanged); touch devices are capped lower so the scroll-linked
   // redraw stays cheap enough for mobile GPUs to keep up every frame.
-  const isTouchDevice =
-    window.matchMedia && window.matchMedia("(pointer: coarse) and (hover: none)").matches;
-  const maxDpr = isTouchDevice ? 1 : 1.5;
+  const maxDpr = isMobileDevice ? 1 : 1.5;
 
   function drawImage(img) {
     if (!img) return;
@@ -1707,9 +1733,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // straight to the nearest frame instead of trying to paint each one —
   // this is the main remaining lag source once the DPR cap and the WebGL
   // shader skip are already in place.
-  const isTouchScrub =
-    window.matchMedia && window.matchMedia("(pointer: coarse) and (hover: none)").matches;
-  const minRedrawIntervalMs = isTouchScrub ? 33 : 0; // ~30fps cap on touch, uncapped on desktop
+  const minRedrawIntervalMs = isMobileDevice ? 33 : 0; // ~30fps cap on touch, uncapped on desktop
   let lastDrawTime = -Infinity;
 
   // Cache beat elements once instead of re-querying the DOM on every
@@ -1749,7 +1773,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // Ease-out curve to counteract the source footage's slow start / fast finish
     doorProgress = Math.pow(doorProgress, 0.6);
 
-    const frameIndex = Math.floor(doorProgress * (frameCount - 1));
+    // Map doorProgress into whichever subset of frames was actually loaded
+    // (all 153 on desktop, every 2nd on mobile via activeFrameIndices).
+    const activeIdx = Math.min(activeFrameCount - 1, Math.floor(doorProgress * activeFrameCount));
+    const frameIndex = activeFrameIndices[activeIdx]; // 0-based source frame index
     // frames[i] is either an ImageBitmap (ready as soon as it's set — no
     // .complete flag needed), a still-loading <img> (has .complete === false
     // until decoded, fallback path only), or not yet requested.
@@ -1901,12 +1928,17 @@ document.addEventListener("DOMContentLoaded", () => {
       opacity = Math.max(0, Math.min(1, opacity));
       const eased = 1 - Math.pow(1 - opacity, 3); // ease-out cubic on the fade itself
       const translateY = phase >= 0 ? shift * (1 - eased) : -shift * 0.4 * (1 - eased);
-      const blur = (1 - eased) * 6;
       const scale = 0.97 + 0.03 * eased;
 
       el.style.opacity = eased.toFixed(3);
       el.style.transform = `translateY(${translateY.toFixed(2)}px) scale(${scale.toFixed(3)})`;
-      el.style.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : "none";
+      // MOBILE PERF: skip blur filter entirely — it's the most GPU-expensive
+      // per-frame style write and the single biggest source of paint jank
+      // during touch scrolling. Desktop keeps it for the polished effect.
+      if (!isMobileDevice) {
+        const blur = (1 - eased) * 6;
+        el.style.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : "none";
+      }
       el.dataset.hidden = '0';
 
       if (opacity > 0) {
@@ -1917,7 +1949,9 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       el.style.opacity = '0';
       el.style.transform = `translateY(${shift}px) scale(0.97)`;
-      el.style.filter = "blur(6px)";
+      if (!isMobileDevice) {
+        el.style.filter = "blur(6px)";
+      }
       el.classList.remove('is-active');
       el.dataset.hidden = '1';
     }
