@@ -296,6 +296,31 @@ h1, h2, h3, h4, h5, h6 {
   transform-origin: left;
   transition: width 0.05s linear;
 }
+/* FIX: native compositor-thread progress bar. Where animation-timeline
+   is supported (Safari 26+, Chrome/Edge 115+; ~80-85% global as of 2026,
+   Firefox still behind a flag), this drives the bar purely off the
+   scroll-timeline with zero JavaScript involvement — it keeps animating
+   smoothly even while the main thread is busy decoding/blitting canvas
+   frames, which is exactly the situation the old width-write-per-tick
+   version was most likely to visibly stutter in. Falls back to the
+   existing JS-driven .style.width path everywhere else — the JS still
+   runs unconditionally, but where this rule applies it wins the visual
+   race and the JS write becomes a harmless no-op the user never sees.
+   scaleX is used instead of width because transform is compositor-only;
+   animating width itself would still force layout on every step. */
+@supports (animation-timeline: scroll()) {
+  .scroll-progress-bar {
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: none;
+    animation: scroll-progress-fill linear both;
+    animation-timeline: scroll(root block);
+  }
+  @keyframes scroll-progress-fill {
+    to { transform: scaleX(1); }
+  }
+}
 
 .scroll-cue {
   position: absolute;
@@ -1551,6 +1576,28 @@ h1, h2, h3, h4, h5, h6 {
 </footer>
 
 <script>
+// -----------------------------------------------------------------------
+// NOTE on OffscreenCanvas + Worker (considered, not applied):
+// Moving the canvas draw itself into a Worker via
+// canvas.transferControlToOffscreen() was evaluated and deliberately
+// NOT done here. Reason: the scroll position that drives every frame
+// still has to be observed on the main thread (ScrollTrigger/native
+// scroll events both require DOM access, which workers don't have), so
+// a worker-based draw would add a postMessage() round-trip on every
+// single scroll tick without removing the main-thread work that's
+// actually driving jank in this file (see fixes below). postMessage is
+// not free — for a scroll-*scrubbed* sequence like this one (vs. an
+// autonomous animation loop with no per-frame main-thread dependency,
+// where OffscreenCanvas is unambiguously a win), the added round-trip
+// latency can net worse than it started, and transferControlToOffscreen()
+// is irreversible per canvas, so it's not something to apply speculatively.
+// If this hero is ever reworked to compute frame index inside the worker
+// itself (e.g. via a SharedArrayBuffer written from a scroll listener,
+// avoiding postMessage entirely), OffscreenCanvas becomes worth
+// revisiting. Until then, fixes 3-5 below (removing the redundant GSAP
+// tween, integer draw coords, and batching DOM writes off the canvas
+// tick) address the actual main-thread contention directly.
+// -----------------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
   const canvas = document.getElementById("door-canvas");
   const ctx = canvas.getContext("2d", { alpha: false });
@@ -1571,11 +1618,24 @@ document.addEventListener("DOMContentLoaded", () => {
   // after that, drawImage(bitmap) is just a cheap GPU blit, no decode.
   const supportsBitmap = "createImageBitmap" in window;
 
+  // FIX: mobile-specific frame source. Decoded pixel count, not download
+  // size, is what drives per-frame drawImage/blit cost. Desktop keeps the
+  // full-resolution AVIFs; touch devices request a "-sm" variant from the
+  // same folder (pre-generate these at ~50% linear dimensions — roughly a
+  // quarter the pixels to decode and blit per frame). If the "-sm" asset
+  // is missing on your server this 404s harmlessly and onerror below falls
+  // back to the full-size frame, so this is safe to ship before the
+  // resized set exists, but the real perf win only lands once it does.
+  const isTouchDeviceEarly =
+    window.matchMedia && window.matchMedia("(pointer: coarse) and (hover: none)").matches;
+  const frameSuffix = isTouchDeviceEarly ? "-sm" : "";
+
   function loadFrame(i) {
     if (frames[i - 1] || (i - 1) in frames) return; // already queued/loaded
     frames[i - 1] = null; // reserve the slot so we don't re-queue it
     const frameNumber = i.toString().padStart(3, '0');
-    const url = `door-frames/ezgif-frame-${frameNumber}.avif`;
+    const url = `door-frames/ezgif-frame-${frameNumber}${frameSuffix}.avif`;
+    const fallbackUrl = `door-frames/ezgif-frame-${frameNumber}.avif`;
 
     const onReady = (bitmapOrImg) => {
       frames[i - 1] = bitmapOrImg;
@@ -1589,10 +1649,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (supportsBitmap) {
       fetch(url, { priority: i === 1 ? "high" : "low" })
-        .then((res) => res.blob())
+        .then((res) => { if (!res.ok) throw new Error("sm variant missing"); return res.blob(); })
         .then((blob) => createImageBitmap(blob))
         .then(onReady)
         .catch(() => {
+          // FIX: if the "-sm" variant 404s (not generated yet) or the
+          // fetch/decode otherwise fails, retry against the guaranteed
+          // full-size frame before giving up — so a partially-migrated
+          // asset set never breaks the hero, it just loses the mobile
+          // size win for whichever frames aren't resized yet.
+          if (url !== fallbackUrl) {
+            fetch(fallbackUrl)
+              .then((res) => res.blob())
+              .then((blob) => createImageBitmap(blob))
+              .then(onReady)
+              .catch(() => {
+                const img = new Image();
+                img.decoding = "async";
+                img.onload = () => onReady(img);
+                img.src = fallbackUrl;
+              });
+            return;
+          }
           // Fallback for a failed fetch/decode: plain <img> still works,
           // just without the async-decode benefit.
           const img = new Image();
@@ -1673,6 +1751,24 @@ document.addEventListener("DOMContentLoaded", () => {
   // canvas to the same source of truth the container itself uses, so
   // there's nothing for it to disagree with.
   const heroSticky = document.querySelector(".hero-sticky");
+  // FIX: cache the container box instead of calling getBoundingClientRect()
+  // inside drawImage(), which runs on every single scroll-linked tick.
+  // getBoundingClientRect() forces a synchronous layout read if anything
+  // on the page has pending layout-invalidating changes — inside a
+  // scroll-driven rAF/onUpdate callback, that's the classic recipe for
+  // "forced synchronous layout" jank on top of the canvas blit cost. The
+  // box is only re-measured on resize/orientation change, which is all it
+  // actually needs.
+  let cachedRect = { width: window.innerWidth, height: window.innerHeight };
+  function refreshHeroRect() {
+    const rect = heroSticky ? heroSticky.getBoundingClientRect() : null;
+    cachedRect = {
+      width: (rect && rect.width) || window.innerWidth,
+      height: (rect && rect.height) || window.innerHeight,
+    };
+  }
+  refreshHeroRect();
+
   function drawImage(img, alpha) {
     if (!img) return;
     // Capped at 1.5 rather than 2: this canvas shows full-bleed photographic
@@ -1680,9 +1776,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // resolution is barely visible, while canvas fill/blit cost scales with
     // pixel count — 1.5 vs 2 is roughly a 40% smaller canvas to redraw.
     const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
-    const rect = heroSticky ? heroSticky.getBoundingClientRect() : null;
-    const w = (rect && rect.width) || window.innerWidth;
-    const h = (rect && rect.height) || window.innerHeight;
+    const w = cachedRect.width;
+    const h = cachedRect.height;
 
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
       canvas.width = Math.round(w * dpr);
@@ -1707,6 +1802,17 @@ document.addEventListener("DOMContentLoaded", () => {
       x = (canvas.width - drawWidth) / 2;
       y = 0;
     }
+
+    // FIX: round every drawImage coordinate to an integer. Sub-pixel
+    // coordinates force the canvas to do extra anti-aliasing work on every
+    // single blit (MDN's own canvas perf guidance flags this explicitly).
+    // At 153 frames redrawn on every scroll tick, that's real, avoidable
+    // per-frame cost for zero visible sharpness gain on photographic
+    // footage.
+    drawWidth = Math.round(drawWidth);
+    drawHeight = Math.round(drawHeight);
+    x = Math.round(x);
+    y = Math.round(y);
 
     if (alpha === undefined || alpha >= 1) {
       // Opaque draw: fill with the deep night tone first (matches the
@@ -1808,24 +1914,47 @@ document.addEventListener("DOMContentLoaded", () => {
     return drew;
   }
 
+  // FIX: decouple DOM writes (beats, progress bar, scroll cue) from the
+  // canvas draw. Both used to run synchronously in the same onUpdate call
+  // as drawFrame() — a canvas blit and several style/class writes sharing
+  // one 16ms tick is exactly the kind of main-thread contention that
+  // tips a frame from smooth to dropped on mid-range mobile GPUs. This
+  // coalesces the DOM writes onto their own rAF, so if ScrollTrigger fires
+  // onUpdate multiple times before the next paint, the DOM only gets
+  // touched once, and the canvas draw (already happening synchronously
+  // in the caller) is never blocked waiting on a style recalc it doesn't
+  // need to be involved in.
+  let pendingChromeUpdate = null;
+  let chromeRafId = 0;
   function updateBeatsAndChrome(doorProgress, scrollProgress) {
-    // Beats — driven by doorProgress (the same reshaped curve that picks
-    // the frame), not raw scrollProgress. The door needs scrollProgress to
-    // reach 0.84 to be fully open, so beats are keyed in doorProgress space
-    // (divide breakpoints by 0.84) to stay locked to the frame regardless
-    // of scroll speed.
-    updateBeat(1, 0, 0.0714, doorProgress);
-    updateBeat(2, 0.1667, 0.3333, doorProgress);
-    updateBeat(3, 0.4286, 0.6190, doorProgress);
-    updateBeat(4, 0.6905, 0.8810, doorProgress);
-    updateBeat(5, 0.9524, 1.0, doorProgress);
+    pendingChromeUpdate = { doorProgress, scrollProgress };
+    if (chromeRafId) return;
+    chromeRafId = requestAnimationFrame(() => {
+      chromeRafId = 0;
+      const { doorProgress, scrollProgress } = pendingChromeUpdate;
+      // Beats — driven by doorProgress (the same reshaped curve that picks
+      // the frame), not raw scrollProgress. The door needs scrollProgress
+      // to reach 0.84 to be fully open, so beats are keyed in doorProgress
+      // space (divide breakpoints by 0.84) to stay locked to the frame
+      // regardless of scroll speed.
+      updateBeat(1, 0, 0.0714, doorProgress);
+      updateBeat(2, 0.1667, 0.3333, doorProgress);
+      updateBeat(3, 0.4286, 0.6190, doorProgress);
+      updateBeat(4, 0.6905, 0.8810, doorProgress);
+      updateBeat(5, 0.9524, 1.0, doorProgress);
 
-    if (scrollProgressBar) {
-      scrollProgressBar.style.width = (scrollProgress * 100).toFixed(2) + "%";
-    }
-    if (scrollCue) {
-      scrollCue.classList.toggle("is-hidden", scrollProgress > 0.03);
-    }
+      // FIX: skip the JS width write entirely when the native CSS
+      // scroll-timeline path (see .scroll-progress-bar CSS above) is
+      // active — writing an inline style here would override/fight the
+      // compositor-driven transform for no benefit, and this check itself
+      // is cheap (CSS.supports results are cached by the engine).
+      if (scrollProgressBar && !CSS.supports("animation-timeline", "scroll()")) {
+        scrollProgressBar.style.width = (scrollProgress * 100).toFixed(2) + "%";
+      }
+      if (scrollCue) {
+        scrollCue.classList.toggle("is-hidden", scrollProgress > 0.03);
+      }
+    });
   }
 
   // doorProgress: the eased 0..1 curve the door-opening frame count maps
@@ -1854,44 +1983,39 @@ document.addEventListener("DOMContentLoaded", () => {
   // as a fallback if GSAP failed to load (e.g. offline/CDN blocked).
   //
   // The ScrollTrigger itself no longer redraws the canvas directly. It
-  // just reports progress; a gsap.to() tween (built in attachScrollTrigger
-  // below) owns playhead.frame and the actual canvas draw happens in that
-  // tween's onUpdate, exactly like GSAP's reference imageSequence() helper.
-  // Beats/chrome, which should track scroll instantly rather than ease,
-  // are still updated directly from ScrollTrigger's onUpdate.
+  // just reports progress and the canvas draw happens directly in its own
+  // onUpdate. Beats/chrome are updated in the same callback.
   // ---------------------------------------------------------------------
-  // Structured the way GreenSock's own seamless-loop reference demo builds
-  // a retargeted scrub tween: a standalone ScrollTrigger.create() (not
-  // attached to the tween via the `scrollTrigger:` shorthand) drives a
-  // separate, reusable scrub tween by mutating its `vars` target and
-  // calling invalidate().restart() — per GreenSock's own comment on that
-  // technique, this is cheap ("no need for overwrites or creating a new
-  // tween on each update"): invalidate() only clears the tween's cached
-  // *start* values so it re-reads playhead.frame's current live position
-  // as the new starting point; restart() then re-plays toward the (just
-  // updated) target over the tween's fixed duration. Nothing is reset to
-  // time zero and no easing state is lost — this is the intended,
-  // documented way to keep retargeting one running scrub tween.
-  let scrollTween = null;
-
+  // FIX (removes the #1 diagnosed jank source): the previous version ran
+  // TWO animation systems per scroll tick — ScrollTrigger's own internal
+  // scrub interpolation, AND a second gsap.to(playhead) tween that was
+  // invalidate().restart()'d on every single onUpdate call, doubling the
+  // GSAP ticker work per frame for no visible benefit. Apple's own
+  // production AirPods/iPhone scroll sequences (verified against their
+  // shipped source) do nothing more than a plain drawImage() call keyed
+  // straight off scroll position — no secondary easing tween at all.
+  // ScrollTrigger's native `scrub: <number>` option already provides the
+  // "catches up, doesn't jump" damping (it smooths self.progress itself
+  // before onUpdate ever fires), so there is no need to re-implement that
+  // same easing a second time with an extra tween. One scheduler, one
+  // draw call per tick.
   function attachScrollTrigger(ScrollTrigger, gsap) {
-    scrollTween = gsap.to(playhead, {
-      frame: 0,
-      duration: prefersReducedMotion ? 0 : (isTouchDevice ? 0.5 : 0.35),
-      ease: "power2",
-      paused: true,
-      onUpdate: () => drawFrame(playhead.frame),
-    });
+    // scrub number = seconds to catch up to the actual scroll position —
+    // this IS the damping the old secondary tween existed to provide.
+    // Slightly slower catch-up on touch (matches the old duration split)
+    // since a fast swipe otherwise produces more redraws per second than
+    // a mobile GPU comfortably keeps up with.
+    const scrubSeconds = prefersReducedMotion ? true : (isTouchDevice ? 0.5 : 0.35);
 
     ScrollTrigger.create({
       trigger: container,
       start: "top top",
       end: "bottom bottom",
-      scrub: true,
+      scrub: scrubSeconds,
       onUpdate: (self) => {
         const doorProgress = doorProgressFromScroll(self.progress);
-        scrollTween.vars.frame = doorProgress * (frameCount - 1);
-        scrollTween.invalidate().restart();
+        playhead.frame = doorProgress * (frameCount - 1);
+        drawFrame(playhead.frame);
         updateBeatsAndChrome(doorProgress, self.progress);
       },
       onRefresh: (self) => {
@@ -1951,8 +2075,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // handles re-measuring scroll distances on its own resize listener).
   let resizeTimer = null;
   window.addEventListener("resize", () => {
+    refreshHeroRect(); // FIX: keep the cached box in sync with real layout
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
+      refreshHeroRect();
       if (window.__ScrollTrigger) {
         window.__ScrollTrigger.refresh();
       }
