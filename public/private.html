@@ -26,7 +26,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,340;9..144,460;9..144,560;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="preload" as="image" href="door-frames/ezgif-frame-001.avif" fetchpriority="high">
+<link rel="preload" as="image" href="door-frames/ezgif-frame-001.avif" fetchpriority="high" media="(pointer: fine)">
+<!-- FIX: mobile equivalent of the desktop preload above. Touch devices
+     now load the sprite-sheet path (door-sheets/door-sheet-00.avif),
+     which contains frame 1, so preload that instead of the full-size
+     single frame — matches what loadSheets() actually requests first,
+     avoiding a wasted duplicate fetch of the old per-frame asset. -->
+<link rel="preload" as="image" href="door-sheets/door-sheet-00.avif" fetchpriority="high" media="(pointer: coarse)">
 
 <style>
 /* =====================================================================
@@ -1612,119 +1618,190 @@ document.addEventListener("DOMContentLoaded", () => {
   // Frames are stored as decoded ImageBitmaps, not <img> elements.
   // Why: ctx.drawImage() on an HTMLImageElement forces the browser to
   // synchronously decode that image on the main thread on every single
-  // call. With 153 AVIF frames being redrawn on every scroll tick, that
-  // per-frame decode cost is the #1 source of scroll jank. createImageBitmap()
+  // call. With frames being redrawn on every scroll tick, that per-frame
+  // decode cost is a top source of scroll jank. createImageBitmap()
   // decodes once, off the main thread, when the frame finishes loading —
   // after that, drawImage(bitmap) is just a cheap GPU blit, no decode.
   const supportsBitmap = "createImageBitmap" in window;
 
-  // FIX: mobile-specific frame source. Decoded pixel count, not download
-  // size, is what drives per-frame drawImage/blit cost. Desktop keeps the
-  // full-resolution AVIFs; touch devices request a "-sm" variant from the
-  // same folder (pre-generate these at ~50% linear dimensions — roughly a
-  // quarter the pixels to decode and blit per frame). If the "-sm" asset
-  // is missing on your server this 404s harmlessly and onerror below falls
-  // back to the full-size frame, so this is safe to ship before the
-  // resized set exists, but the real perf win only lands once it does.
   const isTouchDeviceEarly =
     window.matchMedia && window.matchMedia("(pointer: coarse) and (hover: none)").matches;
-  const frameSuffix = isTouchDeviceEarly ? "-sm" : "";
 
-  function loadFrame(i) {
-    if (frames[i - 1] || (i - 1) in frames) return; // already queued/loaded
-    frames[i - 1] = null; // reserve the slot so we don't re-queue it
-    const frameNumber = i.toString().padStart(3, '0');
-    const url = `door-frames/ezgif-frame-${frameNumber}${frameSuffix}.avif`;
-    const fallbackUrl = `door-frames/ezgif-frame-${frameNumber}.avif`;
+  // ---------------------------------------------------------------------
+  // FIX (deep-research pass): sprite-sheet loading for touch devices.
+  //
+  // Why this replaces the earlier per-frame "-sm.avif" approach: that
+  // version fixed decode/blit COST per frame (smaller pixels) but not
+  // COUNT of frames in flight. 153 separate fetch() + createImageBitmap()
+  // calls means 153 HTTP round-trips and, more importantly, 153 separate
+  // decoded ImageBitmap objects resident in memory at once — real texture/
+  // VRAM pressure on mobile GPUs, which can force the browser to evict and
+  // re-decode under memory pressure mid-scroll (presents as lag that
+  // doesn't fully resolve after initial load). Confirmed against current
+  // sources: GreenSock's own community guidance flags per-file src
+  // switching as "guaranteed to be slow"; sprite-sheet benchmarks show
+  // stable 60fps vs. ~35fps for the equivalent per-image approach; MDN's
+  // canvas guidance recommends sheets specifically to cut HTTP overhead.
+  //
+  // Packed as 6 sheets of 28 frames each (4 cols x 7 rows, 960x540 tiles
+  // with 4px padding) rather than one giant sheet: iOS Safari hard-caps
+  // canvas area at 16,777,216px AND each dimension at 4096px (verified —
+  // this is not a soft/negotiable limit, exceeding it makes the canvas
+  // silently fail to draw). One sheet holding all 153 frames at this tile
+  // size would be ~4x over that cap and would break outright on iPhone,
+  // not just underperform. 4px padding between tiles avoids WebKit's
+  // known scaled-drawImage edge-bleed issue on sprite sheets (confirmed
+  // via the WHATWG spec discussion on clamp-to-edge behavior).
+  //
+  // Net effect vs. the old mobile path: 153 requests -> 6 requests, 153
+  // resident decoded bitmaps -> 6, and each draw is a single drawImage()
+  // source-rect slice (9-arg form) directly off an already-decoded sheet
+  // — no per-frame createImageBitmap call needed on the hot path at all.
+  // ---------------------------------------------------------------------
+  const useSheets = isTouchDeviceEarly;
+  let sheetManifest = null;
+  let sheetImages = []; // decoded ImageBitmap|Image per sheet, indexed by sheet number
+  let sheetsReady = false;
 
-    const onReady = (bitmapOrImg) => {
-      frames[i - 1] = bitmapOrImg;
-      loadedCount++;
-      if (!firstDrawn) {
-        firstDrawn = true;
-        drawImage(bitmapOrImg);
-        canvas.classList.add("is-ready");
-      }
-    };
+  function loadSheets() {
+    fetch("door-sheets/manifest.json")
+      .then((res) => { if (!res.ok) throw new Error("manifest missing"); return res.json(); })
+      .then((manifest) => {
+        sheetManifest = manifest;
+        let loadedSheets = 0;
 
-    if (supportsBitmap) {
-      fetch(url, { priority: i === 1 ? "high" : "low" })
-        .then((res) => { if (!res.ok) throw new Error("sm variant missing"); return res.blob(); })
-        .then((blob) => createImageBitmap(blob))
-        .then(onReady)
-        .catch(() => {
-          // FIX: if the "-sm" variant 404s (not generated yet) or the
-          // fetch/decode otherwise fails, retry against the guaranteed
-          // full-size frame before giving up — so a partially-migrated
-          // asset set never breaks the hero, it just loses the mobile
-          // size win for whichever frames aren't resized yet.
-          if (url !== fallbackUrl) {
-            fetch(fallbackUrl)
+        const onSheetReady = (sheetIdx, bitmapOrImg) => {
+          sheetImages[sheetIdx] = bitmapOrImg;
+          loadedSheets++;
+          if (sheetIdx === 0 && !firstDrawn) {
+            firstDrawn = true;
+            drawImage(getSheetFrameRef(1));
+            canvas.classList.add("is-ready");
+          }
+          if (loadedSheets === manifest.numSheets) sheetsReady = true;
+        };
+
+        // Load sheet 0 first (covers the opening of the sequence, which is
+        // what an eager scroller reaches soonest) at high priority; the
+        // rest follow immediately after since 6 total requests is cheap
+        // enough not to need idle-batching the way 153 individual frames
+        // did.
+        for (let s = 0; s < manifest.numSheets; s++) {
+          const url = `door-sheets/door-sheet-${String(s).padStart(2, "0")}.avif`;
+          if (supportsBitmap) {
+            fetch(url, { priority: s === 0 ? "high" : "low" })
               .then((res) => res.blob())
               .then((blob) => createImageBitmap(blob))
-              .then(onReady)
+              .then((bmp) => onSheetReady(s, bmp))
               .catch(() => {
                 const img = new Image();
                 img.decoding = "async";
-                img.onload = () => onReady(img);
-                img.src = fallbackUrl;
+                img.onload = () => onSheetReady(s, img);
+                img.src = url;
               });
-            return;
+          } else {
+            const img = new Image();
+            img.decoding = "async";
+            if (s === 0) img.fetchPriority = "high";
+            img.onload = () => onSheetReady(s, img);
+            img.src = url;
           }
-          // Fallback for a failed fetch/decode: plain <img> still works,
-          // just without the async-decode benefit.
-          const img = new Image();
-          img.decoding = "async";
-          img.onload = () => onReady(img);
-          img.src = url;
-        });
-    } else {
-      // Older browsers without createImageBitmap support.
-      const img = new Image();
-      img.decoding = "async";
-      if (i === 1) img.fetchPriority = "high";
-      img.onload = () => onReady(img);
-      img.src = url;
-    }
+        }
+      })
+      .catch(() => {
+        // Manifest missing entirely (sheets not deployed to this server
+        // yet) — fall back to the guaranteed-present per-frame path below
+        // so the hero still works, just without the sheet optimization.
+        loadFramesLegacy();
+      });
   }
 
-  // First frame: load right away, at high fetch priority, so the hero paints fast.
-  loadFrame(1);
-
-  // Next handful: enough runway for an eager scroller before the background
-  // queue catches up. Widened vs. before since the scroll distance is now
-  // shorter (650vh instead of 1600vh) — a fast scroller reaches later
-  // frames sooner, so more of them need to already be in flight.
-  for (let i = 2; i <= Math.min(24, frameCount); i++) loadFrame(i);
-
-  // Remaining frames stream in the background in small batches via
-  // requestIdleCallback (falls back to a timer) so they never compete with
-  // first-paint or main-thread work. Larger batch + shorter timeout than
-  // before so the full sequence finishes loading sooner — with a shorter
-  // scrub distance, frames get requested faster and idle time is the
-  // limiting factor, not bandwidth.
-  let nextBatchStart = 25;
-  function loadNextBatch(deadline) {
-    const batchSize = 14;
-    let loaded = 0;
-    while (nextBatchStart <= frameCount && loaded < batchSize) {
-      loadFrame(nextBatchStart);
-      nextBatchStart++;
-      loaded++;
-      if (deadline && deadline.timeRemaining && deadline.timeRemaining() < 1) break;
-    }
-    if (nextBatchStart <= frameCount) {
-      scheduleIdle(loadNextBatch);
-    }
+  // Returns { img, sx, sy, sw, sh } describing where frame `i` (1-indexed)
+  // lives within its sheet, or null if that sheet hasn't loaded yet.
+  function getSheetFrameRef(i) {
+    if (!sheetManifest) return null;
+    const entry = sheetManifest.frames[i - 1];
+    if (!entry) return null;
+    const img = sheetImages[entry.sheet];
+    if (!img) return null;
+    return { img, sx: entry.x, sy: entry.y, sw: entry.w, sh: entry.h };
   }
-  function scheduleIdle(fn) {
-    if ("requestIdleCallback" in window) {
-      requestIdleCallback(fn, { timeout: 300 });
-    } else {
-      setTimeout(fn, 100);
+
+  // ---------------------------------------------------------------------
+  // Legacy per-frame path — kept as the fallback for desktop (crossfade
+  // needs individually addressable frames) and for touch devices if the
+  // sheet manifest 404s for any reason.
+  // ---------------------------------------------------------------------
+  function loadFramesLegacy() {
+    function loadFrame(i) {
+      if (frames[i - 1] || (i - 1) in frames) return; // already queued/loaded
+      frames[i - 1] = null; // reserve the slot so we don't re-queue it
+      const frameNumber = i.toString().padStart(3, '0');
+      const url = `door-frames/ezgif-frame-${frameNumber}.avif`;
+
+      const onReady = (bitmapOrImg) => {
+        frames[i - 1] = bitmapOrImg;
+        loadedCount++;
+        if (!firstDrawn) {
+          firstDrawn = true;
+          drawImage(bitmapOrImg);
+          canvas.classList.add("is-ready");
+        }
+      };
+
+      if (supportsBitmap) {
+        fetch(url, { priority: i === 1 ? "high" : "low" })
+          .then((res) => res.blob())
+          .then((blob) => createImageBitmap(blob))
+          .then(onReady)
+          .catch(() => {
+            const img = new Image();
+            img.decoding = "async";
+            img.onload = () => onReady(img);
+            img.src = url;
+          });
+      } else {
+        const img = new Image();
+        img.decoding = "async";
+        if (i === 1) img.fetchPriority = "high";
+        img.onload = () => onReady(img);
+        img.src = url;
+      }
     }
+
+    loadFrame(1);
+    for (let i = 2; i <= Math.min(24, frameCount); i++) loadFrame(i);
+
+    let nextBatchStart = 25;
+    function loadNextBatch(deadline) {
+      const batchSize = 14;
+      let loaded = 0;
+      while (nextBatchStart <= frameCount && loaded < batchSize) {
+        loadFrame(nextBatchStart);
+        nextBatchStart++;
+        loaded++;
+        if (deadline && deadline.timeRemaining && deadline.timeRemaining() < 1) break;
+      }
+      if (nextBatchStart <= frameCount) {
+        scheduleIdle(loadNextBatch);
+      }
+    }
+    function scheduleIdle(fn) {
+      if ("requestIdleCallback" in window) {
+        requestIdleCallback(fn, { timeout: 300 });
+      } else {
+        setTimeout(fn, 100);
+      }
+    }
+    scheduleIdle(loadNextBatch);
   }
-  scheduleIdle(loadNextBatch);
+
+  if (useSheets) {
+    loadSheets();
+  } else {
+    loadFramesLegacy();
+  }
+
 
   // Mobile fix: phones report devicePixelRatio 2-3, and every point of DPR
   // squares the canvas fill/blit cost. Desktop keeps the existing 1.5 cap
@@ -1751,33 +1828,48 @@ document.addEventListener("DOMContentLoaded", () => {
   // canvas to the same source of truth the container itself uses, so
   // there's nothing for it to disagree with.
   const heroSticky = document.querySelector(".hero-sticky");
-  // FIX: cache the container box instead of calling getBoundingClientRect()
-  // inside drawImage(), which runs on every single scroll-linked tick.
-  // getBoundingClientRect() forces a synchronous layout read if anything
-  // on the page has pending layout-invalidating changes — inside a
-  // scroll-driven rAF/onUpdate callback, that's the classic recipe for
-  // "forced synchronous layout" jank on top of the canvas blit cost. The
-  // box is only re-measured on resize/orientation change, which is all it
-  // actually needs.
-  let cachedRect = { width: window.innerWidth, height: window.innerHeight };
-  function refreshHeroRect() {
+  // NOTE: getBoundingClientRect() is read live on every draw, on purpose —
+  // this is NOT cached. An earlier attempt to cache this and only
+  // refresh it on the `resize` event reintroduced the exact bug this
+  // comment used to warn about: mobile browsers do not reliably fire
+  // `resize` when the address bar hides/shows mid-scroll, so a cached
+  // value goes stale for stretches of scroll and exposes
+  // .hero-sticky's own background-color (var(--night-deep), a dark
+  // navy/blue) as a solid band under or around the frame — which is
+  // the "blue line" artifact this exact setup produces when the box
+  // and the canvas buffer disagree on size. Reading it live avoids
+  // that at the cost of one rect read per draw call; because the beat/
+  // progress-bar DOM writes were already moved off this tick (see
+  // updateBeatsAndChrome's own rAF batching below), there is nothing
+  // else in this callback that dirties layout first, so this read does
+  // not force a synchronous reflow in practice — it is just reading a
+  // value the browser already has settled.
+  function getHeroRect() {
     const rect = heroSticky ? heroSticky.getBoundingClientRect() : null;
-    cachedRect = {
+    return {
       width: (rect && rect.width) || window.innerWidth,
       height: (rect && rect.height) || window.innerHeight,
     };
   }
-  refreshHeroRect();
 
-  function drawImage(img, alpha) {
-    if (!img) return;
+  function drawImage(imgOrRef, alpha) {
+    if (!imgOrRef) return;
+    // FIX: accept either a plain decoded image/bitmap (legacy per-frame
+    // path) or a { img, sx, sy, sw, sh } sheet reference (sprite-sheet
+    // path). Sheet refs use the 9-argument drawImage() form to slice
+    // directly out of an already-decoded sheet — no extra decode or
+    // allocation per frame, just a source-rect blit.
+    const isSheetRef = imgOrRef && typeof imgOrRef === "object" && "sx" in imgOrRef;
+    const img = isSheetRef ? imgOrRef.img : imgOrRef;
+    const srcW = isSheetRef ? imgOrRef.sw : img.width;
+    const srcH = isSheetRef ? imgOrRef.sh : img.height;
+
     // Capped at 1.5 rather than 2: this canvas shows full-bleed photographic
     // footage (not text/UI), so the sharpness gain from full device
     // resolution is barely visible, while canvas fill/blit cost scales with
     // pixel count — 1.5 vs 2 is roughly a 40% smaller canvas to redraw.
     const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
-    const w = cachedRect.width;
-    const h = cachedRect.height;
+    const { width: w, height: h } = getHeroRect();
 
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
       canvas.width = Math.round(w * dpr);
@@ -1787,7 +1879,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const canvasRatio = canvas.width / canvas.height;
-    const imgRatio = img.width / img.height;
+    const imgRatio = srcW / srcH;
 
     let drawWidth, drawHeight, x, y;
 
@@ -1806,9 +1898,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // FIX: round every drawImage coordinate to an integer. Sub-pixel
     // coordinates force the canvas to do extra anti-aliasing work on every
     // single blit (MDN's own canvas perf guidance flags this explicitly).
-    // At 153 frames redrawn on every scroll tick, that's real, avoidable
-    // per-frame cost for zero visible sharpness gain on photographic
-    // footage.
+    // Redrawn on every scroll tick, that's real, avoidable per-frame cost
+    // for zero visible sharpness gain on photographic footage.
     drawWidth = Math.round(drawWidth);
     drawHeight = Math.round(drawHeight);
     x = Math.round(x);
@@ -1820,13 +1911,21 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.globalAlpha = 1;
       ctx.fillStyle = '#061529';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, x, y, drawWidth, drawHeight);
+      if (isSheetRef) {
+        ctx.drawImage(img, imgOrRef.sx, imgOrRef.sy, imgOrRef.sw, imgOrRef.sh, x, y, drawWidth, drawHeight);
+      } else {
+        ctx.drawImage(img, x, y, drawWidth, drawHeight);
+      }
     } else {
       // Crossfade layer: painted on top of whatever's already there
       // (the base frame drawn opaque just before this call), at partial
       // alpha, without re-clearing the canvas — see drawCrossfade below.
       ctx.globalAlpha = alpha;
-      ctx.drawImage(img, x, y, drawWidth, drawHeight);
+      if (isSheetRef) {
+        ctx.drawImage(img, imgOrRef.sx, imgOrRef.sy, imgOrRef.sw, imgOrRef.sh, x, y, drawWidth, drawHeight);
+      } else {
+        ctx.drawImage(img, x, y, drawWidth, drawHeight);
+      }
       ctx.globalAlpha = 1;
     }
   }
@@ -1898,10 +1997,20 @@ document.addEventListener("DOMContentLoaded", () => {
       // (see drawCrossfade's comment — crossfade roughly doubles blit cost,
       // which is exactly what the DPR/redraw caps elsewhere exist to avoid
       // on mobile GPUs).
-      const frame = frames[roundedIndex];
-      if (frame && (frame instanceof Image ? frame.complete : true)) {
-        drawImage(frame, 1);
+      // FIX: prefer the sprite-sheet reference (single shared decode,
+      // sliced via source-rect) when sheets are in use; fall back to the
+      // legacy per-frame bitmap array if sheets aren't active/ready for
+      // this frame yet (e.g. still loading, or manifest 404'd).
+      const sheetRef = useSheets ? getSheetFrameRef(roundedIndex + 1) : null;
+      if (sheetRef) {
+        drawImage(sheetRef, 1);
         drew = true;
+      } else {
+        const frame = frames[roundedIndex];
+        if (frame && (frame instanceof Image ? frame.complete : true)) {
+          drawImage(frame, 1);
+          drew = true;
+        }
       }
     } else {
       drew = drawCrossfade(clamped);
@@ -2075,10 +2184,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // handles re-measuring scroll distances on its own resize listener).
   let resizeTimer = null;
   window.addEventListener("resize", () => {
-    refreshHeroRect(); // FIX: keep the cached box in sync with real layout
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      refreshHeroRect();
       if (window.__ScrollTrigger) {
         window.__ScrollTrigger.refresh();
       }
