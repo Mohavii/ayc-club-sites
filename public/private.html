@@ -2001,11 +2001,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
     const { width: w, height: h } = getHeroRect();
 
+    // FIX (the mobile "blue band" persisting even with 100dvh): this used
+    // to also set canvas.style.width/height to a fixed px value taken
+    // from this same measurement. An inline style like that beats the
+    // stylesheet's `width: 100%; height: 100%` rule on #door-canvas, so
+    // once set, the canvas's own *displayed* box was frozen at whatever
+    // w/h happened to be measured on the last draw call — it stopped
+    // tracking .hero-sticky's box between draws. .hero-sticky itself now
+    // resizes live as the address bar hides (100dvh), but if that resize
+    // lands between scroll-driven draw calls (e.g. mid-transition, no new
+    // scroll tick yet), the canvas element stays pinned at its stale,
+    // smaller inline size for a moment — exposing .hero-sticky's own
+    // background in the gap around it, same "blue band" symptom as
+    // before, just one layer deeper. Only the raster buffer (canvas.width/
+    // height below, which controls resolution, not layout) needs setting
+    // from JS; leaving the *displayed* size to the stylesheet's 100%/100%
+    // means the browser keeps the canvas's box glued to .hero-sticky's on
+    // every single paint, with no JS/timing involved at all — nothing to
+    // fall behind.
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
-      canvas.style.width = w + "px";
-      canvas.style.height = h + "px";
     }
 
     const canvasRatio = canvas.width / canvas.height;
