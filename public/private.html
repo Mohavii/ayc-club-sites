@@ -2350,14 +2350,33 @@ document.addEventListener("DOMContentLoaded", () => {
   // canvas and container can't drift apart even mid-scroll.
   if (heroSticky && "ResizeObserver" in window) {
     let lastW = 0, lastH = 0;
+    // FIX (the real "normal mode vs desktop mode" gap): this used to call
+    // drawFrame() synchronously, right here, on every single firing. On a
+    // real phone the address bar collapsing over the course of a scroll
+    // gesture fires this observer several times in a row WHILE
+    // ScrollTrigger's own onUpdate is *also* calling drawFrame() for the
+    // actual scroll — two independent drivers both forcing uncapped
+    // redraws (this one bypasses both the dedup check and the 33ms
+    // mobile redraw cap on purpose) on the same frames. Requesting
+    // "desktop site" mostly just stops the address bar from collapsing
+    // the same way, which is why that made it smoother — it wasn't the
+    // canvas doing less work, it was this observer firing less. rAF
+    // coalescing here means N firings on the same frame still only cost
+    // one real redraw, while still guaranteeing the canvas is resized
+    // before the next paint (no stale-size color band).
+    let addressBarResizeRafId = 0;
     const heroResizeObserver = new ResizeObserver((entries) => {
       const box = entries[0].contentRect;
       if (Math.round(box.width) === lastW && Math.round(box.height) === lastH) return;
       lastW = Math.round(box.width);
       lastH = Math.round(box.height);
-      lastFrameIndex = -1; // force drawFrame to redraw even if the rounded frame didn't change
-      lastDrawTime = -Infinity; // bypass the touch min-redraw-interval cap for this forced redraw
-      drawFrame(playhead.frame);
+      if (addressBarResizeRafId) return;
+      addressBarResizeRafId = requestAnimationFrame(() => {
+        addressBarResizeRafId = 0;
+        lastFrameIndex = -1; // force drawFrame to redraw even if the rounded frame didn't change
+        lastDrawTime = -Infinity; // bypass the touch min-redraw-interval cap for this forced redraw
+        drawFrame(playhead.frame);
+      });
     });
     heroResizeObserver.observe(heroSticky);
   }
