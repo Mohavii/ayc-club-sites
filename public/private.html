@@ -2593,14 +2593,26 @@ document.addEventListener("DOMContentLoaded", () => {
     // ScrollTrigger owns progress tracking in the normal path instead).
     let headerContainerTop = 0;
     let headerMaxScroll = 0;
+    // FIX (layout-thrash source): heroBottom used to be read fresh, as
+    // container.offsetHeight, inside updateHeader() itself — i.e. on
+    // every single scroll tick. offsetHeight is a forced-layout read: if
+    // any style write elsewhere in the document is still pending when
+    // this runs (the door canvas's own scrollProgressBar.style.width
+    // write fires on the very same scroll gesture, in a separate rAF
+    // callback that can land on either side of this one within the same
+    // frame), the browser can't answer from its cached layout and has to
+    // run a synchronous layout pass right there, mid-scroll. The
+    // container's box only actually changes on resize, so it's cached
+    // here instead and left alone on every other tick.
+    let heroBottom = 0;
     function recomputeHeaderLayout() {
       headerContainerTop = container.getBoundingClientRect().top + window.scrollY;
       headerMaxScroll = container.offsetHeight - window.innerHeight;
+      heroBottom = headerMaxScroll + window.innerHeight;
     }
     recomputeHeaderLayout();
     function updateHeader() {
       headerRafId = null;
-      const heroBottom = container.offsetHeight; // hero-scroll-container end
       const scrollY = window.scrollY;
       siteHeader.classList.toggle('is-visible', scrollProgressPastHero());
       const onLight = scrollY > heroBottom - window.innerHeight * 0.4;
@@ -2706,19 +2718,37 @@ document.addEventListener("DOMContentLoaded", () => {
   // ---------------------------------------------------------------------
   // Axis cards: subtle 3D tilt + cursor-position custom properties for
   // the sheen defined in CSS.
+  //
+  // FIX (layout-thrash on every mouse move): this used to call
+  // card.getBoundingClientRect() inside the pointermove handler itself —
+  // a forced synchronous layout read on every single pointermove event,
+  // uncapped by rAF, at native pointer frequency (100Hz+ on a lot of
+  // mice/trackpads, far above the 60fps the page can actually paint).
+  // Any pending style write anywhere else in the document (the door
+  // canvas's own scroll-driven writes in particular, if the user is
+  // scrolling and mousing at once, but even unrelated writes elsewhere
+  // in the page) means that read can't be answered from cached layout
+  // and forces the browser to run a full layout pass right there,
+  // dozens of times a second, just from moving the mouse over a card.
+  // The sibling magnetic-button handler just above already does this
+  // correctly — cache the rect once on pointerenter and reuse it for
+  // every move — so this now matches that pattern instead of re-reading
+  // layout on every move.
   // ---------------------------------------------------------------------
   document.querySelectorAll('.axis-card').forEach((card) => {
+    let bounds = null;
+    card.addEventListener('pointerenter', () => { bounds = card.getBoundingClientRect(); });
     card.addEventListener('pointermove', (e) => {
-      const r = card.getBoundingClientRect();
-      const px = (e.clientX - r.left) / r.width;
-      const py = (e.clientY - r.top) / r.height;
+      if (!bounds) bounds = card.getBoundingClientRect();
+      const px = (e.clientX - bounds.left) / bounds.width;
+      const py = (e.clientY - bounds.top) / bounds.height;
       card.style.setProperty('--mx', (px * 100).toFixed(1) + '%');
       card.style.setProperty('--my', (py * 100).toFixed(1) + '%');
       const tiltX = (py - 0.5) * -6;
       const tiltY = (px - 0.5) * 6;
       card.style.transform = `translateY(-6px) perspective(600px) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
     });
-    card.addEventListener('pointerleave', () => { card.style.transform = ''; });
+    card.addEventListener('pointerleave', () => { card.style.transform = ''; bounds = null; });
   });
 });
 </script>
