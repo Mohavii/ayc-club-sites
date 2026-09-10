@@ -28,11 +28,22 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,340;9..144,460;9..144,560;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="preload" as="image" href="door-frames/ezgif-frame-001.avif" fetchpriority="high" media="(pointer: fine)">
 <!-- FIX: mobile equivalent of the desktop preload above. Touch devices
-     now load the sprite-sheet path (door-sheets/door-sheet-00.avif),
+     now load the sprite-sheet path (door-sheets-mobile/door-sheet-00.avif),
      which contains frame 1, so preload that instead of the full-size
      single frame — matches what loadSheets() actually requests first,
-     avoiding a wasted duplicate fetch of the old per-frame asset. -->
-<link rel="preload" as="image" href="door-sheets/door-sheet-00.avif" fetchpriority="high" media="(pointer: coarse)">
+     avoiding a wasted duplicate fetch of the old per-frame asset.
+     FIX: points at door-sheets-mobile/ (half-resolution tier — 480x270
+     tiles instead of 960x540) rather than the original door-sheets/.
+     Touch canvases render at a DPR-1-capped backing store that's
+     typically only ~380-430px wide, so the full-size tiles were being
+     decoded at 4x more pixels than the canvas could ever show — pure
+     wasted decode cost, which is the more CPU-bound half of AVIF
+     performance on Android (Apple's chips get a hardware-accelerated
+     decode path that most Android devices don't). Halving the linear
+     resolution quarters the pixels every touch device decodes and
+     roughly halves the total sprite-sheet download (2.9MB -> ~1.35MB),
+     with no visible quality loss at the size this is actually shown. -->
+<link rel="preload" as="image" href="door-sheets-mobile/door-sheet-00.avif" fetchpriority="high" media="(pointer: coarse)">
 
 <style>
 /* =====================================================================
@@ -215,11 +226,23 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @media (max-width: 900px) {
-  /* Shorter than desktop on purpose, but still long enough that touch's
-     redraw cap (minRedrawIntervalMs) and sheet windowing above don't get
-     pushed harder than they're built for by frames flipping too fast per
-     pixel scrolled. Faster than the 780vh this was at before. */
-  .hero-scroll-container { height: 520vh; }
+  /* FIX: cut further, from 520vh to 380vh, specifically to reduce how much
+     physical swiping it takes to get through the door sequence on mobile
+     (was already down from 780vh in an earlier pass). Shortening this
+     does NOT change the sequence's own logic — doorProgressFromScroll()
+     and the beat breakpoints all key off scrollProgress as a 0..1
+     fraction of this height, not off an absolute pixel count, so the
+     same easing/pacing plays out over less physical scroll distance.
+     The one real side effect: a given swipe now advances more frames per
+     pixel than before, so a fast fling has a slightly higher chance of
+     needing a sheet the windowed decoder hasn't fetched yet mid-gesture.
+     updateSheetWindow() below was hardened to decode every sheet spanned
+     since the last tick (not just the current one) specifically to cover
+     this, and GSAP's scrub (scrubSeconds, see attachScrollTrigger) already
+     spreads any single scroll gesture across many ticks rather than
+     jumping straight to the target, which keeps any one tick's frame
+     delta modest even at this shorter distance. */
+  .hero-scroll-container { height: 380vh; }
 }
 
 .hero-sticky {
@@ -1719,7 +1742,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!sheetManifest || idx < 0 || idx >= sheetManifest.numSheets) return Promise.reject(new Error("bad sheet index"));
     if (sheetBlobs[idx]) return Promise.resolve(sheetBlobs[idx]);
     if (sheetFetchPromises[idx]) return sheetFetchPromises[idx];
-    const url = `door-sheets/door-sheet-${String(idx).padStart(2, "0")}.avif`;
+    // FIX: door-sheets-mobile/ holds a half-resolution tier (480x270 tiles,
+    // see the <link rel="preload"> comment above for why) generated
+    // specifically for the touch/useSheets path this function serves.
+    const url = `door-sheets-mobile/door-sheet-${String(idx).padStart(2, "0")}.avif`;
     const promise = fetch(url, { priority: idx === 0 ? "high" : "low" })
       .then((res) => res.blob())
       .then((blob) => {
@@ -1769,25 +1795,43 @@ document.addEventListener("DOMContentLoaded", () => {
     sheetImages[idx] = null;
   }
 
-  // Keeps only the sheet the playhead is currently inside, plus one
-  // sheet of look-ahead in the scroll direction, actually decoded. Cheap
-  // to call on every scroll update — a scan over at most 6 entries plus,
-  // at most, one local decode (bytes are already cached — see loadSheets)
-  // when crossing into a sheet for the first time.
-  function updateSheetWindow(currentSheetIdx, direction) {
+  // Keeps only the sheet(s) the playhead has actually crossed since the
+  // last tick, plus one sheet of look-ahead in the scroll direction,
+  // actually decoded.
+  //
+  // FIX: previously this only decoded currentSheetIdx + one look-ahead
+  // sheet. That was fine when frames advanced slowly per pixel scrolled,
+  // but the mobile hero's scroll distance was shortened (see the 380vh
+  // rule above) specifically so less swiping is needed to finish the
+  // sequence — which means a given fling now advances more frames per
+  // pixel than before, and a fast one can jump across more than one
+  // sheet boundary within a single throttled redraw tick. Only decoding
+  // the landing sheet meant a big jump could show a frozen/stale frame
+  // until the skipped-over sheet caught up. previousSheetIdx lets this
+  // decode every sheet spanned between the last tick and this one, not
+  // just where the playhead ended up — closing that gap. In practice
+  // GSAP's scrub already spreads most gestures across many ticks (see
+  // scrubSeconds in attachScrollTrigger), so this mostly matters for the
+  // no-GSAP raw-scroll fallback, which has no such damping.
+  function updateSheetWindow(currentSheetIdx, direction, previousSheetIdx) {
     if (!sheetManifest) return;
-    markSheetUsed(currentSheetIdx);
-    decodeSheet(currentSheetIdx);
 
-    const lookahead = direction < 0 ? currentSheetIdx - 1 : currentSheetIdx + 1;
     const wanted = new Set([currentSheetIdx]);
-    if (lookahead >= 0 && lookahead < sheetManifest.numSheets) {
-      markSheetUsed(lookahead);
-      decodeSheet(lookahead);
-      wanted.add(lookahead);
+    if (previousSheetIdx != null && previousSheetIdx !== currentSheetIdx) {
+      const lo = Math.min(previousSheetIdx, currentSheetIdx);
+      const hi = Math.max(previousSheetIdx, currentSheetIdx);
+      for (let i = lo; i <= hi; i++) wanted.add(i);
     }
 
+    const lookahead = direction < 0 ? currentSheetIdx - 1 : currentSheetIdx + 1;
+    if (lookahead >= 0 && lookahead < sheetManifest.numSheets) wanted.add(lookahead);
+
     const now = performance.now();
+    wanted.forEach((idx) => {
+      markSheetUsed(idx);
+      decodeSheet(idx);
+    });
+
     for (let i = 0; i < sheetManifest.numSheets; i++) {
       if (wanted.has(i)) continue;
       if (sheetImages[i] && now - (sheetLastUsed[i] || 0) > MAX_SHEET_UNUSED_MS) {
@@ -1797,7 +1841,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function loadSheets() {
-    fetch("door-sheets/manifest.json")
+    fetch("door-sheets-mobile/manifest.json")
       .then((res) => { if (!res.ok) throw new Error("manifest missing"); return res.json(); })
       .then((manifest) => {
         sheetManifest = manifest;
@@ -2104,9 +2148,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // whether GSAP ScrollTrigger or the raw-scroll fallback is driving it.
     if (useSheets && sheetManifest) {
       const direction = clamped >= lastPlayheadFloatForWindow ? 1 : -1;
+      const previousRoundedIndex = Math.max(0, Math.min(frameCount - 1, Math.round(lastPlayheadFloatForWindow)));
+      const previousEntry = sheetManifest.frames[previousRoundedIndex];
       lastPlayheadFloatForWindow = clamped;
       const entry = sheetManifest.frames[roundedIndex];
-      if (entry) updateSheetWindow(entry.sheet, direction);
+      if (entry) updateSheetWindow(entry.sheet, direction, previousEntry ? previousEntry.sheet : null);
     }
 
     if (roundedIndex === lastFrameIndex && clamped === roundedIndex) return false;
