@@ -2286,17 +2286,43 @@ document.addEventListener("DOMContentLoaded", () => {
     onScroll();
   }
 
+  // FIX (Android jank root cause): smooth-scroll.js loads GSAP/ScrollTrigger
+  // via a CDN dynamic import(), so window.__ScrollTrigger is essentially
+  // never set synchronously here — this always raced the 2s timeout below
+  // against that network+parse time. On a slower connection or CPU (far
+  // more likely on Android than on the Safari device this was tested on),
+  // the CDN load can cross 2000ms: attachRawScrollFallback() fires, but
+  // the "lenis-gsap-ready" listener was never removed, so attachScrollTrigger()
+  // fires moments later too. That leaves BOTH drivers calling drawFrame()
+  // independently on every scroll tick — double the canvas redraws and
+  // layout reads per frame, with two slightly different progress
+  // calculations fighting over which frame paints. This guard makes the
+  // two paths mutually exclusive: whichever one wins the race is the only
+  // one that ever attaches.
+  let scrollDriverAttached = false;
+  function attachScrollTriggerOnce(ScrollTrigger, gsap) {
+    if (scrollDriverAttached) return;
+    scrollDriverAttached = true;
+    attachScrollTrigger(ScrollTrigger, gsap);
+  }
+  function attachRawScrollFallbackOnce() {
+    if (scrollDriverAttached) return;
+    scrollDriverAttached = true;
+    attachRawScrollFallback();
+  }
+
   if (window.__ScrollTrigger && window.__gsap) {
-    attachScrollTrigger(window.__ScrollTrigger, window.__gsap);
+    attachScrollTriggerOnce(window.__ScrollTrigger, window.__gsap);
   } else {
     document.addEventListener("lenis-gsap-ready", (e) => {
-      attachScrollTrigger(e.detail.ScrollTrigger, e.detail.gsap);
+      attachScrollTriggerOnce(e.detail.ScrollTrigger, e.detail.gsap);
     }, { once: true });
-    // If GSAP/ScrollTrigger never shows up (CDN blocked, offline, etc.),
-    // fall back to the original raw-scroll driver after a short grace
-    // period so the hero still works.
+    // If GSAP/ScrollTrigger never shows up (CDN blocked, offline, slow
+    // connection, etc.), fall back to the raw-scroll driver after a short
+    // grace period so the hero still works — the guard above ensures this
+    // never runs alongside a late-arriving ScrollTrigger.
     setTimeout(() => {
-      if (!window.__ScrollTrigger) attachRawScrollFallback();
+      attachRawScrollFallbackOnce();
     }, 2000);
   }
 
