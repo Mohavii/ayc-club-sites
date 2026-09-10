@@ -227,6 +227,22 @@ h1, h2, h3, h4, h5, h6 {
   top: 0;
   height: 100vh;
   height: 100svh;
+  /* FIX (the mobile "blue band" below the frame): 100svh locks the sticky
+     box to the *smallest* possible viewport (address bar fully expanded).
+     Mobile browsers auto-hide their address bar as soon as you start
+     scrolling, which makes the actual visible viewport taller than 100svh
+     — but the sticky box (and the canvas sized off it) don't grow to
+     match. That leaves a gap between the bottom of the pinned frame and
+     the real bottom of the screen, exposing .hero-scroll-container's own
+     background-color (var(--night-deep), a dark navy/blue) as a solid
+     band right under the image while scrolling. 100dvh tracks the actual
+     current viewport live — it grows/shrinks in step with the address
+     bar instead of assuming it's always fully shown — so the sticky box,
+     and via the existing live getBoundingClientRect()/ResizeObserver
+     redraw path in the JS below, the canvas inside it, always fill the
+     real visible screen with no gap. Kept as the last, most-specific
+     override so browsers without dvh support still fall back to svh/vh. */
+  height: 100dvh;
   width: 100vw;
   overflow: hidden;
   background: var(--night-deep);
@@ -1932,6 +1948,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // .hero-sticky's own rendered box instead of window.innerHeight ties the
   // canvas to the same source of truth the container itself uses, so
   // there's nothing for it to disagree with.
+  //
+  // UPDATE: .hero-sticky's CSS height has since been changed from a fixed
+  // 100svh to 100dvh (see the .hero-sticky rule above) so the sticky box
+  // itself now grows/shrinks live with the address bar instead of staying
+  // pinned at the small-viewport value — that was leaving its own gap
+  // below the box (exposing the container's background) independently of
+  // anything the canvas did. The live-read approach below still stands:
+  // it's what keeps the canvas glued to .hero-sticky's box on every draw,
+  // whatever size that box currently is.
   const heroSticky = document.querySelector(".hero-sticky");
   // NOTE: getBoundingClientRect() is read live on every draw, on purpose —
   // this is NOT cached. An earlier attempt to cache this and only
