@@ -1,0 +1,46 @@
+/* ==========================================================================
+   SpecularButton — supporting styles.
+
+   These rules don't redefine button colors/sizing — the site's existing
+   .btn / .btn-primary / .btn-secondary / .btn-third / .btn-ghost styles
+   (theme.css, home.css) stay exactly as they are. This file only adds the
+   WebGL canvas layer on top and makes sure it isn't clipped.
+   ========================================================================== */
+
+/* .btn sets overflow:hidden (for its own click-ripple); once the specular
+   fx layer is attached we need overflow visible so its soft glow can bleed
+   slightly past the button's edge instead of being cut off. */
+.specular-enhanced {
+  overflow: visible;
+}
+
+/* Canvas sits behind the label, extended past the button so the rim glow
+   can bleed outside the edge. */
+.specular-button__fx {
+  position: absolute;
+  inset: -20px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.specular-button__fx canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Wraps the button's original content (text/icons) so it stays visually
+   above the fx canvas. */
+.specular-button__label {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .specular-button__fx {
+    display: none;
+  }
+}
