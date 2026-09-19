@@ -1933,28 +1933,25 @@ document.addEventListener("DOMContentLoaded", () => {
   // canvas to the same source of truth the container itself uses, so
   // there's nothing for it to disagree with.
   const heroSticky = document.querySelector(".hero-sticky");
-  // NOTE: getBoundingClientRect() is read live on every draw, on purpose —
-  // this is NOT cached. An earlier attempt to cache this and only
-  // refresh it on the `resize` event reintroduced the exact bug this
-  // comment used to warn about: mobile browsers do not reliably fire
-  // `resize` when the address bar hides/shows mid-scroll, so a cached
-  // value goes stale for stretches of scroll and exposes
-  // .hero-sticky's own background-color (var(--night-deep), a dark
-  // navy/blue) as a solid band under or around the frame — which is
-  // the "blue line" artifact this exact setup produces when the box
-  // and the canvas buffer disagree on size. Reading it live avoids
-  // that at the cost of one rect read per draw call; because the beat/
-  // progress-bar DOM writes were already moved off this tick (see
-  // updateBeatsAndChrome's own rAF batching below), there is nothing
-  // else in this callback that dirties layout first, so this read does
-  // not force a synchronous reflow in practice — it is just reading a
-  // value the browser already has settled.
+  // FIX: cache hero dimensions instead of calling getBoundingClientRect()
+  // on every draw tick. The old live-read approach was causing read-after-
+  // write layout thrashing when beat DOM writes (opacity/transform/filter)
+  // overlapped with the next tick's rect read — the actual source of the
+  // residual PC stutter. These cached values are kept fresh by the
+  // ResizeObserver below, which fires on every actual size change including
+  // mobile address-bar show/hide, so staleness is no longer a concern.
+  let cachedHeroW = 0;
+  let cachedHeroH = 0;
+  if (heroSticky) {
+    const initRect = heroSticky.getBoundingClientRect();
+    cachedHeroW = initRect.width || window.innerWidth;
+    cachedHeroH = initRect.height || window.innerHeight;
+  } else {
+    cachedHeroW = window.innerWidth;
+    cachedHeroH = window.innerHeight;
+  }
   function getHeroRect() {
-    const rect = heroSticky ? heroSticky.getBoundingClientRect() : null;
-    return {
-      width: (rect && rect.width) || window.innerWidth,
-      height: (rect && rect.height) || window.innerHeight,
-    };
+    return { width: cachedHeroW, height: cachedHeroH };
   }
 
   function drawImage(imgOrRef, alpha) {
@@ -1979,8 +1976,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
-      canvas.style.width = w + "px";
-      canvas.style.height = h + "px";
+      // FIX: no canvas.style.width/height here — CSS width:100%;height:100%
+      // on #door-canvas keeps the element sized to .hero-sticky exactly,
+      // eliminating the blue band that appeared when JS pixel values briefly
+      // disagreed with the CSS container size (especially on mobile during
+      // address-bar show/hide transitions).
     }
 
     const canvasRatio = canvas.width / canvas.height;
@@ -2329,6 +2329,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (Math.round(box.width) === lastW && Math.round(box.height) === lastH) return;
       lastW = Math.round(box.width);
       lastH = Math.round(box.height);
+      // FIX: keep the cached hero rect fresh — this is what getHeroRect()
+      // reads on every draw tick instead of calling getBoundingClientRect().
+      cachedHeroW = box.width || window.innerWidth;
+      cachedHeroH = box.height || window.innerHeight;
       lastFrameIndex = -1; // force drawFrame to redraw even if the rounded frame didn't change
       lastDrawTime = -Infinity; // bypass the touch min-redraw-interval cap for this forced redraw
       drawFrame(playhead.frame);

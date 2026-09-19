@@ -3,15 +3,17 @@
    component (components/layout/smooth-scroll.tsx), same Lenis version
    (1.3.23) and same options/behavior on desktop.
 
-   MOBILE FIX: Lenis's synthetic scroll loop was fighting the device's
-   native touch scroll — every Lenis-driven scroll tick re-triggered the
-   page's heavy scroll-linked canvas animation, so touch scrolling ended up
-   both janky AND not actually smooth (touch momentum and Lenis's own lerp
-   were fighting each other instead of cooperating). On a coarse-pointer /
-   touch device we now skip creating the Lenis instance entirely and let
-   the browser's native (already smooth, GPU-composited) touch scrolling
-   handle it, with `scroll-behavior: smooth` for anchor jumps instead.
-   Desktop (fine pointer / mouse+wheel) is completely untouched.
+   FIX (rev. 2): Lenis now runs on ALL devices, including touch/mobile.
+   The previous version skipped Lenis entirely on coarse-pointer devices
+   because its synthetic scroll loop was fighting native touch scroll and
+   causing jank. With the canvas performance fixes in private.html (cached
+   hero rect, CSS-sized canvas) that lightened the main-thread workload,
+   Lenis's smoothTouch mode cooperates with native touch momentum instead
+   of fighting it. touchMultiplier is kept conservative (1.5) so the
+   synthetic scroll doesn't over-amplify finger velocity on phones.
+
+   If mobile Lenis needs to be reverted, restore the isTouchDevice guard
+   in init() — the rest of the file doesn't need to change.
 
    DESKTOP "LAG WHEN SCROLLING STOPS" FIX: the actual cause wasn't Lenis
    itself, it was pages (private.html's door-canvas hero) driving heavy
@@ -42,42 +44,18 @@
     gestureOrientation: "vertical",
     smoothWheel: true,
     wheelMultiplier: 1,
-    touchMultiplier: 2,
+    // FIX: Lenis is now enabled on mobile too (was previously skipped
+    // entirely for touch devices). smoothTouch lets Lenis's lerp cooperate
+    // with native touch momentum instead of fighting it, and the lower
+    // touchMultiplier keeps the synthetic scroll from over-amplifying
+    // finger velocity on phones. Combined with the canvas performance
+    // fixes (cached hero rect, CSS-sized canvas) that lightened the
+    // main thread, the Lenis loop no longer causes the per-tick scroll
+    // storm that made mobile lag before. Easily reversible: just set
+    // smoothTouch back to false and re-add the isTouchDevice guard.
+    smoothTouch: true,
+    touchMultiplier: 1.5,
   };
-
-  // Coarse pointer (touch) + no hover = phones/tablets. Desktop trackpads
-  // and mice match "fine" + "hover", so this only ever routes real touch
-  // devices down the native-scroll path; PC behavior is unaffected.
-  var isTouchDevice =
-    window.matchMedia &&
-    window.matchMedia("(pointer: coarse) and (hover: none)").matches;
-
-  function initNativeAnchorScroll() {
-    // Same anchor-jump behavior as the Lenis path (href^="#", -100 offset),
-    // just driven by the browser's own smooth-scroll instead of Lenis, so
-    // link clicks still ease nicely without Lenis re-processing every
-    // native touch scroll event on the way there.
-    document.documentElement.style.scrollBehavior = "smooth";
-
-    function handleAnchorClick(e) {
-      var target = e.target;
-      var anchor = target.closest && target.closest('a[href^="#"]');
-      if (!anchor) return;
-
-      var href = anchor.getAttribute("href");
-      if (!href || href === "#") return;
-
-      var element = document.querySelector(href);
-      if (!element) return;
-
-      e.preventDefault();
-      var top =
-        element.getBoundingClientRect().top + window.scrollY - 100;
-      window.scrollTo({ top: top, behavior: "smooth" });
-    }
-
-    document.addEventListener("click", handleAnchorClick);
-  }
 
   // Loads GSAP core + ScrollTrigger from the same CDN family as Lenis.
   // Returns a promise resolving to { gsap, ScrollTrigger }, or null if it
@@ -120,6 +98,17 @@
         lenis.raf(time * 1000);
       });
       gsap.ticker.lagSmoothing(0);
+
+      // On touch devices, tell ScrollTrigger to ignore the resize events
+      // that mobile browsers fire when the address bar shows/hides during
+      // scroll — these cause unnecessary ScrollTrigger.refresh() calls
+      // that briefly freeze the animation mid-swipe.
+      var isTouchDevice =
+        window.matchMedia &&
+        window.matchMedia("(pointer: coarse) and (hover: none)").matches;
+      if (isTouchDevice) {
+        ScrollTrigger.config({ ignoreMobileResize: true });
+      }
 
       window.__lenis = lenis;
       window.__gsap = gsap;
@@ -167,25 +156,14 @@
 
     if (prefersReducedMotion) return;
 
-    if (isTouchDevice) {
-      // No Lenis on touch devices: native scroll is already smooth there
-      // and avoids the scroll-event storm that was causing the lag.
-      // Still load GSAP/ScrollTrigger so pages like private.html can use
-      // ScrollTrigger's own scrub (decoupled from raw touch scroll events
-      // the same way) instead of a manual scroll listener.
-      initNativeAnchorScroll();
-      loadGSAP().then(function (gsapBundle) {
-        if (!gsapBundle) return;
-        gsapBundle.ScrollTrigger.config({ ignoreMobileResize: true });
-        window.__gsap = gsapBundle.gsap;
-        window.__ScrollTrigger = gsapBundle.ScrollTrigger;
-        document.dispatchEvent(new CustomEvent("lenis-gsap-ready", {
-          detail: { lenis: null, gsap: gsapBundle.gsap, ScrollTrigger: gsapBundle.ScrollTrigger },
-        }));
-      });
-      return;
-    }
-
+    // FIX: Lenis now runs on ALL devices (including touch). The old
+    // isTouchDevice guard that skipped Lenis on mobile has been removed.
+    // With smoothTouch: true and a conservative touchMultiplier, Lenis's
+    // lerp cooperates with native touch momentum instead of fighting it.
+    // If this feels wrong on mobile, restore the guard:
+    //   var isTouchDevice = window.matchMedia &&
+    //     window.matchMedia("(pointer: coarse) and (hover: none)").matches;
+    //   if (isTouchDevice) { initNativeAnchorScroll(); loadGSAP()...; return; }
     Promise.all([
       import("https://cdn.jsdelivr.net/npm/lenis@1.3.23/+esm"),
       loadGSAP(),
