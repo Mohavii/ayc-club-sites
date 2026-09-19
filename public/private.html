@@ -227,22 +227,6 @@ h1, h2, h3, h4, h5, h6 {
   top: 0;
   height: 100vh;
   height: 100svh;
-  /* FIX (the mobile "blue band" below the frame): 100svh locks the sticky
-     box to the *smallest* possible viewport (address bar fully expanded).
-     Mobile browsers auto-hide their address bar as soon as you start
-     scrolling, which makes the actual visible viewport taller than 100svh
-     — but the sticky box (and the canvas sized off it) don't grow to
-     match. That leaves a gap between the bottom of the pinned frame and
-     the real bottom of the screen, exposing .hero-scroll-container's own
-     background-color (var(--night-deep), a dark navy/blue) as a solid
-     band right under the image while scrolling. 100dvh tracks the actual
-     current viewport live — it grows/shrinks in step with the address
-     bar instead of assuming it's always fully shown — so the sticky box,
-     and via the existing live getBoundingClientRect()/ResizeObserver
-     redraw path in the JS below, the canvas inside it, always fill the
-     real visible screen with no gap. Kept as the last, most-specific
-     override so browsers without dvh support still fall back to svh/vh. */
-  height: 100dvh;
   width: 100vw;
   overflow: hidden;
   background: var(--night-deep);
@@ -1948,15 +1932,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // .hero-sticky's own rendered box instead of window.innerHeight ties the
   // canvas to the same source of truth the container itself uses, so
   // there's nothing for it to disagree with.
-  //
-  // UPDATE: .hero-sticky's CSS height has since been changed from a fixed
-  // 100svh to 100dvh (see the .hero-sticky rule above) so the sticky box
-  // itself now grows/shrinks live with the address bar instead of staying
-  // pinned at the small-viewport value — that was leaving its own gap
-  // below the box (exposing the container's background) independently of
-  // anything the canvas did. The live-read approach below still stands:
-  // it's what keeps the canvas glued to .hero-sticky's box on every draw,
-  // whatever size that box currently is.
   const heroSticky = document.querySelector(".hero-sticky");
   // NOTE: getBoundingClientRect() is read live on every draw, on purpose —
   // this is NOT cached. An earlier attempt to cache this and only
@@ -2001,27 +1976,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
     const { width: w, height: h } = getHeroRect();
 
-    // FIX (the mobile "blue band" persisting even with 100dvh): this used
-    // to also set canvas.style.width/height to a fixed px value taken
-    // from this same measurement. An inline style like that beats the
-    // stylesheet's `width: 100%; height: 100%` rule on #door-canvas, so
-    // once set, the canvas's own *displayed* box was frozen at whatever
-    // w/h happened to be measured on the last draw call — it stopped
-    // tracking .hero-sticky's box between draws. .hero-sticky itself now
-    // resizes live as the address bar hides (100dvh), but if that resize
-    // lands between scroll-driven draw calls (e.g. mid-transition, no new
-    // scroll tick yet), the canvas element stays pinned at its stale,
-    // smaller inline size for a moment — exposing .hero-sticky's own
-    // background in the gap around it, same "blue band" symptom as
-    // before, just one layer deeper. Only the raster buffer (canvas.width/
-    // height below, which controls resolution, not layout) needs setting
-    // from JS; leaving the *displayed* size to the stylesheet's 100%/100%
-    // means the browser keeps the canvas's box glued to .hero-sticky's on
-    // every single paint, with no JS/timing involved at all — nothing to
-    // fall behind.
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
+      canvas.style.width = w + "px";
+      canvas.style.height = h + "px";
     }
 
     const canvasRatio = canvas.width / canvas.height;
@@ -2327,43 +2286,17 @@ document.addEventListener("DOMContentLoaded", () => {
     onScroll();
   }
 
-  // FIX (Android jank root cause): smooth-scroll.js loads GSAP/ScrollTrigger
-  // via a CDN dynamic import(), so window.__ScrollTrigger is essentially
-  // never set synchronously here — this always raced the 2s timeout below
-  // against that network+parse time. On a slower connection or CPU (far
-  // more likely on Android than on the Safari device this was tested on),
-  // the CDN load can cross 2000ms: attachRawScrollFallback() fires, but
-  // the "lenis-gsap-ready" listener was never removed, so attachScrollTrigger()
-  // fires moments later too. That leaves BOTH drivers calling drawFrame()
-  // independently on every scroll tick — double the canvas redraws and
-  // layout reads per frame, with two slightly different progress
-  // calculations fighting over which frame paints. This guard makes the
-  // two paths mutually exclusive: whichever one wins the race is the only
-  // one that ever attaches.
-  let scrollDriverAttached = false;
-  function attachScrollTriggerOnce(ScrollTrigger, gsap) {
-    if (scrollDriverAttached) return;
-    scrollDriverAttached = true;
-    attachScrollTrigger(ScrollTrigger, gsap);
-  }
-  function attachRawScrollFallbackOnce() {
-    if (scrollDriverAttached) return;
-    scrollDriverAttached = true;
-    attachRawScrollFallback();
-  }
-
   if (window.__ScrollTrigger && window.__gsap) {
-    attachScrollTriggerOnce(window.__ScrollTrigger, window.__gsap);
+    attachScrollTrigger(window.__ScrollTrigger, window.__gsap);
   } else {
     document.addEventListener("lenis-gsap-ready", (e) => {
-      attachScrollTriggerOnce(e.detail.ScrollTrigger, e.detail.gsap);
+      attachScrollTrigger(e.detail.ScrollTrigger, e.detail.gsap);
     }, { once: true });
-    // If GSAP/ScrollTrigger never shows up (CDN blocked, offline, slow
-    // connection, etc.), fall back to the raw-scroll driver after a short
-    // grace period so the hero still works — the guard above ensures this
-    // never runs alongside a late-arriving ScrollTrigger.
+    // If GSAP/ScrollTrigger never shows up (CDN blocked, offline, etc.),
+    // fall back to the original raw-scroll driver after a short grace
+    // period so the hero still works.
     setTimeout(() => {
-      attachRawScrollFallbackOnce();
+      if (!window.__ScrollTrigger) attachRawScrollFallback();
     }, 2000);
   }
 
@@ -2391,33 +2324,14 @@ document.addEventListener("DOMContentLoaded", () => {
   // canvas and container can't drift apart even mid-scroll.
   if (heroSticky && "ResizeObserver" in window) {
     let lastW = 0, lastH = 0;
-    // FIX (the real "normal mode vs desktop mode" gap): this used to call
-    // drawFrame() synchronously, right here, on every single firing. On a
-    // real phone the address bar collapsing over the course of a scroll
-    // gesture fires this observer several times in a row WHILE
-    // ScrollTrigger's own onUpdate is *also* calling drawFrame() for the
-    // actual scroll — two independent drivers both forcing uncapped
-    // redraws (this one bypasses both the dedup check and the 33ms
-    // mobile redraw cap on purpose) on the same frames. Requesting
-    // "desktop site" mostly just stops the address bar from collapsing
-    // the same way, which is why that made it smoother — it wasn't the
-    // canvas doing less work, it was this observer firing less. rAF
-    // coalescing here means N firings on the same frame still only cost
-    // one real redraw, while still guaranteeing the canvas is resized
-    // before the next paint (no stale-size color band).
-    let addressBarResizeRafId = 0;
     const heroResizeObserver = new ResizeObserver((entries) => {
       const box = entries[0].contentRect;
       if (Math.round(box.width) === lastW && Math.round(box.height) === lastH) return;
       lastW = Math.round(box.width);
       lastH = Math.round(box.height);
-      if (addressBarResizeRafId) return;
-      addressBarResizeRafId = requestAnimationFrame(() => {
-        addressBarResizeRafId = 0;
-        lastFrameIndex = -1; // force drawFrame to redraw even if the rounded frame didn't change
-        lastDrawTime = -Infinity; // bypass the touch min-redraw-interval cap for this forced redraw
-        drawFrame(playhead.frame);
-      });
+      lastFrameIndex = -1; // force drawFrame to redraw even if the rounded frame didn't change
+      lastDrawTime = -Infinity; // bypass the touch min-redraw-interval cap for this forced redraw
+      drawFrame(playhead.frame);
     });
     heroResizeObserver.observe(heroSticky);
   }
@@ -2653,26 +2567,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // ScrollTrigger owns progress tracking in the normal path instead).
     let headerContainerTop = 0;
     let headerMaxScroll = 0;
-    // FIX (layout-thrash source): heroBottom used to be read fresh, as
-    // container.offsetHeight, inside updateHeader() itself — i.e. on
-    // every single scroll tick. offsetHeight is a forced-layout read: if
-    // any style write elsewhere in the document is still pending when
-    // this runs (the door canvas's own scrollProgressBar.style.width
-    // write fires on the very same scroll gesture, in a separate rAF
-    // callback that can land on either side of this one within the same
-    // frame), the browser can't answer from its cached layout and has to
-    // run a synchronous layout pass right there, mid-scroll. The
-    // container's box only actually changes on resize, so it's cached
-    // here instead and left alone on every other tick.
-    let heroBottom = 0;
     function recomputeHeaderLayout() {
       headerContainerTop = container.getBoundingClientRect().top + window.scrollY;
       headerMaxScroll = container.offsetHeight - window.innerHeight;
-      heroBottom = headerMaxScroll + window.innerHeight;
     }
     recomputeHeaderLayout();
     function updateHeader() {
       headerRafId = null;
+      const heroBottom = container.offsetHeight; // hero-scroll-container end
       const scrollY = window.scrollY;
       siteHeader.classList.toggle('is-visible', scrollProgressPastHero());
       const onLight = scrollY > heroBottom - window.innerHeight * 0.4;
@@ -2778,37 +2680,19 @@ document.addEventListener("DOMContentLoaded", () => {
   // ---------------------------------------------------------------------
   // Axis cards: subtle 3D tilt + cursor-position custom properties for
   // the sheen defined in CSS.
-  //
-  // FIX (layout-thrash on every mouse move): this used to call
-  // card.getBoundingClientRect() inside the pointermove handler itself —
-  // a forced synchronous layout read on every single pointermove event,
-  // uncapped by rAF, at native pointer frequency (100Hz+ on a lot of
-  // mice/trackpads, far above the 60fps the page can actually paint).
-  // Any pending style write anywhere else in the document (the door
-  // canvas's own scroll-driven writes in particular, if the user is
-  // scrolling and mousing at once, but even unrelated writes elsewhere
-  // in the page) means that read can't be answered from cached layout
-  // and forces the browser to run a full layout pass right there,
-  // dozens of times a second, just from moving the mouse over a card.
-  // The sibling magnetic-button handler just above already does this
-  // correctly — cache the rect once on pointerenter and reuse it for
-  // every move — so this now matches that pattern instead of re-reading
-  // layout on every move.
   // ---------------------------------------------------------------------
   document.querySelectorAll('.axis-card').forEach((card) => {
-    let bounds = null;
-    card.addEventListener('pointerenter', () => { bounds = card.getBoundingClientRect(); });
     card.addEventListener('pointermove', (e) => {
-      if (!bounds) bounds = card.getBoundingClientRect();
-      const px = (e.clientX - bounds.left) / bounds.width;
-      const py = (e.clientY - bounds.top) / bounds.height;
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width;
+      const py = (e.clientY - r.top) / r.height;
       card.style.setProperty('--mx', (px * 100).toFixed(1) + '%');
       card.style.setProperty('--my', (py * 100).toFixed(1) + '%');
       const tiltX = (py - 0.5) * -6;
       const tiltY = (px - 0.5) * 6;
       card.style.transform = `translateY(-6px) perspective(600px) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
     });
-    card.addEventListener('pointerleave', () => { card.style.transform = ''; bounds = null; });
+    card.addEventListener('pointerleave', () => { card.style.transform = ''; });
   });
 });
 </script>
