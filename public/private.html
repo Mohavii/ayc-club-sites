@@ -26,13 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,340;9..144,460;9..144,560;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="preload" as="image" href="door-frames/ezgif-frame-001.avif" fetchpriority="high" media="(pointer: fine)">
-<!-- FIX: mobile equivalent of the desktop preload above. Touch devices
-     now load the sprite-sheet path (door-sheets/door-sheet-00.avif),
-     which contains frame 1, so preload that instead of the full-size
-     single frame — matches what loadSheets() actually requests first,
-     avoiding a wasted duplicate fetch of the old per-frame asset. -->
-<link rel="preload" as="image" href="door-sheets/door-sheet-00.avif" fetchpriority="high" media="(pointer: coarse)">
+<link rel="preload" as="video" href="assets/door-scroll.mp4" type="video/mp4" fetchpriority="high">
 
 <style>
 /* =====================================================================
@@ -206,7 +200,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* =====================================================================
-   SCROLLYTELLING HERO — untouched video/canvas system, refined chrome
+   SCROLLYTELLING HERO — scroll-scrubbed video, refined chrome
    ===================================================================== */
 .hero-scroll-container {
   height: 650vh;
@@ -232,7 +226,7 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--night-deep);
 }
 
-#door-canvas {
+#door-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -242,7 +236,8 @@ h1, h2, h3, h4, h5, h6 {
   transition: opacity 0.6s var(--ease-soft);
 }
 
-#door-canvas.is-ready { opacity: 1; }
+#door-video.is-ready { opacity: 1; }
+#door-video.is-fallback { opacity: 1; }
 
 /* Fine film-grain overlay for texture without tinting the footage */
 .hero-grain {
@@ -1337,7 +1332,10 @@ h1, h2, h3, h4, h5, h6 {
 
 <div class="hero-scroll-container" id="hero-scroll">
   <div class="hero-sticky">
-    <canvas id="door-canvas"></canvas>
+    <video id="door-video" preload="auto" muted playsinline poster="door-frames/ezgif-frame-001.avif" aria-label="Animation de présentation de l'Association YOUTH CLUBs">
+      <source src="assets/door-scroll.webm" type="video/webm">
+      <source src="assets/door-scroll.mp4" type="video/mp4">
+    </video>
     <div class="hero-grain"></div>
     <div class="hero-vignette"></div>
 
@@ -1581,578 +1579,70 @@ h1, h2, h3, h4, h5, h6 {
 
 <script>
 // -----------------------------------------------------------------------
-// NOTE on OffscreenCanvas + Worker (considered, not applied):
-// Moving the canvas draw itself into a Worker via
-// canvas.transferControlToOffscreen() was evaluated and deliberately
-// NOT done here. Reason: the scroll position that drives every frame
-// still has to be observed on the main thread (ScrollTrigger/native
-// scroll events both require DOM access, which workers don't have), so
-// a worker-based draw would add a postMessage() round-trip on every
-// single scroll tick without removing the main-thread work that's
-// actually driving jank in this file (see fixes below). postMessage is
-// not free — for a scroll-*scrubbed* sequence like this one (vs. an
-// autonomous animation loop with no per-frame main-thread dependency,
-// where OffscreenCanvas is unambiguously a win), the added round-trip
-// latency can net worse than it started, and transferControlToOffscreen()
-// is irreversible per canvas, so it's not something to apply speculatively.
-// If this hero is ever reworked to compute frame index inside the worker
-// itself (e.g. via a SharedArrayBuffer written from a scroll listener,
-// avoiding postMessage entirely), OffscreenCanvas becomes worth
-// revisiting. Until then, fixes 3-5 below (removing the redundant GSAP
-// tween, integer draw coords, and batching DOM writes off the canvas
-// tick) address the actual main-thread contention directly.
+// Scroll owns the paused video playhead. The video element stays on the
+// compositor/media pipeline while this small controller only updates
+// currentTime once per animation frame, avoiding per-frame image decoding
+// and canvas blits.
 // -----------------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
-  const canvas = document.getElementById("door-canvas");
-  const ctx = canvas.getContext("2d", { alpha: false });
-  const frameCount = 153;
-  const frames = [];
-  let loadedCount = 0;
-  let firstDrawn = false;
-
+  const video = document.getElementById("door-video");
+  const container = document.getElementById("hero-scroll");
+  const heroSticky = document.querySelector(".hero-sticky");
   const scrollProgressBar = document.getElementById("scroll-progress-bar");
   const scrollCue = document.getElementById("scroll-cue");
+  const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const isTouchDevice = window.matchMedia?.("(pointer: coarse) and (hover: none)").matches;
+  const beatEls = {
+    1: document.querySelector(".beat-1"),
+    2: document.querySelector(".beat-2"),
+    3: document.querySelector(".beat-3"),
+    4: document.querySelector(".beat-4"),
+    5: document.querySelector(".beat-5"),
+  };
 
-  // Frames are stored as decoded ImageBitmaps, not <img> elements.
-  // Why: ctx.drawImage() on an HTMLImageElement forces the browser to
-  // synchronously decode that image on the main thread on every single
-  // call. With frames being redrawn on every scroll tick, that per-frame
-  // decode cost is a top source of scroll jank. createImageBitmap()
-  // decodes once, off the main thread, when the frame finishes loading —
-  // after that, drawImage(bitmap) is just a cheap GPU blit, no decode.
-  const supportsBitmap = "createImageBitmap" in window;
+  // The video is deliberately paused: scroll owns the playhead. This keeps
+  // seeking deterministic and avoids a second animation loop fighting scroll.
+  let videoProgress = 0;
+  let videoReady = false;
+  let pendingVideoProgress = 0;
+  let seekRaf = 0;
 
-  const isTouchDeviceEarly =
-    window.matchMedia && window.matchMedia("(pointer: coarse) and (hover: none)").matches;
-
-  // ---------------------------------------------------------------------
-  // FIX (deep-research pass): sprite-sheet loading for touch devices.
-  //
-  // Why this replaces the earlier per-frame "-sm.avif" approach: that
-  // version fixed decode/blit COST per frame (smaller pixels) but not
-  // COUNT of frames in flight. 153 separate fetch() + createImageBitmap()
-  // calls means 153 HTTP round-trips and, more importantly, 153 separate
-  // decoded ImageBitmap objects resident in memory at once — real texture/
-  // VRAM pressure on mobile GPUs, which can force the browser to evict and
-  // re-decode under memory pressure mid-scroll (presents as lag that
-  // doesn't fully resolve after initial load). Confirmed against current
-  // sources: GreenSock's own community guidance flags per-file src
-  // switching as "guaranteed to be slow"; sprite-sheet benchmarks show
-  // stable 60fps vs. ~35fps for the equivalent per-image approach; MDN's
-  // canvas guidance recommends sheets specifically to cut HTTP overhead.
-  //
-  // Packed as 6 sheets of 28 frames each (4 cols x 7 rows, 960x540 tiles
-  // with 4px padding) rather than one giant sheet: iOS Safari hard-caps
-  // canvas area at 16,777,216px AND each dimension at 4096px (verified —
-  // this is not a soft/negotiable limit, exceeding it makes the canvas
-  // silently fail to draw). One sheet holding all 153 frames at this tile
-  // size would be ~4x over that cap and would break outright on iPhone,
-  // not just underperform. 4px padding between tiles avoids WebKit's
-  // known scaled-drawImage edge-bleed issue on sprite sheets (confirmed
-  // via the WHATWG spec discussion on clamp-to-edge behavior).
-  //
-  // Net effect vs. the old mobile path: 153 requests -> 6 requests, 153
-  // resident decoded bitmaps -> 6, and each draw is a single drawImage()
-  // source-rect slice (9-arg form) directly off an already-decoded sheet
-  // — no per-frame createImageBitmap call needed on the hot path at all.
-  // ---------------------------------------------------------------------
-  const useSheets = isTouchDeviceEarly;
-  let sheetManifest = null;
-  let sheetImages = []; // decoded ImageBitmap|Image per sheet, indexed by sheet number — only the "windowed" set is populated at any given time
-  let sheetBlobs = []; // downloaded (still-compressed) bytes per sheet, kept for the whole session
-  let sheetFetchPromises = []; // in-flight blob download per sheet index, so we never double-fetch
-  let sheetDecodePromises = []; // in-flight decode per sheet index, so we never double-decode
-  let sheetsReady = false; // true once the manifest is usable, not once every sheet is downloaded
-
-  // ---------------------------------------------------------------------
-  // MOBILE FIX (resident memory), rev. 2: the first version of this fix
-  // fetched sheets from the network only when the playhead got close to
-  // them. That solved the memory problem below but traded it for a new
-  // one — a normal-speed flick through the hero can easily outrun a
-  // 500-700KB network fetch on a real phone connection, so crossing into
-  // a not-yet-requested sheet showed a frozen frame until it arrived.
-  // That's the "glitchy" playback this revision fixes.
-  //
-  // The actual memory problem was never the DOWNLOAD, it was the DECODE:
-  // each sheet is 3856x3808px, and decoded to raw RGBA (what
-  // createImageBitmap holds) that's ~56MB per sheet — 6 resident at once
-  // is ~330MB held for as long as the hero is on the page, which is what
-  // risks texture eviction/re-decode stutter on a mid/low-RAM Android
-  // phone. The compressed bytes on the wire are tiny by comparison (the
-  // whole set is ~2.9MB total).
-  //
-  // So: every sheet's compressed bytes start downloading immediately, in
-  // parallel, right after the manifest loads — same network behavior and
-  // total transfer as the original bulk-load, so there is no fetch to
-  // wait on later no matter how fast someone scrolls. DECODING those
-  // bytes into a drawable bitmap is what stays windowed: only the sheet
-  // the playhead is in, plus one sheet of look-ahead, are ever decoded at
-  // once, and a decoded sheet outside that window gets its ImageBitmap
-  // explicitly closed (freeing the ~56MB immediately) once it's gone
-  // unused for a few seconds — but its downloaded bytes stay cached, so
-  // re-decoding it later if the user scrolls back is a fast local
-  // operation, not a second network round trip. Peak resident DECODED
-  // memory drops from ~330MB to ~110MB; peak network usage is unchanged.
-  // ---------------------------------------------------------------------
-  const MAX_SHEET_UNUSED_MS = 4000;
-  const sheetLastUsed = Object.create(null);
-
-  function markSheetUsed(idx) {
-    sheetLastUsed[idx] = performance.now();
-  }
-
-  function blobToImage(blob) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.decoding = "async";
-      const objectUrl = URL.createObjectURL(blob);
-      img.onload = () => { URL.revokeObjectURL(objectUrl); resolve(img); };
-      img.onerror = (err) => { URL.revokeObjectURL(objectUrl); reject(err); };
-      img.src = objectUrl;
+  function seekVideo(progress) {
+    pendingVideoProgress = Math.max(0, Math.min(1, progress));
+    if (seekRaf || !videoReady || prefersReducedMotion) return;
+    seekRaf = requestAnimationFrame(() => {
+      seekRaf = 0;
+      const nextTime = pendingVideoProgress * video.duration;
+      if (Number.isFinite(nextTime) && Math.abs(video.currentTime - nextTime) > 0.006) {
+        try { video.currentTime = nextTime; } catch (_) { /* metadata may be settling */ }
+      }
     });
   }
 
-  // Downloads sheet `idx`'s compressed bytes, once, and keeps them cached
-  // in sheetBlobs for the rest of the session — evicting a DECODED sheet
-  // later (see evictSheet) never means a second network fetch.
-  function fetchSheetBlob(idx) {
-    if (!sheetManifest || idx < 0 || idx >= sheetManifest.numSheets) return Promise.reject(new Error("bad sheet index"));
-    if (sheetBlobs[idx]) return Promise.resolve(sheetBlobs[idx]);
-    if (sheetFetchPromises[idx]) return sheetFetchPromises[idx];
-    const url = `door-sheets/door-sheet-${String(idx).padStart(2, "0")}.avif`;
-    const promise = fetch(url, { priority: idx === 0 ? "high" : "low" })
-      .then((res) => res.blob())
-      .then((blob) => {
-        sheetBlobs[idx] = blob;
-        sheetFetchPromises[idx] = null;
-        return blob;
-      });
-    sheetFetchPromises[idx] = promise;
-    return promise;
+  function syncVideo(progress) {
+    videoProgress = progress;
+    seekVideo(progress);
   }
 
-  // Decodes sheet `idx` into a drawable bitmap, reusing the cached blob
-  // if it's already downloaded (no network involved) or downloading it
-  // first if not (e.g. a very early, very fast scroll outrunning the
-  // background prefetch below — rare, but handled the same way either
-  // way).
-  function decodeSheet(idx) {
-    if (sheetImages[idx]) return Promise.resolve(sheetImages[idx]);
-    if (sheetDecodePromises[idx]) return sheetDecodePromises[idx];
-    const promise = fetchSheetBlob(idx)
-      .then((blob) => (supportsBitmap ? createImageBitmap(blob).catch(() => blobToImage(blob)) : blobToImage(blob)))
-      .then((bitmapOrImg) => {
-        sheetImages[idx] = bitmapOrImg;
-        sheetDecodePromises[idx] = null;
-        if (idx === 0 && !firstDrawn) {
-          firstDrawn = true;
-          drawImage(getSheetFrameRef(1));
-          canvas.classList.add("is-ready");
-        }
-        return bitmapOrImg;
-      });
-    sheetDecodePromises[idx] = promise;
-    return promise;
+  video.addEventListener("loadedmetadata", () => {
+    videoReady = Number.isFinite(video.duration) && video.duration > 0;
+    video.pause();
+    video.classList.add("is-ready");
+    seekVideo(videoProgress);
+  }, { once: true });
+  video.addEventListener("canplay", () => video.classList.add("is-ready"), { once: true });
+  video.addEventListener("error", () => {
+    // The poster remains visible rather than leaving a blank hero if a codec
+    // is unavailable or a deploy omitted the generated video asset.
+    video.classList.add("is-fallback");
+  });
+  if (video.readyState >= 1) video.dispatchEvent(new Event("loadedmetadata"));
+
+  function doorProgressFromScroll(scrollProgress) {
+    // The first 84% of the hero opens the door; the final beat gets a calm hold.
+    return Math.pow(Math.min(1, scrollProgress / 0.84), 0.6);
   }
 
-  // Frees a decoded sheet's pixel memory right away. ImageBitmap.close()
-  // is the only deterministic way to do that — dropping the reference
-  // alone just leaves it to the browser's own GC schedule, which is the
-  // uncertainty this fix exists to remove. The downloaded blob is left
-  // in sheetBlobs untouched, so a later re-decode is cheap. The rare
-  // <img> fallback path (createImageBitmap unsupported/failed) has no
-  // equivalent handle, so that case is just dereferenced.
-  function evictSheet(idx) {
-    const img = sheetImages[idx];
-    if (!img) return;
-    if (typeof img.close === "function") img.close();
-    sheetImages[idx] = null;
-  }
-
-  // Keeps only the sheet the playhead is currently inside, plus one
-  // sheet of look-ahead in the scroll direction, actually decoded. Cheap
-  // to call on every scroll update — a scan over at most 6 entries plus,
-  // at most, one local decode (bytes are already cached — see loadSheets)
-  // when crossing into a sheet for the first time.
-  function updateSheetWindow(currentSheetIdx, direction) {
-    if (!sheetManifest) return;
-    markSheetUsed(currentSheetIdx);
-    decodeSheet(currentSheetIdx);
-
-    const lookahead = direction < 0 ? currentSheetIdx - 1 : currentSheetIdx + 1;
-    const wanted = new Set([currentSheetIdx]);
-    if (lookahead >= 0 && lookahead < sheetManifest.numSheets) {
-      markSheetUsed(lookahead);
-      decodeSheet(lookahead);
-      wanted.add(lookahead);
-    }
-
-    const now = performance.now();
-    for (let i = 0; i < sheetManifest.numSheets; i++) {
-      if (wanted.has(i)) continue;
-      if (sheetImages[i] && now - (sheetLastUsed[i] || 0) > MAX_SHEET_UNUSED_MS) {
-        evictSheet(i);
-      }
-    }
-  }
-
-  function loadSheets() {
-    fetch("door-sheets/manifest.json")
-      .then((res) => { if (!res.ok) throw new Error("manifest missing"); return res.json(); })
-      .then((manifest) => {
-        sheetManifest = manifest;
-        sheetsReady = true;
-        // Sheet 0 needs to be decoded right away for the first paint.
-        decodeSheet(0);
-        // Every other sheet's BYTES start downloading now too, at low
-        // priority — same ~2.9MB total transfer, same timing, as the
-        // original bulk-load. Only their DECODE is deferred to
-        // updateSheetWindow, since decode-into-resident-memory was the
-        // actual cost driving the mobile lag, not the download.
-        for (let s = 1; s < manifest.numSheets; s++) fetchSheetBlob(s);
-      })
-      .catch(() => {
-        // Manifest missing entirely (sheets not deployed to this server
-        // yet) — fall back to the guaranteed-present per-frame path below
-        // so the hero still works, just without the sheet optimization.
-        loadFramesLegacy();
-      });
-  }
-
-  // Returns { img, sx, sy, sw, sh } describing where frame `i` (1-indexed)
-  // lives within its sheet, or null if that sheet isn't decoded right
-  // now (evicted, or the rare case of still downloading) — the caller
-  // keeps showing the last drawn frame until it resolves.
-  function getSheetFrameRef(i) {
-    if (!sheetManifest) return null;
-    const entry = sheetManifest.frames[i - 1];
-    if (!entry) return null;
-    const img = sheetImages[entry.sheet];
-    if (!img) return null;
-    return { img, sx: entry.x, sy: entry.y, sw: entry.w, sh: entry.h };
-  }
-
-  // ---------------------------------------------------------------------
-  // Legacy per-frame path — kept as the fallback for desktop (crossfade
-  // needs individually addressable frames) and for touch devices if the
-  // sheet manifest 404s for any reason.
-  // ---------------------------------------------------------------------
-  function loadFramesLegacy() {
-    function loadFrame(i) {
-      if (frames[i - 1] || (i - 1) in frames) return; // already queued/loaded
-      frames[i - 1] = null; // reserve the slot so we don't re-queue it
-      const frameNumber = i.toString().padStart(3, '0');
-      const url = `door-frames/ezgif-frame-${frameNumber}.avif`;
-
-      const onReady = (bitmapOrImg) => {
-        frames[i - 1] = bitmapOrImg;
-        loadedCount++;
-        if (!firstDrawn) {
-          firstDrawn = true;
-          drawImage(bitmapOrImg);
-          canvas.classList.add("is-ready");
-        }
-      };
-
-      if (supportsBitmap) {
-        fetch(url, { priority: i === 1 ? "high" : "low" })
-          .then((res) => res.blob())
-          .then((blob) => createImageBitmap(blob))
-          .then(onReady)
-          .catch(() => {
-            const img = new Image();
-            img.decoding = "async";
-            img.onload = () => onReady(img);
-            img.src = url;
-          });
-      } else {
-        const img = new Image();
-        img.decoding = "async";
-        if (i === 1) img.fetchPriority = "high";
-        img.onload = () => onReady(img);
-        img.src = url;
-      }
-    }
-
-    loadFrame(1);
-    for (let i = 2; i <= Math.min(24, frameCount); i++) loadFrame(i);
-
-    let nextBatchStart = 25;
-    function loadNextBatch(deadline) {
-      const batchSize = 14;
-      let loaded = 0;
-      while (nextBatchStart <= frameCount && loaded < batchSize) {
-        loadFrame(nextBatchStart);
-        nextBatchStart++;
-        loaded++;
-        if (deadline && deadline.timeRemaining && deadline.timeRemaining() < 1) break;
-      }
-      if (nextBatchStart <= frameCount) {
-        scheduleIdle(loadNextBatch);
-      }
-    }
-    function scheduleIdle(fn) {
-      if ("requestIdleCallback" in window) {
-        requestIdleCallback(fn, { timeout: 300 });
-      } else {
-        setTimeout(fn, 100);
-      }
-    }
-    scheduleIdle(loadNextBatch);
-  }
-
-  if (useSheets) {
-    loadSheets();
-  } else {
-    loadFramesLegacy();
-  }
-
-
-  // Mobile fix: phones report devicePixelRatio 2-3, and every point of DPR
-  // squares the canvas fill/blit cost. Desktop keeps the existing 1.5 cap
-  // (unchanged); touch devices are capped lower so the scroll-linked
-  // redraw stays cheap enough for mobile GPUs to keep up every frame.
-  const isTouchDevice =
-    window.matchMedia && window.matchMedia("(pointer: coarse) and (hover: none)").matches;
-  const maxDpr = isTouchDevice ? 1 : 1.5;
-  const prefersReducedMotion =
-    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  // MOBILE FIX: this used to size the canvas from window.innerWidth/
-  // innerHeight, but .hero-sticky is sized with CSS `100svh` (the *small*
-  // viewport, i.e. address-bar-visible height). On mobile, innerHeight
-  // grows/shrinks live as the address bar hides/shows during scroll, while
-  // svh stays fixed at the small value — so the two disagree continuously.
-  // The canvas is also only resized on a 120ms-debounced `resize` listener
-  // (see below), so for stretches of scroll the canvas buffer is drawn at
-  // a stale/mismatched size relative to the actual .hero-sticky box. Any
-  // gap between the two exposes .hero-sticky's own background-color
-  // (var(--night-deep), the same dark navy as the canvas fill) as a solid
-  // band under/around the image. Reading the size straight from
-  // .hero-sticky's own rendered box instead of window.innerHeight ties the
-  // canvas to the same source of truth the container itself uses, so
-  // there's nothing for it to disagree with.
-  const heroSticky = document.querySelector(".hero-sticky");
-  // FIX: cache hero dimensions instead of calling getBoundingClientRect()
-  // on every draw tick. The old live-read approach was causing read-after-
-  // write layout thrashing when beat DOM writes (opacity/transform/filter)
-  // overlapped with the next tick's rect read — the actual source of the
-  // residual PC stutter. These cached values are kept fresh by the
-  // ResizeObserver below, which fires on every actual size change including
-  // mobile address-bar show/hide, so staleness is no longer a concern.
-  let cachedHeroW = 0;
-  let cachedHeroH = 0;
-  if (heroSticky) {
-    const initRect = heroSticky.getBoundingClientRect();
-    cachedHeroW = initRect.width || window.innerWidth;
-    cachedHeroH = initRect.height || window.innerHeight;
-  } else {
-    cachedHeroW = window.innerWidth;
-    cachedHeroH = window.innerHeight;
-  }
-  function getHeroRect() {
-    return { width: cachedHeroW, height: cachedHeroH };
-  }
-
-  function drawImage(imgOrRef, alpha) {
-    if (!imgOrRef) return;
-    // FIX: accept either a plain decoded image/bitmap (legacy per-frame
-    // path) or a { img, sx, sy, sw, sh } sheet reference (sprite-sheet
-    // path). Sheet refs use the 9-argument drawImage() form to slice
-    // directly out of an already-decoded sheet — no extra decode or
-    // allocation per frame, just a source-rect blit.
-    const isSheetRef = imgOrRef && typeof imgOrRef === "object" && "sx" in imgOrRef;
-    const img = isSheetRef ? imgOrRef.img : imgOrRef;
-    const srcW = isSheetRef ? imgOrRef.sw : img.width;
-    const srcH = isSheetRef ? imgOrRef.sh : img.height;
-
-    // Capped at 1.5 rather than 2: this canvas shows full-bleed photographic
-    // footage (not text/UI), so the sharpness gain from full device
-    // resolution is barely visible, while canvas fill/blit cost scales with
-    // pixel count — 1.5 vs 2 is roughly a 40% smaller canvas to redraw.
-    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
-    const { width: w, height: h } = getHeroRect();
-
-    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      // FIX: no canvas.style.width/height here — CSS width:100%;height:100%
-      // on #door-canvas keeps the element sized to .hero-sticky exactly,
-      // eliminating the blue band that appeared when JS pixel values briefly
-      // disagreed with the CSS container size (especially on mobile during
-      // address-bar show/hide transitions).
-    }
-
-    const canvasRatio = canvas.width / canvas.height;
-    const imgRatio = srcW / srcH;
-
-    let drawWidth, drawHeight, x, y;
-
-    if (canvasRatio > imgRatio) {
-      drawWidth = canvas.width;
-      drawHeight = canvas.width / imgRatio;
-      x = 0;
-      y = (canvas.height - drawHeight) / 2;
-    } else {
-      drawWidth = canvas.height * imgRatio;
-      drawHeight = canvas.height;
-      x = (canvas.width - drawWidth) / 2;
-      y = 0;
-    }
-
-    // FIX: round every drawImage coordinate to an integer. Sub-pixel
-    // coordinates force the canvas to do extra anti-aliasing work on every
-    // single blit (MDN's own canvas perf guidance flags this explicitly).
-    // Redrawn on every scroll tick, that's real, avoidable per-frame cost
-    // for zero visible sharpness gain on photographic footage.
-    drawWidth = Math.round(drawWidth);
-    drawHeight = Math.round(drawHeight);
-    x = Math.round(x);
-    y = Math.round(y);
-
-    if (alpha === undefined || alpha >= 1) {
-      // Opaque draw: fill with the deep night tone first (matches the
-      // palette during letterboxing), then paint the frame over it.
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = '#061529';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      if (isSheetRef) {
-        ctx.drawImage(img, imgOrRef.sx, imgOrRef.sy, imgOrRef.sw, imgOrRef.sh, x, y, drawWidth, drawHeight);
-      } else {
-        ctx.drawImage(img, x, y, drawWidth, drawHeight);
-      }
-    } else {
-      // Crossfade layer: painted on top of whatever's already there
-      // (the base frame drawn opaque just before this call), at partial
-      // alpha, without re-clearing the canvas — see drawCrossfade below.
-      ctx.globalAlpha = alpha;
-      if (isSheetRef) {
-        ctx.drawImage(img, imgOrRef.sx, imgOrRef.sy, imgOrRef.sw, imgOrRef.sh, x, y, drawWidth, drawHeight);
-      } else {
-        ctx.drawImage(img, x, y, drawWidth, drawHeight);
-      }
-      ctx.globalAlpha = 1;
-    }
-  }
-
-  // Desktop-only sub-frame crossfade: when the damped frame position sits
-  // between two integer frames (e.g. 42.6), draw frame 42 opaque then
-  // frame 43 on top at 60% alpha. This makes the 153-frame sequence read
-  // as noticeably denser without exporting more frames. Skipped on touch
-  // devices — it roughly doubles the per-tick canvas blit cost, and the
-  // DPR/redraw-rate caps already in place there exist specifically to
-  // keep that cost down, so doubling it back is a net loss on mobile
-  // GPUs. Mobile instead gets frame damping without the crossfade.
-  function drawCrossfade(floatIndex) {
-    const lo = Math.max(0, Math.min(frameCount - 1, Math.floor(floatIndex)));
-    const hi = Math.max(0, Math.min(frameCount - 1, Math.ceil(floatIndex)));
-    const t = floatIndex - lo;
-    const loFrame = frames[lo];
-    const hiFrame = frames[hi];
-    const loReady = loFrame && (loFrame instanceof Image ? loFrame.complete : true);
-    const hiReady = hiFrame && (hiFrame instanceof Image ? hiFrame.complete : true);
-
-    if (!loReady) return false;
-    drawImage(loFrame, 1);
-    if (hi !== lo && t > 0.01 && hiReady) {
-      drawImage(hiFrame, t);
-    }
-    return true;
-  }
-
-  // ---------------------------------------------------------------------
-  // Canvas frame drawing, keyed off a single tweened value.
-  //
-  // Ported to match GSAP's own reference pattern for this technique
-  // (the "imageSequence" scrub helper GreenSock publishes and every
-  // Apple-style scroll sequence on the web is descended from): instead of
-  // reading a raw scroll-derived progress number and hand-rolling a
-  // separate requestAnimationFrame loop to ease/damp it toward that target
-  // (two animation systems layered on top of each other, running forever
-  // even when nothing is moving), there is now exactly one animated value —
-  // playhead.frame — and GSAP's own scrub tween owns the easing. scrub: 0.35
-  // below IS the "catch up / settle after scroll stops" feel; it replaces
-  // the old renderLoop()/FRAME_DAMPING logic entirely rather than sitting
-  // alongside it. GSAP only calls onUpdate when playhead.frame actually
-  // changes, so there's no redraw work at all while the tween is settled —
-  // where the old renderLoop ran an empty rAF check on every frame forever.
-  // ---------------------------------------------------------------------
-  let playhead = { frame: 0 };
-
-  // Mobile fix: same reasoning as GSAP's own reference helper skipping a
-  // redraw when the rounded frame hasn't changed (`frame !== curFrame`) —
-  // here extended with a small min-interval on touch devices specifically,
-  // since a fast swipe can still produce several onUpdate calls per rounded
-  // frame at high scrub speed, and painting every one of those is the kind
-  // of redundant redraw work mobile GPUs feel most.
-  const minRedrawIntervalMs = isTouchDevice ? 33 : 0; // ~30fps cap on touch, uncapped on desktop
-  let lastDrawTime = -Infinity;
-  let lastPlayheadFloatForWindow = 0;
-
-  function drawFrame(floatIndex) {
-    const now = performance.now();
-    if (minRedrawIntervalMs && now - lastDrawTime < minRedrawIntervalMs) return false;
-
-    const clamped = Math.max(0, Math.min(frameCount - 1, floatIndex));
-    const roundedIndex = Math.round(clamped);
-
-    // Sprite-sheet windowing: runs on every accepted tick (already
-    // throttled to ~30fps on touch above) regardless of whether the
-    // rounded frame changed, so a sheet in active use doesn't get evicted
-    // out from under someone who's paused mid-scroll on it. Direction is
-    // derived from the playhead's own movement so this works identically
-    // whether GSAP ScrollTrigger or the raw-scroll fallback is driving it.
-    if (useSheets && sheetManifest) {
-      const direction = clamped >= lastPlayheadFloatForWindow ? 1 : -1;
-      lastPlayheadFloatForWindow = clamped;
-      const entry = sheetManifest.frames[roundedIndex];
-      if (entry) updateSheetWindow(entry.sheet, direction);
-    }
-
-    if (roundedIndex === lastFrameIndex && clamped === roundedIndex) return false;
-
-    let drew = false;
-    if (isTouchDevice || prefersReducedMotion) {
-      // Touch/reduced-motion: snap to the nearest whole frame, no crossfade
-      // (see drawCrossfade's comment — crossfade roughly doubles blit cost,
-      // which is exactly what the DPR/redraw caps elsewhere exist to avoid
-      // on mobile GPUs).
-      // FIX: prefer the sprite-sheet reference (single shared decode,
-      // sliced via source-rect) when sheets are in use; fall back to the
-      // legacy per-frame bitmap array if sheets aren't active/ready for
-      // this frame yet (e.g. still loading, or manifest 404'd).
-      const sheetRef = useSheets ? getSheetFrameRef(roundedIndex + 1) : null;
-      if (sheetRef) {
-        drawImage(sheetRef, 1);
-        drew = true;
-      } else {
-        const frame = frames[roundedIndex];
-        if (frame && (frame instanceof Image ? frame.complete : true)) {
-          drawImage(frame, 1);
-          drew = true;
-        }
-      }
-    } else {
-      drew = drawCrossfade(clamped);
-    }
-
-    if (drew) {
-      lastFrameIndex = roundedIndex;
-      lastDrawTime = now;
-    }
-    return drew;
-  }
-
-  // FIX: decouple DOM writes (beats, progress bar, scroll cue) from the
-  // canvas draw. Both used to run synchronously in the same onUpdate call
-  // as drawFrame() — a canvas blit and several style/class writes sharing
-  // one 16ms tick is exactly the kind of main-thread contention that
-  // tips a frame from smooth to dropped on mid-range mobile GPUs. This
-  // coalesces the DOM writes onto their own rAF, so if ScrollTrigger fires
-  // onUpdate multiple times before the next paint, the DOM only gets
-  // touched once, and the canvas draw (already happening synchronously
-  // in the caller) is never blocked waiting on a style recalc it doesn't
-  // need to be involved in.
   let pendingChromeUpdate = null;
   let chromeRafId = 0;
   function updateBeatsAndChrome(doorProgress, scrollProgress) {
@@ -2160,184 +1650,63 @@ document.addEventListener("DOMContentLoaded", () => {
     if (chromeRafId) return;
     chromeRafId = requestAnimationFrame(() => {
       chromeRafId = 0;
-      const { doorProgress, scrollProgress } = pendingChromeUpdate;
-      // Beats — driven by doorProgress (the same reshaped curve that picks
-      // the frame), not raw scrollProgress. The door needs scrollProgress
-      // to reach 0.84 to be fully open, so beats are keyed in doorProgress
-      // space (divide breakpoints by 0.84) to stay locked to the frame
-      // regardless of scroll speed.
-      updateBeat(1, 0, 0.0714, doorProgress);
-      updateBeat(2, 0.1667, 0.3333, doorProgress);
-      updateBeat(3, 0.4286, 0.6190, doorProgress);
-      updateBeat(4, 0.6905, 0.8810, doorProgress);
-      updateBeat(5, 0.9524, 1.0, doorProgress);
-
-      // FIX: skip the JS width write entirely when the native CSS
-      // scroll-timeline path (see .scroll-progress-bar CSS above) is
-      // active — writing an inline style here would override/fight the
-      // compositor-driven transform for no benefit, and this check itself
-      // is cheap (CSS.supports results are cached by the engine).
+      const state = pendingChromeUpdate;
+      updateBeat(1, 0, 0.0714, state.doorProgress);
+      updateBeat(2, 0.1667, 0.3333, state.doorProgress);
+      updateBeat(3, 0.4286, 0.6190, state.doorProgress);
+      updateBeat(4, 0.6905, 0.8810, state.doorProgress);
+      updateBeat(5, 0.9524, 1.0, state.doorProgress);
       if (scrollProgressBar && !CSS.supports("animation-timeline", "scroll()")) {
-        scrollProgressBar.style.width = (scrollProgress * 100).toFixed(2) + "%";
+        scrollProgressBar.style.width = (state.scrollProgress * 100).toFixed(2) + "%";
       }
-      if (scrollCue) {
-        scrollCue.classList.toggle("is-hidden", scrollProgress > 0.03);
-      }
+      if (scrollCue) scrollCue.classList.toggle("is-hidden", state.scrollProgress > 0.03);
     });
   }
 
-  // doorProgress: the eased 0..1 curve the door-opening frame count maps
-  // onto (fully open by 84% scroll, eased to counteract the source
-  // footage's slow start / fast finish). Beats read this directly and
-  // instantly — only the canvas playhead is scrubbed/damped below.
-  function doorProgressFromScroll(scrollProgress) {
-    return Math.pow(Math.min(1, scrollProgress / 0.84), 0.6);
+  function updateFromProgress(scrollProgress) {
+    const progress = Math.max(0, Math.min(1, scrollProgress));
+    const doorProgress = doorProgressFromScroll(progress);
+    syncVideo(doorProgress);
+    updateBeatsAndChrome(doorProgress, progress);
   }
 
-  const container = document.getElementById("hero-scroll");
-  let lastFrameIndex = -1;
-
-  // Cache beat elements once instead of re-querying the DOM on every
-  // animation frame during scroll.
-  const beatEls = {
-    1: document.querySelector('.beat-1'),
-    2: document.querySelector('.beat-2'),
-    3: document.querySelector('.beat-3'),
-    4: document.querySelector('.beat-4'),
-    5: document.querySelector('.beat-5'),
-  };
-
-  // ---------------------------------------------------------------------
-  // Scroll driver: GSAP ScrollTrigger when available, raw scroll events
-  // as a fallback if GSAP failed to load (e.g. offline/CDN blocked).
-  //
-  // The ScrollTrigger itself no longer redraws the canvas directly. It
-  // just reports progress and the canvas draw happens directly in its own
-  // onUpdate. Beats/chrome are updated in the same callback.
-  // ---------------------------------------------------------------------
-  // FIX (removes the #1 diagnosed jank source): the previous version ran
-  // TWO animation systems per scroll tick — ScrollTrigger's own internal
-  // scrub interpolation, AND a second gsap.to(playhead) tween that was
-  // invalidate().restart()'d on every single onUpdate call, doubling the
-  // GSAP ticker work per frame for no visible benefit. Apple's own
-  // production AirPods/iPhone scroll sequences (verified against their
-  // shipped source) do nothing more than a plain drawImage() call keyed
-  // straight off scroll position — no secondary easing tween at all.
-  // ScrollTrigger's native `scrub: <number>` option already provides the
-  // "catches up, doesn't jump" damping (it smooths self.progress itself
-  // before onUpdate ever fires), so there is no need to re-implement that
-  // same easing a second time with an extra tween. One scheduler, one
-  // draw call per tick.
-  function attachScrollTrigger(ScrollTrigger, gsap) {
-    // scrub number = seconds to catch up to the actual scroll position —
-    // this IS the damping the old secondary tween existed to provide.
-    // Slightly slower catch-up on touch (matches the old duration split)
-    // since a fast swipe otherwise produces more redraws per second than
-    // a mobile GPU comfortably keeps up with.
-    const scrubSeconds = prefersReducedMotion ? true : (isTouchDevice ? 0.5 : 0.35);
-
+  function attachScrollTrigger(ScrollTrigger) {
     ScrollTrigger.create({
       trigger: container,
       start: "top top",
       end: "bottom bottom",
-      scrub: scrubSeconds,
-      onUpdate: (self) => {
-        const doorProgress = doorProgressFromScroll(self.progress);
-        playhead.frame = doorProgress * (frameCount - 1);
-        drawFrame(playhead.frame);
-        updateBeatsAndChrome(doorProgress, self.progress);
-      },
-      onRefresh: (self) => {
-        const doorProgress = doorProgressFromScroll(self.progress);
-        updateBeatsAndChrome(doorProgress, self.progress);
-      },
+      scrub: prefersReducedMotion ? true : (isTouchDevice ? 0.5 : 0.35),
+      onUpdate: (self) => updateFromProgress(self.progress),
+      onRefresh: (self) => updateFromProgress(self.progress),
     });
   }
 
   function attachRawScrollFallback() {
-    let maxScroll = 0;
-    let containerTop = 0;
-    function recomputeLayout() {
-      containerTop = container.getBoundingClientRect().top + window.scrollY;
-      maxScroll = container.offsetHeight - window.innerHeight;
+    let rafId = 0;
+    function update() {
+      rafId = 0;
+      const maxScroll = Math.max(1, container.offsetHeight - window.innerHeight);
+      const progress = Math.max(0, Math.min(1, (window.scrollY - container.offsetTop) / maxScroll));
+      updateFromProgress(progress);
     }
-    recomputeLayout();
-
-    let rafId = null;
-    function onScroll() {
-      if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        const rectTop = containerTop - window.scrollY;
-        const scrollProgress = Math.max(0, Math.min(1, -rectTop / maxScroll));
-        const doorProgress = doorProgressFromScroll(scrollProgress);
-        // No GSAP available in this fallback path, so no scrub/tween —
-        // draw the target frame directly.
-        playhead.frame = doorProgress * (frameCount - 1);
-        drawFrame(playhead.frame);
-        updateBeatsAndChrome(doorProgress, scrollProgress);
-      });
-    }
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", () => {
-      recomputeLayout();
-      onScroll();
-    }, { passive: true });
-    onScroll();
+    window.addEventListener("scroll", () => { if (!rafId) rafId = requestAnimationFrame(update); }, { passive: true });
+    window.addEventListener("resize", update, { passive: true });
+    update();
   }
 
-  if (window.__ScrollTrigger && window.__gsap) {
-    attachScrollTrigger(window.__ScrollTrigger, window.__gsap);
+  if (prefersReducedMotion) {
+    video.currentTime = 0;
+    updateFromProgress(0);
+  } else if (window.__ScrollTrigger) {
+    attachScrollTrigger(window.__ScrollTrigger);
   } else {
-    document.addEventListener("lenis-gsap-ready", (e) => {
-      attachScrollTrigger(e.detail.ScrollTrigger, e.detail.gsap);
-    }, { once: true });
-    // If GSAP/ScrollTrigger never shows up (CDN blocked, offline, etc.),
-    // fall back to the original raw-scroll driver after a short grace
-    // period so the hero still works.
-    setTimeout(() => {
-      if (!window.__ScrollTrigger) attachRawScrollFallback();
-    }, 2000);
+    document.addEventListener("lenis-gsap-ready", (e) => attachScrollTrigger(e.detail.ScrollTrigger), { once: true });
+    setTimeout(() => { if (!window.__ScrollTrigger) attachRawScrollFallback(); }, 2000);
   }
 
-  // Canvas resize on window resize (layout-only; ScrollTrigger.refresh()
-  // handles re-measuring scroll distances on its own resize listener).
-  let resizeTimer = null;
-  window.addEventListener("resize", () => {
-    if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      if (window.__ScrollTrigger) {
-        window.__ScrollTrigger.refresh();
-      }
-    }, 120);
-  }, { passive: true });
-
-  // MOBILE FIX (see drawImage above): redraw the canvas immediately
-  // whenever .hero-sticky's own rendered box changes size — e.g. the
-  // address bar showing/hiding as the user scrolls — instead of waiting on
-  // the 120ms-debounced window `resize` listener below. That debounce is
-  // fine for the heavier ScrollTrigger.refresh(), but leaving the canvas
-  // stale for up to 120ms every time the viewport height changes is
-  // exactly what let .hero-sticky's own background color show through as
-  // a visible band. This forces a redraw at the tween's current frame
-  // (playhead.frame), which now reads size from .hero-sticky directly, so
-  // canvas and container can't drift apart even mid-scroll.
+  // Keep the initial poster/video crop aligned with the sticky viewport.
   if (heroSticky && "ResizeObserver" in window) {
-    let lastW = 0, lastH = 0;
-    const heroResizeObserver = new ResizeObserver((entries) => {
-      const box = entries[0].contentRect;
-      if (Math.round(box.width) === lastW && Math.round(box.height) === lastH) return;
-      lastW = Math.round(box.width);
-      lastH = Math.round(box.height);
-      // FIX: keep the cached hero rect fresh — this is what getHeroRect()
-      // reads on every draw tick instead of calling getBoundingClientRect().
-      cachedHeroW = box.width || window.innerWidth;
-      cachedHeroH = box.height || window.innerHeight;
-      lastFrameIndex = -1; // force drawFrame to redraw even if the rounded frame didn't change
-      lastDrawTime = -Infinity; // bypass the touch min-redraw-interval cap for this forced redraw
-      drawFrame(playhead.frame);
-    });
-    heroResizeObserver.observe(heroSticky);
+    new ResizeObserver(() => { if (videoReady) seekVideo(videoProgress); }).observe(heroSticky);
   }
 
   function updateBeat(num, start, end, progress) {
