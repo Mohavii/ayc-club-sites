@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2f78c2" />
+  <title>Mon cadre Youth Impact · Association YOUTH CLUBs</title>
+  <meta name="description" content="Ajoute ta photo et télécharge-la instantanément dans le cadre Youth Impact « Participant ». Ta photo reste sur ton appareil." />
+  <link rel="icon" type="image/png" href="assets/favicon-32.png" sizes="32x32">
+  <link rel="icon" type="image/png" href="assets/favicon-16.png" sizes="16x16">
+  <link rel="icon" type="image/png" href="assets/favicon-192.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="shortcut icon" href="assets/favicon.ico">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Association YOUTH CLUBs">
+  <meta property="og:title" content="Mon cadre Youth Impact · Association YOUTH CLUBs">
+  <meta property="og:description" content="Ajoute ta photo et télécharge-la instantanément dans le cadre Youth Impact « Participant ».">
+  <meta property="og:image" content="assets/og-image.jpg">
+  <meta property="og:locale" content="fr_FR">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="cadre-assets/style.css" />
+</head>
+<body data-step="1">
+  <div class="topbar">
+    <a class="backlink" href="index">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="m14.7 5.3 1.4 1.4L10.8 12l5.3 5.3-1.4 1.4L8 12l6.7-6.7Z"/></svg>
+      Retour au site
+    </a>
+  </div>
+
+  <main class="app">
+    <header class="hero">
+      <span class="eyebrow">Participant</span>
+      <h1>Mon cadre <span>Youth Impact</span></h1>
+      <p class="sub">Ajoute ta photo et récupère ton visuel en un instant, prêt à partager.</p>
+      <ol class="steps" aria-label="Étapes">
+        <li>1 · Choisis</li>
+        <li>2 · Ajuste</li>
+        <li>3 · Télécharge</li>
+      </ol>
+    </header>
+
+    <section class="layout">
+      <div class="stage">
+        <label id="dropzone" class="dropzone" tabindex="0">
+          <input id="file" type="file" accept="image/*" hidden />
+          <canvas id="canvas" aria-label="Aperçu de ta photo dans le cadre"></canvas>
+        </label>
+        <p id="hint" class="hint" aria-live="polite">Appuie sur l’aperçu ou dépose une photo dessus pour commencer.</p>
+        <p id="error" class="error" role="alert" hidden></p>
+      </div>
+
+      <aside id="panel" class="panel is-empty">
+        <h2>Ajuste ta photo</h2>
+
+        <div class="field">
+          <div class="field-row">
+            <label for="zoom">Zoom</label>
+            <output id="zoom-out" for="zoom">100&nbsp;%</output>
+          </div>
+          <input id="zoom" type="range" min="100" max="400" value="100" disabled />
+        </div>
+
+        <div class="field">
+          <div class="field-row"><span id="bg-label">Fond de l’image</span></div>
+          <div class="seg" role="radiogroup" aria-labelledby="bg-label">
+            <label><input type="radio" name="bg" value="white" checked disabled /><span>Blanc</span></label>
+            <label><input type="radio" name="bg" value="transparent" disabled /><span>Transparent</span></label>
+          </div>
+        </div>
+
+        <button id="recenter" type="button" class="btn ghost small" disabled>Recentrer la photo</button>
+      </aside>
+    </section>
+
+    <p class="privacy">Ta photo n’est jamais envoyée : tout se passe dans ton navigateur.</p>
+  </main>
+
+  <div class="actionbar">
+    <button id="pick" type="button" class="btn primary">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M9 3 7.2 5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9Zm3 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>
+      Choisir une photo
+    </button>
+    <button id="download" type="button" class="btn primary grow" hidden>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M11 3h2v9.2l3.3-3.3 1.4 1.4L12 16.1l-5.7-5.8 1.4-1.4L11 12.2V3ZM5 18h14v3H5v-3Z"/></svg>
+      Télécharger
+    </button>
+    <button id="change" type="button" class="btn ghost" hidden>Autre photo</button>
+  </div>
+
+  <script src="cadre-assets/script.js"></script>
+</body>
+</html>
