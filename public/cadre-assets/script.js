@@ -11,11 +11,10 @@
   const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15 Mo
   const MAX_ZOOM = 4;                      // 400 %
 
-  // At 100 % zoom the whole photo (corner to corner) fits inside a circle of this
-  // radius, which sits just within the opening of the ring. Anything the photo
-  // does not cover is filled with a blurred copy of the same photo.
-  const FIT_RADIUS = 470;
-  const BLUR_PX = 40;
+  // At 100 % zoom the photo already fills the whole ring (like CSS "cover").
+  // Everything outside the ring (the corners of the square) is a blurred,
+  // enlarged copy of the same photo.
+  const BLUR_PX = 38;
   const SUPPORTS_FILTER = typeof CanvasRenderingContext2D !== 'undefined' &&
     'filter' in CanvasRenderingContext2D.prototype;
 
@@ -30,8 +29,8 @@
   const TEXT = {
     hintEmpty: 'Appuie sur l’aperçu ou dépose une photo dessus pour commencer.',
     hintLoaded: IS_TOUCH
-      ? 'Ta photo entière est visible, avec un fond flou. Pince avec deux doigts pour zoomer, glisse pour la placer.'
-      : 'Ta photo entière est visible, avec un fond flou. Zoome avec le curseur ou la molette, puis fais-la glisser.',
+      ? 'Pince avec deux doigts pour zoomer, glisse pour placer ta photo dans le cadre.'
+      : 'Zoome avec le curseur ou la molette, puis fais glisser ta photo pour la placer dans le cadre.',
     hintDone: 'Téléchargement lancé. Retrouve ton image dans tes téléchargements ou ta galerie.',
     notImage: 'Ce fichier n’est pas une image. Choisis un PNG, JPG, WEBP ou GIF.',
     tooBig: 'Cette image dépasse 15 Mo. Choisis-en une plus légère.',
@@ -54,7 +53,6 @@
     panel: $('panel'),
     zoom: $('zoom'),
     zoomOut: $('zoom-out'),
-    bgInputs: Array.from(document.querySelectorAll('input[name="bg"]')),
     recenter: $('recenter'),
     pick: $('pick'),
     download: $('download'),
@@ -83,7 +81,6 @@
   let offY = 0;
 
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-  const getBg = () => (els.bgInputs.find((r) => r.checked) || { value: 'white' }).value;
 
   function showError(message) {
     els.error.textContent = message;
@@ -128,7 +125,6 @@
     els.panel.classList.toggle('is-empty', !loaded);
     els.zoom.disabled = !loaded;
     els.recenter.disabled = !loaded;
-    els.bgInputs.forEach((r) => { r.disabled = !loaded; });
     els.pick.hidden = loaded;
     els.download.hidden = !loaded;
     els.change.hidden = !loaded;
@@ -144,21 +140,22 @@
   }
 
   // ---- Drawing ----
-  // A blurred, enlarged copy of the photo that covers the whole clip circle.
-  // It is rendered once per upload so dragging and zooming stay smooth.
+  // A blurred, enlarged copy of the photo that covers the WHOLE square canvas, so
+  // everything outside the ring is blurred. Rendered once per upload so dragging
+  // and zooming stay smooth.
   function makeBackground(img) {
     const c = document.createElement('canvas');
     c.width = FRAME_SIZE;
     c.height = FRAME_SIZE;
     const g = c.getContext('2d');
 
-    // Draw it a bit larger than needed so the blur never fades out at the edges.
-    const side = CIRCLE.r * 2 * 1.3;
+    // "Cover" the canvas, with extra margin so the blur never fades out at the edges.
+    const side = FRAME_SIZE * 1.25;
     const s = side / Math.min(img.naturalWidth, img.naturalHeight);
     const w = img.naturalWidth * s;
     const h = img.naturalHeight * s;
-    const x = CIRCLE.x - w / 2;
-    const y = CIRCLE.y - h / 2;
+    const x = (FRAME_SIZE - w) / 2;
+    const y = (FRAME_SIZE - h) / 2;
 
     g.imageSmoothingQuality = 'high';
     if (SUPPORTS_FILTER) {
@@ -179,12 +176,11 @@
     return c;
   }
 
-  // Where the sharp photo is drawn. At 100 % the whole photo fits inside the ring
-  // opening; zooming in lets it grow until it fills the circle.
+  // Where the sharp photo is drawn. At 100 % it covers the whole ring circle
+  // (no empty space); zooming in makes it bigger from there.
   function photoRect() {
     const side = CIRCLE.r * 2;
-    const diagonal = Math.hypot(image.naturalWidth, image.naturalHeight);
-    const base = (FIT_RADIUS * 2) / diagonal;
+    const base = side / Math.min(image.naturalWidth, image.naturalHeight);
     const scale = base * zoom;
     const w = image.naturalWidth * scale;
     const h = image.naturalHeight * scale;
@@ -232,28 +228,30 @@
   function render() {
     ctx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
 
-    if (getBg() === 'white') {
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, FRAME_SIZE, FRAME_SIZE);
-    }
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(CIRCLE.x, CIRCLE.y, CIRCLE.r, 0, Math.PI * 2);
-    ctx.clip();
-
     if (image) {
+      // 1. Blurred photo over the whole square (this is what shows outside the ring).
       ctx.drawImage(background, 0, 0);
+
+      // 2. Sharp photo, clipped to the ring opening.
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(CIRCLE.x, CIRCLE.y, CIRCLE.r, 0, Math.PI * 2);
+      ctx.clip();
       const r = photoRect();
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(image, r.x, r.y, r.w, r.h);
+      ctx.restore();
     } else {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(CIRCLE.x, CIRCLE.y, CIRCLE.r, 0, Math.PI * 2);
+      ctx.clip();
       drawPlaceholder();
+      ctx.restore();
     }
-    ctx.restore();
 
-    // The frame goes on top of the photo.
+    // 3. The frame goes on top of everything.
     if (frameReady) ctx.drawImage(frame, 0, 0, FRAME_SIZE, FRAME_SIZE);
   }
 
@@ -411,12 +409,6 @@
     setZoom(Number(els.zoom.value) / 100);
     render();
   });
-  els.bgInputs.forEach((r) =>
-    r.addEventListener('change', () => {
-      els.dropzone.classList.toggle('checker', getBg() === 'transparent');
-      render();
-    })
-  );
   els.recenter.addEventListener('click', () => {
     setZoom(1);
     offX = 0;
