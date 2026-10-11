@@ -24,9 +24,9 @@ button, form submit buttons, etc. Non-CTA controls (the nav menu toggle,
 carousel arrows, back-to-top) don't carry the `.btn` class, so they're
 untouched.
 
-`private.html` and the `/portal` app use their own separate design system
-and already have their own button micro-interactions, so they were left
-alone — say the word if you'd like the effect there too.
+The `/portal` app uses its own separate design system and already has its
+own button micro-interactions, so it was left alone — say the word if
+you'd like the effect there too.
 
 Colors default per variant using your existing palette:
 - `.btn-primary` / `.btn-secondary` → gold highlight (`#FFC96B`) on a navy

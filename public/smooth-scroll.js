@@ -3,27 +3,27 @@
    component (components/layout/smooth-scroll.tsx), same Lenis version
    (1.3.23) and same options/behavior on desktop.
 
-   FIX (rev. 2): Lenis now runs on ALL devices, including touch/mobile.
+    FIX (rev. 2): Lenis now runs on ALL devices, including touch/mobile.
    The previous version skipped Lenis entirely on coarse-pointer devices
    because its synthetic scroll loop was fighting native touch scroll and
-   causing jank. With the canvas performance fixes in private.html (cached
-   hero rect, CSS-sized canvas) that lightened the main-thread workload,
-   Lenis's smoothTouch mode cooperates with native touch momentum instead
-   of fighting it. touchMultiplier is kept conservative (1.5) so the
-   synthetic scroll doesn't over-amplify finger velocity on phones.
+   causing jank. With canvas performance fixes (cached hero rect, CSS-sized
+   canvas) that lightened the main-thread workload, Lenis's smoothTouch
+   mode cooperates with native touch momentum instead of fighting it.
+   touchMultiplier is kept conservative (1.5) so the synthetic scroll
+   doesn't over-amplify finger velocity on phones.
 
    If mobile Lenis needs to be reverted, restore the isTouchDevice guard
    in init() — the rest of the file doesn't need to change.
 
    DESKTOP "LAG WHEN SCROLLING STOPS" FIX: the actual cause wasn't Lenis
-   itself, it was pages (private.html's door-canvas hero) driving heavy
-   per-tick work (canvas redraw + several DOM style writes) directly off
-   raw native `scroll` events via requestAnimationFrame. While the wheel is
-   moving, Lenis's synthetic scroll events fire at a smooth, even cadence,
-   so that work rides along fine. The instant the gesture stops, Lenis's
-   easing tail produces its last few scroll events at an uneven cadence
-   (and any scroll-linked work still queued lands right as layout/paint are
-   also settling), which reads as a stutter right at the stop.
+   itself, it was pages driving heavy per-tick work (canvas redraw + several
+   DOM style writes) directly off raw native `scroll` events via
+   requestAnimationFrame. While the wheel is moving, Lenis's synthetic
+   scroll events fire at a smooth, even cadence, so that work rides along
+   fine. The instant the gesture stops, Lenis's easing tail produces its
+   last few scroll events at an uneven cadence (and any scroll-linked work
+   still queued lands right as layout/paint are also settling), which reads
+   as a stutter right at the stop.
    GSAP's ScrollTrigger fixes this because it doesn't react to raw scroll
    events at all — it samples scroll position once per tick from GSAP's own
    ticker (already rAF-synced) and hands out an interpolated progress value,
@@ -31,8 +31,8 @@
    This file now loads GSAP + ScrollTrigger alongside Lenis and wires them
    together (Lenis drives the actual scroll, ScrollTrigger reads position
    through it and drives the ticker), and exposes both on `window` so that
-   page-level scripts (private.html's hero) can build their own
-   ScrollTrigger instances instead of listening to `scroll` directly.
+   page-level scripts can build their own ScrollTrigger instances instead
+   of listening to `scroll` directly.
    ========================================================================== */
 (function () {
   var LENIS_OPTIONS = {
