@@ -54,8 +54,9 @@ and **Espace membres** (→ internes portal), so the old site stays reachable.
 
 What you can do on it, per event: show/hide, lycée, name, category, icon, date, place,
 price, responsible person, status (to confirm / registrations open / full / over),
-investment goal, Instagram link, ticket link, short description. You can add and delete
-events. Empty field = "À confirmer" on the site. A ticket link turns the disabled
+investment goal, Instagram link, ticket link, short description. The six existing events
+stay as they are: the dashboard edits them, it cannot add or delete any (the server refuses it).
+Empty field = "À confirmer" on the site. A ticket link turns the disabled
 "Billetterie bientôt disponible" button into a real **Réserver ma place** button.
 
 **How it works (the whole thing):**
@@ -74,7 +75,7 @@ dashboard  →  POST /api/admin/impact  →  commit to data/impact-events.json
 - No new database table, no new Vercel project. One new API route
   (`api/admin/impact.js`), added to the `portal-admin` and `local` targets in
   `scripts/deployment-targets.js` (portal-admin goes from 4 to 5 functions; the Hobby cap is 12).
-- You can also edit `data/impact-events.json` by hand on GitHub; the same build picks it up.
+- To add or remove an event one day, edit `data/impact-events.json` by hand on GitHub (copy an entry, give it a new `id`); the same build picks it up.
 
 ### One thing to configure
 The function runs on the Vercel project that serves `/api/admin/*` (`ayc-portal-admin`).

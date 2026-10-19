@@ -14,13 +14,12 @@
   <div class="portal-heading"><div>
     <p class="eyebrow">Site public · Youth Impact</p>
     <h1>Événements des clubs</h1>
-    <p>Ce que tu modifies ici apparaît sur la page d’accueil du site, dans la fiche de chaque événement. Après l’enregistrement, compte 1 à 2 minutes avant la mise en ligne. Champ vide = « à confirmer » sur le site.</p>
+    <p>Modifie les informations des événements existants. Ce que tu changes ici apparaît sur la page d’accueil du site, dans la fiche de chaque événement. Après l’enregistrement, compte 1 à 2 minutes avant la mise en ligne. Champ vide = « à confirmer » sur le site.</p>
   </div></div>
   <div id="ev-error"></div>
   <div id="ev-list"></div>
   <div class="ev-bar">
     <span class="ev-msg" id="ev-msg" role="status"></span>
-    <button class="btn btn-secondary" id="ev-add" type="button">+ Ajouter un événement</button>
     <button class="btn btn-primary" id="ev-save" type="button">Enregistrer</button>
   </div>
 </main></div>
@@ -79,11 +78,10 @@
           <h2>${P.escapeHtml(e.event || "Nouvel événement")} <span class="list-item-meta">· ${P.escapeHtml(e.school || "")}</span></h2>
           <div>
             <label><input type="checkbox" data-i="${i}" data-k="visible"${e.visible === false ? "" : " checked"}> Visible sur le site</label>
-            <button class="btn btn-danger btn-sm" type="button" data-del="${i}">Supprimer</button>
           </div>
         </div>
         <div class="form-grid">${FIELDS.map((f) => field(f, i)).join("")}</div>
-      </section>`).join("") : P.renderEmpty("Aucun événement. Ajoutes-en un.");
+      </section>`).join("") : P.renderEmpty("Aucun événement.");
   }
 
   // Un seul écouteur : met à jour le tableau à chaque frappe.
@@ -93,16 +91,6 @@
     events[i][t.dataset.k] = t.type === "checkbox" ? t.checked : t.value;
     if (t.type === "checkbox") t.closest(".ev-card").classList.toggle("is-hidden", !t.checked);
   });
-  $("ev-list").addEventListener("click", (ev) => {
-    const i = ev.target.dataset.del;
-    if (i === undefined || !confirm("Supprimer cet événement du site ?")) return;
-    events.splice(i, 1); render();
-  });
-  $("ev-add").addEventListener("click", () => {
-    events.push({ visible: true, school: "", event: "", category: "", icon: "movie-night", desc: "", date: "", place: "", price: "", lead: "", status: "a-confirmer", objective: "", instagram: "", ticketUrl: "" });
-    render(); $("ev-list").lastElementChild.scrollIntoView({ behavior: "smooth" });
-  });
-
   async function load() {
     const data = await call("GET");
     events = data.events; sha = data.sha; render();

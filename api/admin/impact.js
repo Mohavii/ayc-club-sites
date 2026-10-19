@@ -2,6 +2,7 @@
 // GET  /api/admin/impact → { events, sha }
 // POST /api/admin/impact → body { events, sha } — saves data/impact-events.json
 //
+// Edit-only: existing events can be changed, not added or removed.
 // National admins only. A save is one git commit, which makes the GitHub
 // Action rebuild the public Youth Impact page (≈1–2 min). `sha` is the version
 // the dashboard loaded: if someone else saved in between, GitHub refuses and
@@ -50,6 +51,14 @@ module.exports = async (req, res) => {
       cleaned = clean(body);
     } catch (err) {
       res.status(400).json({ error: err.message });
+      return;
+    }
+
+    // Edit-only: the set of events is fixed (change data/impact-events.json by hand to add/remove one).
+    const { data: current } = await readJsonFile(FILE);
+    const same = (current?.events || []).map((e) => e.id).join() === cleaned.events.map((e) => e.id).join();
+    if (!same) {
+      res.status(400).json({ error: "Ajouter ou supprimer un événement n'est pas possible depuis le tableau de bord." });
       return;
     }
 
