@@ -446,3 +446,7 @@ h3{font-size:var(--step-h3);font-weight:700;line-height:1.15;letter-spacing:-.01
 
 /* Fusion : [hidden] doit toujours gagner sur les classes .btn (billetterie du tableau de bord). */
 [hidden]{display:none!important}
+
+/* Photo de profil fournie depuis le tableau de bord */
+.profile__photo--img{padding:0;overflow:hidden}
+.profile__photo--img img{width:100%;height:100%;object-fit:cover}

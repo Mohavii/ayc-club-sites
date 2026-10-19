@@ -13,11 +13,14 @@
 <body><div id="topbar-root"></div><div class="workspace"><div id="sidebar-root"></div><main class="portal-content">
   <div class="portal-heading"><div>
     <p class="eyebrow">Site public · Youth Impact</p>
-    <h1>Événements des clubs</h1>
+    <h1>Événements et équipe</h1>
     <p>Modifie les informations des événements existants. Ce que tu changes ici apparaît sur la page d’accueil du site, dans la fiche de chaque événement. Après l’enregistrement, compte 1 à 2 minutes avant la mise en ligne. Champ vide = « à confirmer » sur le site.</p>
   </div></div>
   <div id="ev-error"></div>
   <div id="ev-list"></div>
+  <h2 style="margin:28px 0 6px">Équipe nationale</h2>
+  <p class="list-item-meta" style="margin-bottom:14px">Section « Équipe » de la page d’accueil. Nom vide = « Profil à compléter » sur le site. Photo : lien https:// ou fichier du site (ex. assets/img/nom.jpg).</p>
+  <div id="tm-list"></div>
   <div class="ev-bar">
     <span class="ev-msg" id="ev-msg" role="status"></span>
     <button class="btn btn-primary" id="ev-save" type="button">Enregistrer</button>
@@ -46,7 +49,7 @@
   ];
 
   const $ = (id) => document.getElementById(id);
-  let events = [], sha = null;
+  let events = [], team = [], sha = null;
 
   const msg = (text, kind = "") => { $("ev-msg").textContent = text; $("ev-msg").className = "ev-msg " + kind; };
 
@@ -71,7 +74,20 @@
     return `<div class="form-field${full ? " full" : ""}"><label for="${id}">${label}</label>${control}</div>`;
   }
 
+  const TEAM_FIELDS = [["name", "Nom et prénom"], ["role", "Rôle"], ["photo", "Photo (https://… ou assets/…)"]];
+  function renderTeam() {
+    $("tm-list").innerHTML = team.map((m, i) => `
+      <section class="portal-card ev-card${m.visible === false ? " is-hidden" : ""}">
+        <div class="ev-head">
+          <h2>${P.escapeHtml(m.name || "Membre " + (i + 1))}</h2>
+          <label><input type="checkbox" data-l="team" data-i="${i}" data-k="visible"${m.visible === false ? "" : " checked"}> Visible sur le site</label>
+        </div>
+        <div class="form-grid">${TEAM_FIELDS.map(([k, label]) => `<div class="form-field"><label for="t-${i}-${k}">${label}</label><input id="t-${i}-${k}" type="text" data-l="team" data-i="${i}" data-k="${k}" value="${P.escapeHtml(m[k] ?? "")}"></div>`).join("")}</div>
+      </section>`).join("");
+  }
+
   function render() {
+    renderTeam();
     $("ev-list").innerHTML = events.length ? events.map((e, i) => `
       <section class="portal-card ev-card${e.visible === false ? " is-hidden" : ""}">
         <div class="ev-head">
@@ -85,21 +101,23 @@
   }
 
   // Un seul écouteur : met à jour le tableau à chaque frappe.
-  $("ev-list").addEventListener("input", (ev) => {
+  const onInput = (ev) => {
     const t = ev.target, i = t.dataset.i;
     if (i === undefined) return;
-    events[i][t.dataset.k] = t.type === "checkbox" ? t.checked : t.value;
+    (t.dataset.l === "team" ? team : events)[i][t.dataset.k] = t.type === "checkbox" ? t.checked : t.value;
     if (t.type === "checkbox") t.closest(".ev-card").classList.toggle("is-hidden", !t.checked);
-  });
+  };
+  $("ev-list").addEventListener("input", onInput);
+  $("tm-list").addEventListener("input", onInput);
   async function load() {
     const data = await call("GET");
-    events = data.events; sha = data.sha; render();
+    events = data.events; team = data.team || []; sha = data.sha; render();
   }
 
   $("ev-save").addEventListener("click", async () => {
     $("ev-save").disabled = true; msg("Enregistrement…");
     try {
-      await call("POST", { events, sha });
+      await call("POST", { events, team, sha });
       await load();
       msg("Enregistré. Le site se met à jour dans 1 à 2 minutes.", "ok");
     } catch (e) { msg(e.message, "err"); }

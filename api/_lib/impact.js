@@ -37,6 +37,7 @@ const TEXT_FIELDS = {
 };
 const URL_FIELDS = ["instagram", "ticketUrl"];
 const MAX_EVENTS = 24;
+const MAX_TEAM = 24;
 
 const slugify = (s) =>
   String(s || "")
@@ -47,15 +48,14 @@ const slugify = (s) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
 
-// Validates + normalises whatever the dashboard sends. Throws Error(message)
-// with a French message that is safe to show to the admin.
-function clean(input) {
-  const list = Array.isArray(input?.events) ? input.events : null;
-  if (!list) throw new Error("Données invalides.");
+// Validates + normalises one list (events or team). Throws Error(message) with
+// a French message that is safe to show to the admin.
+function cleanEvents(list) {
+  if (!Array.isArray(list)) throw new Error("Données invalides.");
   if (list.length > MAX_EVENTS) throw new Error(`Maximum ${MAX_EVENTS} événements.`);
 
   const seen = new Set();
-  const events = list.map((raw, i) => {
+  return list.map((raw, i) => {
     const e = { id: "", visible: raw?.visible !== false };
     for (const [key, max] of Object.entries(TEXT_FIELDS)) {
       e[key] = String(raw?.[key] ?? "").trim().slice(0, max);
@@ -79,7 +79,29 @@ function clean(input) {
     e.id = id;
     return e;
   });
-  return { events };
+}
+
+// Team members: name, role, optional photo (https link or a file under assets/).
+function cleanTeam(list) {
+  if (!Array.isArray(list)) throw new Error("Données invalides.");
+  if (list.length > MAX_TEAM) throw new Error(`Maximum ${MAX_TEAM} membres.`);
+  return list.map((raw, i) => {
+    const photo = String(raw?.photo ?? "").trim();
+    if (photo && !/^(https:\/\/[^\s"'<>]{1,300}|assets\/[A-Za-z0-9_\-./]{1,200})$/.test(photo)) {
+      throw new Error(`Équipe, membre ${i + 1} : la photo doit être un lien https:// ou un fichier assets/…`);
+    }
+    return {
+      id: `membre-${i + 1}`,
+      visible: raw?.visible !== false,
+      name: String(raw?.name ?? "").trim().slice(0, 80),
+      role: String(raw?.role ?? "").trim().slice(0, 80),
+      photo,
+    };
+  });
+}
+
+function clean(input) {
+  return { events: cleanEvents(input?.events), team: cleanTeam(input?.team ?? []) };
 }
 
 // ---------- public-page rendering (used at build time) ----------
@@ -103,10 +125,22 @@ function renderTicket(e, i) {
           </div>
           <div class="ticket__perf" aria-hidden="true"></div>
           <div class="ticket__body">
-            <div class="lockup"><img src="assets/logos/youthimpact-logomark-clair.svg" alt="" width="34" height="44"><span class="lockup__rule"></span><p class="lockup__text"><strong>Club Youth</strong><span>${esc(e.school)}</span></p></div>
+            <div class="lockup"><img src="assets/logos/youthimpact-logomark-clair.svg" alt="" width="34" height="44"><span class="lockup__rule"></span><p class="lockup__text"><strong>Youth Club</strong><span>${esc(e.school)}</span></p></div>
             <p class="ticket__desc">${esc(e.desc)}</p>
             <button class="ticket__link" type="button" aria-haspopup="dialog">Découvrir le projet<span class="sr-only"> : ${esc(e.school)}</span></button>
           </div>
+        </article>`;
+}
+
+function renderProfile(m) {
+  const photo = m.photo
+    ? `<div class="profile__photo profile__photo--img"><img src="${esc(m.photo)}" alt="${esc(m.name)}" loading="lazy"></div>`
+    : `<div class="profile__photo"><svg aria-hidden="true"><use href="#i-lyceen"/></svg></div>`;
+  return `        <article class="profile">
+          ${photo}
+          ${m.name ? "" : `<p class="profile__hint">Profil à compléter</p>`}
+          <h3>${esc(m.name || "Nom et prénom")}</h3>
+          <p class="profile__role">${esc(m.role || "Rôle national à renseigner")}</p>
         </article>`;
 }
 
@@ -119,4 +153,4 @@ function renderTitle(n) {
   return `${w} ${club}. ${w} ${projet}. Une même ambition.`;
 }
 
-module.exports = { ICONS, STATUSES, TEXT_FIELDS, URL_FIELDS, clean, renderTicket, renderTitle };
+module.exports = { ICONS, STATUSES, TEXT_FIELDS, URL_FIELDS, clean, renderTicket, renderProfile, renderTitle };

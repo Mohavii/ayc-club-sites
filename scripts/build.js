@@ -148,18 +148,19 @@ function replaceBetween(html, name, content) {
 }
 
 // Youth Impact home page (public/index.html): the club tickets, the title and
-// the counter are generated from data/impact-events.json — the file the
+// the counter and the team profiles are generated from data/impact-events.json — the file the
 // internes dashboard edits.
 function updateImpactPage() {
   if (!fs.existsSync(IMPACT_DATA) || !fs.existsSync(IMPACT_PAGE)) {
     console.log("impact-events.json or public/index.html missing — skipping Youth Impact page.");
     return;
   }
-  const { events } = impact.clean(JSON.parse(fs.readFileSync(IMPACT_DATA, "utf8")));
+  const { events, team } = impact.clean(JSON.parse(fs.readFileSync(IMPACT_DATA, "utf8")));
   const shown = events.filter((e) => e.visible);
 
   let html = fs.readFileSync(IMPACT_PAGE, "utf8");
   html = replaceBetween(html, "IMPACT_TICKETS", "\n" + shown.map(impact.renderTicket).join("\n\n") + "\n");
+  html = replaceBetween(html, "IMPACT_TEAM", "\n" + team.filter((m) => m.visible).map(impact.renderProfile).join("\n") + "\n");
   html = replaceBetween(html, "IMPACT_TITLE", impact.renderTitle(shown.length));
   html = replaceBetween(html, "IMPACT_COUNT", String(shown.length).padStart(2, "0"));
   fs.writeFileSync(IMPACT_PAGE, html, "utf8");

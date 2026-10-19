@@ -56,6 +56,13 @@ What you can do on it, per event: show/hide, lycée, name, category, icon, date,
 price, responsible person, status (to confirm / registrations open / full / over),
 investment goal, Instagram link, ticket link, short description. The six existing events
 stay as they are: the dashboard edits them, it cannot add or delete any (the server refuses it).
+
+
+**Team ("Équipe nationale" section):** below the events, the dashboard edits the 3 existing
+profiles: name, role, photo (an `https://` link, or a file you committed such as `assets/img/sarra.jpg`)
+and show/hide. A profile with an empty name stays the "Profil à compléter" placeholder.
+Like the events, profiles can be edited but not added or removed from the dashboard.
+
 Empty field = "À confirmer" on the site. A ticket link turns the disabled
 "Billetterie bientôt disponible" button into a real **Réserver ma place** button.
 
@@ -75,7 +82,7 @@ dashboard  →  POST /api/admin/impact  →  commit to data/impact-events.json
 - No new database table, no new Vercel project. One new API route
   (`api/admin/impact.js`), added to the `portal-admin` and `local` targets in
   `scripts/deployment-targets.js` (portal-admin goes from 4 to 5 functions; the Hobby cap is 12).
-- To add or remove an event one day, edit `data/impact-events.json` by hand on GitHub (copy an entry, give it a new `id`); the same build picks it up.
+- To add or remove an event or a team member one day, edit `data/impact-events.json` by hand on GitHub (copy an entry, give it a new `id`, keep the `id`s unique); the same build picks it up.
 
 ### One thing to configure
 The function runs on the Vercel project that serves `/api/admin/*` (`ayc-portal-admin`).
@@ -121,8 +128,7 @@ unstyled, revert `middleware.js` only.
 
 - **`noindex`**: `public/index.html` still has `<meta name="robots" content="noindex, nofollow">`
   (kept from the add-on). Remove that line when you want Google to index the new home.
-- **Media kit**: the "Consulter le media kit" link points to `assets/youth-impact-media-kit.pdf`,
-  which isn't in either archive. Add the file or remove the link.
+- **Media kit**: the "Consulter le media kit" link was removed from the page (the PDF wasn't in either archive).
 - **Photos**: the add-on's note still applies — check consent for the photos in `assets/img/`.
 - **Domain spelling**: your message wrote `associationyuthclubs.org`; the repo (middleware,
   Google OAuth, mailer) uses `associationyouthclubs.org`, so I used that one. If the
@@ -149,6 +155,8 @@ and `public/legacy-rejoindre.html` (club list) in place, as it did before for th
 ---
 
 ## 7. New and changed files
+
+**Wording:** "Club Youth" → "Youth Club" everywhere; "Lycée Pilote Borj Baccouche" → "Lycée Pilote Bourguiba Tunis" (event id `bourguiba-tunis`).
 
 **New:** `SETUP-YOUTH-IMPACT.md`, `data/impact-events.json`, `api/_lib/impact.js`,
 `api/admin/impact.js`, `public/portal/impact-admin.html`, `public/index.html` (Youth Impact),

@@ -35,9 +35,9 @@
       "ticketUrl": ""
     },
     {
-      "id": "borj-baccouche",
+      "id": "bourguiba-tunis",
       "visible": true,
-      "school": "Lycée Pilote Borj Baccouche",
+      "school": "Lycée Pilote Bourguiba Tunis",
       "event": "Tournoi sportif",
       "category": "Sport & Compétition",
       "icon": "football",
@@ -101,6 +101,29 @@
       "objective": "",
       "instagram": "",
       "ticketUrl": ""
+    }
+  ],
+  "team": [
+    {
+      "id": "membre-1",
+      "visible": true,
+      "name": "",
+      "role": "",
+      "photo": ""
+    },
+    {
+      "id": "membre-2",
+      "visible": true,
+      "name": "",
+      "role": "",
+      "photo": ""
+    },
+    {
+      "id": "membre-3",
+      "visible": true,
+      "name": "",
+      "role": "",
+      "photo": ""
     }
   ]
 }
