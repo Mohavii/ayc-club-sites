@@ -1,0 +1,47 @@
+{
+  "slug": "labc",
+  "status": "live",
+  "name": "Lycée Belgesm",
+  "city": "Sfax",
+  "founded": 2025,
+  "memberCount": 0,
+  "about": "",
+  "heroImage": null,
+  "logo": null,
+  "officers": [
+    "746843897350848514"
+  ],
+  "events": [],
+  "bel": [],
+  "partners": [],
+  "forms": {
+    "join": {
+      "enabled": false,
+      "title": "Rejoindre le club",
+      "fields": []
+    },
+    "team_communication": {
+      "enabled": false,
+      "title": "Équipe Communication",
+      "fields": []
+    },
+    "team_logistique": {
+      "enabled": false,
+      "title": "Équipe Logistique",
+      "fields": []
+    },
+    "team_sponsoring": {
+      "enabled": false,
+      "title": "Équipe Sponsoring",
+      "fields": []
+    }
+  },
+  "vpcRoleId": "1541931160328868041",
+  "formWebhooks": {
+    "join": "https://discord.com/api/webhooks/1541931165613691001/8zO5lfopBFTIDQ7DcN6uvyE0gp7AGk3QPyqjPzrccW_2uYY4uxpvzOq6AO29Rwyh1E3N",
+    "team_communication": "https://discord.com/api/webhooks/1541931167182495774/rqlj50zE4qOzHPNK-BCjcaBAzRvFnnB_dckUmhIoxOCOT0b8A1ErqpRH1KsmH0BcE5K8",
+    "team_logistique": "https://discord.com/api/webhooks/1541931169099030528/-HBhyaSZbwVqOng788whUtQK-PcurvxTeUripM4E35Z1F50eVR4dBUFXd2-WmR0t8pXr",
+    "team_sponsoring": "https://discord.com/api/webhooks/1541931171129196744/cRXKvVhxyDt08h2mr0h4bLyp7OKVOB6XLerJGOxFdJErgcvFB5Rzc-uMAqMFXwfG5Vy9"
+  },
+  "controlRoomChannelId": "1541931163734511656"
+}

@@ -11,294 +11,123 @@
   <link rel="stylesheet" href="../theme.css">
   <link rel="stylesheet" href="portal.css">
   <style>
-    /* ==========================================================================
-       Standalone document editor.
-       Each report is a real browser tab (report-editor?id=... or
-       ?template=...), never a form buried in the portal's own nav/sidebar.
-       The page reads as one continuous paper document: a title you type
-       into directly, a slim strip of metadata fields, then the
-       template's own sections flowing underneath — all on the same sheet,
-       the way a Word/Docs page reads, rather than a dashboard of cards.
-       ========================================================================== */
-    html{ background:#e9edf5; }
-    body.editor-standalone{ min-height:100vh; }
-    body.editor-standalone #topbar-root,
-    body.editor-standalone #sidebar-root{ display:none !important; }
-    body.editor-standalone .workspace{ display:block; }
-
-    /* ---- app bar: identifies the tool and this specific report -------- */
-    .editor-appbar{
-      position:sticky; top:0; z-index:40;
-      display:flex; align-items:center; gap:14px;
-      padding:12px clamp(14px,4vw,36px);
-      background:rgba(255,255,255,.92); backdrop-filter:blur(10px) saturate(160%);
-      border-bottom:1px solid var(--line);
-    }
-    .editor-appbar .brand-mini{ display:flex; align-items:center; gap:9px; text-decoration:none; flex:none; }
-    .editor-appbar .brand-mini img{ width:24px; height:24px; object-fit:contain; }
-    .editor-appbar .brand-mini span{ font-family:var(--font-display); color:var(--navy-1); font-size:.82rem; letter-spacing:.01em; }
-    .editor-appbar .appbar-divider{ width:1px; height:22px; background:var(--line); flex:none; }
-    .editor-appbar .appbar-doc{ min-width:0; display:flex; align-items:center; gap:8px; }
-    .editor-appbar .appbar-doc-name{
-      font-family:var(--font-body); font-weight:600; font-size:.88rem; color:var(--ink);
-      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:38vw;
-    }
-    .editor-appbar .save-state{
-      font-size:.72rem; font-weight:600; color:var(--ink-soft); flex:none;
-      display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
-    }
-    .editor-appbar .save-state .dot{ width:6px; height:6px; border-radius:50%; background:#c7cede; flex:none; }
-    .editor-appbar .save-state.is-dirty .dot{ background:#e08a2c; }
-    .editor-appbar .save-state.is-saved .dot{ background:#2c8659; }
-    .editor-appbar .appbar-spacer{ flex:1 1 auto; }
-    .editor-appbar .appbar-actions{ display:flex; align-items:center; gap:8px; flex:none; }
-    .editor-appbar .btn-ghost{
-      display:inline-flex; align-items:center; gap:8px;
-      font-family:var(--font-body); font-weight:600; font-size:.8rem; color:var(--ink-soft);
-      background:var(--paper-2); border:1px solid var(--line); border-radius:999px;
-      padding:8px 15px; cursor:pointer; transition:background .18s var(--ease), color .18s var(--ease), border-color .18s var(--ease);
-      text-decoration:none;
-    }
-    .editor-appbar .btn-ghost:hover{ background:#fff; border-color:#c7d2e6; color:var(--navy-1); }
-
-    /* ---- the page itself ---------------------------------------------- */
-    .editor-shell{ max-width:900px; margin:0 auto; padding:34px clamp(12px,4vw,28px) 110px; }
-
-    .doc-sheet{
-      background:var(--white); border:1px solid var(--line); border-radius:20px;
-      box-shadow:0 1px 2px rgba(28,32,56,.05), 0 24px 48px -28px rgba(39,40,99,.22);
-      overflow:hidden;
-    }
-    .doc-head{ padding:34px clamp(20px,6vw,64px) 6px; }
-    .doc-title-input{
-      width:100%; border:none; outline:none; background:transparent;
-      font-family:var(--font-display); color:var(--navy-1); font-size:2rem; letter-spacing:.01em;
-      padding:2px 0 10px; border-bottom:2px solid transparent;
-    }
-    .doc-title-input::placeholder{ color:#b7c0d6; }
-    .doc-title-input:focus{ border-bottom-color:var(--blue-2); }
-
-    .doc-meta-row{
-      display:grid; grid-template-columns:repeat(auto-fit, minmax(170px,1fr)); gap:10px 16px;
-      padding:14px clamp(20px,6vw,64px) 22px; border-bottom:1px solid var(--line);
-      background:linear-gradient(180deg, rgba(246,248,251,.6), transparent);
-    }
-    .doc-meta-field label{
-      display:block; font-family:var(--font-body); font-weight:700; font-size:.66rem;
-      text-transform:uppercase; letter-spacing:.06em; color:#8b95ac; margin-bottom:5px;
-    }
-    .doc-meta-field input, .doc-meta-field select{
-      width:100%; box-sizing:border-box; border:1px solid transparent; background:transparent;
-      font-family:var(--font-body); font-size:.86rem; color:var(--ink); padding:5px 7px; margin:-5px -7px;
-      border-radius:8px; transition:border-color .15s var(--ease), background .15s var(--ease);
-    }
-    .doc-meta-field input:hover, .doc-meta-field select:hover{ background:var(--paper-2); }
-    .doc-meta-field input:focus, .doc-meta-field select:focus{
-      outline:none; background:#fff; border-color:var(--blue-2); box-shadow:0 0 0 3px rgba(58,184,234,.14);
-    }
-
-    .meta-strip{ display:flex; flex-wrap:wrap; gap:8px; padding:16px clamp(20px,6vw,64px) 0; }
-    .meta-chip{ display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; font-size:.73rem; font-weight:700; background:#f1f4f9; color:#536387; border:1px solid #dbe2ef; }
-    .meta-chip.warn{ background:#fff8e6; color:#b27b00; border-color:#ffe69c; }
-
-    .review-note{ margin:16px clamp(20px,6vw,64px) 0; border-left:3px solid #c02b2b; background:#fdf0f0; padding:12px 14px; border-radius:10px; font-size:.83rem; color:#7a2020; }
-
-    /* ---- document body: template sections, continuous sheet ----------- */
-    .doc-body{ padding:24px clamp(20px,6vw,64px) 8px; font-family:Georgia,'Times New Roman',serif; color:#2a3350; }
-    .doc-body-intro{ margin-bottom:6px; }
-    .doc-body-intro label{
-      display:block; font-family:var(--font-body); font-weight:700; font-size:.7rem;
-      text-transform:uppercase; letter-spacing:.06em; color:#8b95ac; margin-bottom:8px;
-    }
-    .doc-body-intro textarea{ font-family:var(--font-body); }
-
-    .tpl-section{ border:none; padding:0; margin-bottom:2px; }
-    .tpl-section.depth-0{ border-top:2px solid #1f2a5a; padding:22px 0 4px; margin-bottom:2px; }
-    .tpl-section.depth-0:first-child{ border-top:none; padding-top:0; }
-    .tpl-section.depth-1{ border-left:3px solid #dbe2ef; padding:4px 0 4px 18px; margin:6px 0 14px; }
-    .tpl-section.depth-2{ background:#fbfcfe; border:1px solid #edf0f6; border-radius:12px; padding:14px 18px; margin:8px 0 14px 18px; }
-    .tpl-section.depth-3{ background:#fff; border:1px dashed #dbe2ef; border-radius:12px; padding:12px 16px; margin:8px 0 12px 30px; }
-    .tpl-section > .tpl-section-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:12px; }
-    .tpl-section > .tpl-section-head h3,.tpl-section > .tpl-section-head h4,
-    .tpl-section > .tpl-section-head h5,.tpl-section > .tpl-section-head h6{
-      margin:0; color:#1f2a5a; font-weight:800; font-family:'Fjalla One',Georgia,serif; letter-spacing:.02em;
-    }
-    .tpl-section.depth-0 > .tpl-section-head h3{ font-size:1.12rem; }
-    .tpl-section.depth-1 > .tpl-section-head h4{ font-size:.96rem; }
-    .tpl-section-note,.tpl-field-note{ font-size:.76rem; color:#7a849a; margin:0 0 12px; font-style:italic; font-family:var(--font-body); }
-
-    .tpl-field{ padding:0 0 18px; margin-bottom:18px; border-bottom:1px solid #eef1f8; }
-    .tpl-field:last-child{ border-bottom:none; margin-bottom:0; padding-bottom:0; }
-    .tpl-field label{ display:block; font-family:'Fjalla One',Georgia,serif; font-weight:700; font-size:.86rem; color:#1f2a5a; margin-bottom:8px; letter-spacing:.01em; }
-    .tpl-field textarea,.tpl-field select{
-      width:100%; box-sizing:border-box; border:1px solid transparent; background:transparent;
-      padding:6px 2px; color:#2a3350; font:inherit; font-size:.95rem; line-height:1.6; border-radius:8px;
-      transition:border-color .15s var(--ease), background .15s var(--ease), box-shadow .15s var(--ease);
-    }
-    .tpl-field textarea{ min-height:70px; resize:vertical; font-family:inherit; }
-    .tpl-field textarea:hover, .tpl-field select:hover{ background:#fbfcfe; }
-    .tpl-field textarea:focus, .tpl-field select:focus{
-      outline:none; background:#fff; border-color:var(--blue-2); box-shadow:0 0 0 3px rgba(58,184,234,.12); padding-left:11px; padding-right:11px;
-    }
-    .tpl-field textarea::placeholder{ color:#b7c0d6; font-style:italic; }
-
-    .tpl-checklist{ display:flex; flex-wrap:wrap; gap:8px; font-family:var(--font-body); }
-    .tpl-checklist label{ display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:.8rem; color:#3d4861; background:#fff; border:1px solid #dbe2ef; border-radius:999px; padding:7px 13px; margin:0; cursor:pointer; }
-    .tpl-checklist input{ margin:0; }
-
-    .tpl-table-wrap{ overflow-x:auto; border:1px solid #e2e8f1; border-radius:12px; font-family:var(--font-body); }
-    table.tpl-table{ width:100%; border-collapse:collapse; font-size:.82rem; }
-    table.tpl-table th{ text-align:left; color:#77819a; font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; padding:10px 9px; border-bottom:1px solid var(--line); background:#f7f9fd; white-space:nowrap; }
-    table.tpl-table td{ padding:7px; border-bottom:1px solid #edf0f6; vertical-align:top; }
-    table.tpl-table td:last-child{ white-space:nowrap; width:1%; }
-    table.tpl-table tr:last-child td{ border-bottom:0; }
-    table.tpl-table textarea{ width:100%; min-width:120px; min-height:44px; box-sizing:border-box; border:1px solid #e2e8f1; border-radius:9px; padding:7px 9px; font:inherit; font-size:.83rem; resize:vertical; font-family:var(--font-body); }
-    .tpl-row-remove{ border:1px solid #f0c8cc; background:#fff3f3; color:#8f2630; border-radius:9px; padding:6px 10px; font-size:.72rem; font-weight:800; cursor:pointer; font-family:var(--font-body); }
-    .tpl-row-add{ margin-top:10px; }
-    .tpl-add-btn{ border:1px dashed #b9c8e5; background:#fff; color:#3b5bdb; border-radius:10px; padding:8px 14px; font-size:.78rem; font-weight:800; cursor:pointer; font-family:var(--font-body); }
-    .tpl-add-btn:hover{ background:#f0f4ff; }
-    .tpl-group-item{ border:1px solid #e2e8f1; border-radius:12px; padding:14px; margin-bottom:10px; background:#fff; position:relative; }
-    .tpl-group-item .tpl-row-remove{ position:absolute; top:10px; right:10px; }
-    .tpl-group-item-label{ font-size:.68rem; font-weight:900; color:#8fa4d4; text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; font-family:var(--font-body); }
-
-    /* ---- bottom action bar --------------------------------------------- */
-    .doc-actions{
-      position:sticky; bottom:0; z-index:30; margin-top:18px;
-      background:rgba(255,255,255,.94); backdrop-filter:blur(8px);
-      border-top:1px solid var(--line); border-radius:0 0 20px 20px;
-      padding:16px clamp(20px,6vw,64px); display:flex; gap:10px; flex-wrap:wrap; align-items:center;
-    }
-    .doc-actions .field-hint{ margin:0; }
-
-    /* ---- template picker: choosing a document to start ----------------- */
-    .picker-shell{ max-width:1000px; margin:0 auto; padding:40px clamp(12px,4vw,28px) 100px; }
-    .picker-head{ margin-bottom:22px; }
-    .picker-head h1{ font-family:var(--font-display); color:var(--navy-1); font-size:1.7rem; margin:0 0 6px; }
-    .picker-head p{ color:var(--ink-soft); margin:0; }
-    .filter-tabs{ display:flex; gap:6px; margin:18px 0 20px; flex-wrap:wrap; }
-    .filter-tabs button{
-      font-family:var(--font-body); font-weight:600; font-size:.82rem; color:var(--ink-soft);
-      background:var(--white); border:1px solid var(--line); border-radius:999px; padding:8px 16px; cursor:pointer;
-      transition:all .15s var(--ease);
-    }
-    .filter-tabs button.active{ background:var(--navy-1); border-color:var(--navy-1); color:#fff; }
-    .tpl-picker{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
-    .tpl-card{
-      border:1px solid var(--line); border-radius:16px; padding:18px; background:#fff; cursor:pointer;
-      text-align:left; transition:all .15s var(--ease); box-shadow:var(--shadow-card);
-    }
-    .tpl-card:hover{ border-color:#b4c3de; transform:translateY(-2px); }
-    .tpl-card strong{ display:block; font-family:var(--font-display); font-size:.95rem; color:#1f2a5a; margin-bottom:6px; letter-spacing:.01em; }
-    .tpl-card span{ display:block; font-size:.8rem; color:#6a748b; line-height:1.5; }
-    .tpl-owner{ display:inline-block; margin-top:10px; padding:3px 9px; border-radius:999px; font-size:.68rem; font-weight:800; background:#f0f4ff; color:#3b5bdb; }
-
-    @media (max-width:640px){
-      .editor-appbar .appbar-doc-name{ max-width:32vw; }
-      .doc-meta-row{ grid-template-columns:1fr 1fr; }
-    }
+    .tpl-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+    .tpl-card{border:1px solid var(--portal-line,#e2e7f0);border-radius:12px;padding:14px;background:#fff;cursor:pointer;text-align:left;transition:all .15s ease}
+    .tpl-card:hover{border-color:#b4c3de;transform:translateY(-1px)}
+    .tpl-card.active{border-color:var(--portal-navy,#1f2a5a);box-shadow:0 0 0 2px rgba(31,42,90,.12)}
+    .tpl-card strong{display:block;font-size:.9rem;color:#1f2a5a;margin-bottom:4px}
+    .tpl-card span{display:block;font-size:.76rem;color:#6a748b;line-height:1.45}
+    .tpl-owner{display:inline-block;margin-top:8px;padding:2px 8px;border-radius:999px;font-size:.68rem;font-weight:800;background:#f0f4ff;color:#3b5bdb}
+    .meta-strip{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+    .meta-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:.75rem;font-weight:700;background:#f1f4f9;color:#536387;border:1px solid #dbe2ef}
+    .meta-chip.warn{background:#fff8e6;color:#b27b00;border-color:#ffe69c}
+    .section-block{border:1px solid #e2e8f1;border-radius:12px;padding:14px;margin-bottom:12px;background:#fcfdff}
+    .section-block label{display:block;font-weight:800;font-size:.82rem;color:#1f2a5a;margin-bottom:6px;text-transform:capitalize}
+    .section-block textarea{width:100%;min-height:110px}
+    .review-note{border-left:3px solid #c02b2b;background:#fdf0f0;padding:10px 12px;border-radius:8px;margin-bottom:10px;font-size:.82rem;color:#7a2020}
+    .editor-sticky{position:sticky;bottom:0;background:#fff;border-top:1px solid #e2e8f1;padding:14px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   </style>
 </head>
-<body class="editor-standalone">
+<body>
   <div id="topbar-root"></div>
-  <div id="sidebar-root"></div>
-
-  <header class="editor-appbar">
-    <a class="brand-mini" href="home" target="_blank" rel="noopener">
-      <img src="../assets/logo-primary-blue.png" alt="">
-      <span>YOUTH CLUBs</span>
-    </a>
-    <span class="appbar-divider"></span>
-    <div class="appbar-doc">
-      <span class="appbar-doc-name" id="appbar-doc-name">Éditeur de rapports</span>
-      <span class="save-state" id="save-state"><span class="dot"></span><span id="save-state-text">Brouillon non enregistré</span></span>
-    </div>
-    <span class="appbar-spacer"></span>
-    <div class="appbar-actions">
-      <a class="btn-ghost" href="reports" target="_blank" rel="noopener">Tous les rapports</a>
-      <button type="button" class="btn-ghost" onclick="window.close()">Fermer l’onglet</button>
-    </div>
-  </header>
-
   <div class="workspace">
+    <div id="sidebar-root"></div>
     <main class="portal-content">
+      <div class="portal-heading">
+        <div>
+          <p class="eyebrow">Système de mise à jour · Rédaction</p>
+          <h1 id="editor-title">Éditeur de rapports</h1>
+          <p id="editor-subtitle">Choisis un modèle de rapport : les sections obligatoires, le destinataire et l’échéance viennent du système de mise à jour.</p>
+        </div>
+        <div class="heading-actions">
+          <a class="btn btn-secondary btn-sm" href="reports">Retour aux rapports</a>
+        </div>
+      </div>
 
-      <div id="notice" style="max-width:900px;margin:16px auto 0;padding:0 clamp(12px,4vw,28px)"></div>
+      <div id="notice"></div>
 
-      <section id="editor-restricted" class="portal-card restricted-state" style="max-width:640px;margin:48px auto" hidden>
+      <section id="editor-restricted" class="portal-card restricted-state" hidden>
         <h2>Espace réservé aux responsables</h2>
         <p>La rédaction des rapports officiels est réservée aux responsables du club et aux personnes mandatées.</p>
       </section>
 
-      <!-- Step 1: no ?id and no ?template in the URL — pick which document to start. -->
-      <section id="picker-shell" class="picker-shell" hidden>
-        <div class="picker-head">
-          <p class="eyebrow">Système de mise à jour</p>
-          <h1>Nouveau rapport</h1>
-          <p>Choisis un modèle : les sections obligatoires, le destinataire et l’échéance viennent du système de mise à jour. Le document s’ouvre ensuite dans cet onglet.</p>
-        </div>
-        <div class="filter-tabs" id="scope-filters">
-          <button class="active" type="button" data-scope="mine">Mes rapports</button>
-          <button type="button" data-scope="local">Tous les rapports locaux</button>
-          <button type="button" data-scope="all">Tous</button>
-        </div>
-        <div class="tpl-picker" id="tpl-picker"></div>
-      </section>
+      <div id="editor-workspace" hidden>
 
-      <!-- Step 2: the document itself — one report, this one tab. -->
-      <div class="editor-shell" id="editor-shell" hidden>
-        <form id="report-form">
-          <div class="doc-sheet">
-            <div class="doc-head">
-              <input id="reportTitle" class="doc-title-input" required placeholder="Titre du rapport…" autocomplete="off">
+        <section class="portal-card" id="picker-card">
+          <div class="toolbar">
+            <div>
+              <p class="eyebrow">Étape 1</p>
+              <h2>Modèle de rapport</h2>
+            </div>
+            <div class="filter-tabs" id="scope-filters">
+              <button class="active" type="button" data-scope="mine">Mes rapports</button>
+              <button type="button" data-scope="local">Tous les rapports locaux</button>
+              <button type="button" data-scope="all">Tous</button>
+            </div>
+          </div>
+          <div class="tpl-picker" id="tpl-picker"></div>
+        </section>
+
+        <section class="portal-card" id="form-card" hidden>
+          <div class="toolbar">
+            <div>
+              <p class="eyebrow">Étape 2</p>
+              <h2 id="form-heading">Contenu du rapport</h2>
+            </div>
+            <span class="section-note" id="form-status"></span>
+          </div>
+
+          <div id="review-feedback"></div>
+          <div class="meta-strip" id="meta-strip"></div>
+
+          <form id="report-form" class="form-grid">
+            <div class="form-field">
+              <label for="reportTitle">Titre du dossier</label>
+              <input id="reportTitle" required placeholder="Titre du rapport">
+            </div>
+            <div class="form-field">
+              <label for="reportRecipient">Destinataire</label>
+              <input id="reportRecipient" placeholder="Instance ou responsable">
+            </div>
+            <div class="form-field">
+              <label for="reportProject">Projet associé</label>
+              <select id="reportProject"><option value="">Aucun projet associé</option></select>
+            </div>
+            <div class="form-field">
+              <label for="reportAxis">Axe stratégique</label>
+              <select id="reportAxis"><option value="">À préciser</option></select>
+            </div>
+            <div class="form-field">
+              <label for="reportSubAxis">Sous-axe</label>
+              <select id="reportSubAxis"><option value="">À préciser</option></select>
+            </div>
+            <div class="form-field">
+              <label for="reportEventDate">Date de l’action</label>
+              <input id="reportEventDate" type="date">
+            </div>
+            <div class="form-field">
+              <label for="reportDueAt">Échéance</label>
+              <input id="reportDueAt" type="datetime-local">
+            </div>
+            <div class="form-field full">
+              <label for="reportDescription">Résumé et contexte</label>
+              <textarea id="reportDescription" placeholder="Contexte, objectifs, actions, résultats ou points à examiner"></textarea>
             </div>
 
-            <div class="doc-meta-row">
-              <div class="doc-meta-field">
-                <label for="reportRecipient">Destinataire</label>
-                <input id="reportRecipient" placeholder="Instance ou responsable">
-              </div>
-              <div class="doc-meta-field">
-                <label for="reportProject">Projet associé</label>
-                <select id="reportProject"><option value="">Aucun projet associé</option></select>
-              </div>
-              <div class="doc-meta-field">
-                <label for="reportAxis">Axe stratégique</label>
-                <select id="reportAxis"><option value="">À préciser</option></select>
-              </div>
-              <div class="doc-meta-field">
-                <label for="reportSubAxis">Sous-axe</label>
-                <select id="reportSubAxis"><option value="">À préciser</option></select>
-              </div>
-              <div class="doc-meta-field">
-                <label for="reportEventDate">Date de l’action</label>
-                <input id="reportEventDate" type="date">
-              </div>
-              <div class="doc-meta-field">
-                <label for="reportDueAt">Échéance</label>
-                <input id="reportDueAt" type="datetime-local">
-              </div>
-            </div>
-
-            <div class="meta-strip" id="meta-strip"></div>
-            <div id="review-feedback"></div>
-
-            <div class="doc-body">
-              <div class="tpl-field doc-body-intro">
-                <label for="reportDescription">Résumé et contexte</label>
-                <textarea id="reportDescription" placeholder="Contexte, objectifs, actions, résultats ou points à examiner…"></textarea>
-              </div>
+            <div class="full">
+              <p class="eyebrow" style="margin-bottom:8px">Sections imposées par le système de mise à jour</p>
               <div id="dynamic-sections"></div>
             </div>
 
-            <div class="doc-actions">
+            <div class="editor-sticky full">
               <button class="btn btn-secondary" type="button" id="save-draft">Enregistrer le brouillon</button>
               <button class="btn btn-primary" type="submit" id="submit-report">Soumettre pour validation</button>
               <span class="field-hint" id="save-hint"></span>
             </div>
-          </div>
-        </form>
-      </div>
+          </form>
+        </section>
 
+      </div>
     </main>
   </div>
 
@@ -311,37 +140,16 @@
     const showError = e => AYCPortal.renderError(notice, e);
 
     const params = new URLSearchParams(location.search);
-    let editingId = params.get('id');
+    const editingId = params.get('id');
     const presetTemplate = params.get('template');
 
     let member = null;
     let templates = [];
     let projects = [];
     let axes = [];
-    let current = null;     // the selected template row for this report
-    let editing = null;     // the report row this tab is editing (or null = new)
+    let current = null;      // the selected template row
+    let editing = null;      // the report row being edited, if any
     let scope = 'mine';
-    let dirty = false;
-
-    // ---- save-state indicator (appbar) -------------------------------
-    function setSaveState(state, label) {
-      const el = byId('save-state');
-      el.classList.remove('is-dirty', 'is-saved');
-      if (state) el.classList.add(state);
-      byId('save-state-text').textContent = label;
-    }
-
-    function setDocName(title) {
-      const t = (title || '').trim();
-      byId('appbar-doc-name').textContent = t || 'Éditeur de rapports';
-      document.title = `${t ? t + ' · ' : ''}Éditeur de rapports · Portail YOUTHCLUBber`;
-    }
-
-    function onFormChanged() {
-      dirty = true;
-      setSaveState('is-dirty', 'Modifications non enregistrées');
-      setDocName(byId('reportTitle').value);
-    }
 
     const DEPARTMENT_LABELS = {
       coordination_strategique: 'Coordination stratégique',
@@ -370,34 +178,16 @@
 
     const jsonArray = value => Array.isArray(value) ? value : [];
     const humanSection = slug => String(slug).replaceAll('_', ' ');
-
-    // Schema keys encode the official document's own numbering
-    // (I_Mandat, VIII_Les_decisions…, 1_Recrutement…, a_instruction…),
-    // straight from the source PDFs. Pulling that prefix back out and
-    // showing it next to the label is what makes the on-screen order
-    // (I. / II. … then A./B. … then a./b. …) match the paper document
-    // instead of a flat, renumbered list.
-    function tokenPrefix(key) {
-      const m = /^([A-Za-z0-9]+)_/.exec(String(key || ''));
-      if (!m) return '';
-      const t = m[1];
-      if (/^[IVXLCDM]+$/.test(t)) return t + '.';
-      if (/^[a-z]$/.test(t)) return t + '.';
-      if (/^[0-9]+$/.test(t)) return t + '.';
-      return '';
-    }
-    const labelWithNumber = field => {
-      const p = tokenPrefix(field.key);
-      return p ? `${p} ${field.label}` : field.label;
-    };
     const toDateInput = v => { if (!v) return ''; const d = new Date(v); return Number.isNaN(d.getTime()) ? String(v).slice(0, 10) : d.toISOString().slice(0, 10); };
     const toDateTimeInput = v => { if (!v) return ''; const d = new Date(v); return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 16); };
 
-    // ---- template picker (only shown with no ?id and no ?template) ----
+    // ---- template picker -------------------------------------------------
     function visibleTemplates() {
       const myRole = member?.access?.displayRole || null;
       if (scope === 'mine' && myRole) {
         const mine = templates.filter(t => t.owner_role === myRole);
+        // A member with no template of their own (or a national admin)
+        // should not be shown an empty page.
         if (mine.length) return mine;
       }
       if (scope === 'local') return templates.filter(t => (t.scope || 'local') === 'local');
@@ -407,307 +197,36 @@
     function renderPicker() {
       const list = visibleTemplates();
       byId('tpl-picker').innerHTML = list.length ? list.map(t => `
-        <button type="button" class="tpl-card" data-tpl="${esc(t.slug)}">
+        <button type="button" class="tpl-card ${current && current.slug === t.slug ? 'active' : ''}" data-tpl="${esc(t.slug)}">
           <strong>${esc(t.name)}</strong>
           <span>${esc(t.description || 'Aucune description enregistrée.')}</span>
           ${t.owner_role ? `<span class="tpl-owner">${esc(ROLE_LABELS[t.owner_role] || t.owner_role)}</span>` : ''}
-          ${!t.owner_role && (t.scope || 'local') === 'national' ? `<span class="tpl-owner" style="background:#fff5dc;color:#966b10">Référence nationale</span>` : ''}
-          ${t.is_form ? `<span class="tpl-owner" style="background:#eef2f8;color:#526078">Formulaire</span>` : ''}
         </button>
       `).join('') : AYCPortal.renderEmpty('Aucun modèle de rapport disponible');
     }
 
-    function openPicker() {
-      byId('picker-shell').hidden = false;
-      byId('editor-shell').hidden = true;
-      setDocName('');
-      renderPicker();
-    }
-
-    // Choosing a template turns THIS tab into that report — no new tab,
-    // no separate step; the URL is updated so a reload lands back here.
-    function chooseTemplate(slug) {
-      current = templates.find(t => t.slug === slug) || null;
-      if (!current) return;
-      const url = new URL(location.href);
-      url.searchParams.delete('id');
-      url.searchParams.set('template', slug);
-      history.replaceState(null, '', url);
-      openDocument();
-    }
-
-    // ---- document surface ----------------------------------------------
-    function openDocument() {
-      byId('picker-shell').hidden = true;
-      byId('editor-shell').hidden = false;
-
-      byId('reportTitle').value = editing?.title || '';
-      byId('reportRecipient').value = editing?.recipient || current?.recipient || '';
-      byId('reportProject').value = editing?.project_id || '';
-      fillAxis('reportAxis', 'À préciser', editing?.axis_slug || null);
-      syncSubAxes(editing?.sub_axis_slug || null);
-      byId('reportEventDate').value = toDateInput(editing?.event_date);
-      byId('reportDueAt').value = toDateTimeInput(editing?.due_at);
-      byId('reportDescription').value = editing?.description || '';
-
-      setDocName(byId('reportTitle').value);
-      setSaveState(editing ? 'is-saved' : null, editing ? (STATUS_LABELS[editing.status] || 'Enregistré') : 'Brouillon non enregistré');
-
-      renderMeta();
-      renderReviewFeedback();
-      renderSections(editing?.payload || {});
-      if (!editing) suggestDueDate();
-      dirty = false;
-    }
-
-    async function loadReportById(id) {
-      const reportsRes = await AYCPortal.api('reports');
-      const report = (reportsRes.reports || []).find(r => String(r.id) === String(id));
-      if (!report) throw new Error('Rapport introuvable ou hors de ton périmètre.');
-      editing = report;
-      current = templates.find(t => t.slug === (report.template_slug || report.report_type)) || null;
-      openDocument();
-    }
-
-    // ---- dynamic sections --------------------------------------------------
-    // Two rendering modes:
-    //  - current.schema_json present -> full recursive renderer (sections,
-    //    nested sub-sections, tables with add/remove rows, repeatable
-    //    groups, checklists), matching the official AYC document structure.
-    //  - otherwise -> legacy flat renderer, one textarea per entry of
-    //    current.required_sections (kept for the earlier hand-authored
-    //    templates that have no schema_json).
-    // currentPayload holds the live, nested form state; the DOM is
-    // re-rendered from it on every add/remove-row so array indices stay
-    // in sync, while individual text edits write straight into it without
-    // a re-render (keeps the caret / focus stable while typing).
-    let currentPayload = {};
-
-    function getAtPath(obj, path) {
-      return path.reduce((o, k) => (o == null ? undefined : o[k]), obj);
-    }
-    function setAtPath(obj, path, value) {
-      let node = obj;
-      for (let i = 0; i < path.length - 1; i++) {
-        const k = path[i];
-        if (node[k] == null || typeof node[k] !== 'object') node[k] = typeof path[i + 1] === 'number' ? [] : {};
-        node = node[k];
-      }
-      node[path[path.length - 1]] = value;
-    }
-
-    function fieldId(path) { return 'f_' + path.map(p => String(p)).join('_').replace(/[^\w]/g, ''); }
-
-    // JSON.stringify() always uses double quotes, so embedding it inside a
-    // double-quoted HTML attribute (the convention everywhere else in this
-    // file) truncates the attribute at the first quote and corrupts the
-    // markup that follows. These inline handlers therefore use single
-    // quotes for the attribute, with the JSON string's own single quotes
-    // (none normally, but titles/labels can end up inside via ${...}
-    // arguments) escaped as &#39; so the attribute always parses cleanly.
-    const attrJson = value => esc(JSON.stringify(value)).replace(/&quot;/g, '"');
-
-    function renderField(field, path) {
-      const id = fieldId(path);
-      const value = getAtPath(currentPayload, path);
-      const setter = `AYC_setField(${attrJson(path)}, this.value)`;
-
-      if (field.type === 'text') {
-        return `
-          <div class="tpl-field">
-            <label for="${id}">${esc(labelWithNumber(field))}</label>
-            <textarea id="${id}" oninput='${setter}' placeholder="${esc(field.placeholder || field.label + '…')}">${esc(value || '')}</textarea>
-          </div>`;
-      }
-      if (field.type === 'select') {
-        const opts = jsonArray(field.options);
-        return `
-          <div class="tpl-field">
-            <label for="${id}">${esc(labelWithNumber(field))}</label>
-            <select id="${id}" onchange='${setter}'>
-              <option value="">À préciser</option>
-              ${opts.map(o => `<option value="${esc(o)}"${value === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}
-            </select>
-          </div>`;
-      }
-      if (field.type === 'list') {
-        const opts = jsonArray(field.options);
-        const checked = jsonArray(value);
-        return `
-          <div class="tpl-field">
-            <label>${esc(labelWithNumber(field))}</label>
-            <div class="tpl-checklist">
-              ${opts.map((o, i) => `
-                <label><input type="checkbox" ${checked.includes(o) ? 'checked' : ''}
-                  onchange='AYC_toggleListItem(${attrJson(path)}, ${attrJson(o)}, this.checked)'> ${esc(o)}</label>
-              `).join('')}
-            </div>
-          </div>`;
-      }
-      if (field.type === 'repeatable_text') {
-        const items = jsonArray(value);
-        return `
-          <div class="tpl-field">
-            <label>${esc(labelWithNumber(field))}</label>
-            ${items.map((v, i) => `
-              <div style="display:flex;gap:8px;margin-bottom:6px">
-                <textarea style="flex:1" oninput='AYC_setListIndex(${attrJson(path)}, ${i}, this.value)' placeholder="${esc(field.label)}…">${esc(v || '')}</textarea>
-                <button type="button" class="tpl-row-remove" onclick='AYC_removeListIndex(${attrJson(path)}, ${i})'>Retirer</button>
-              </div>
-            `).join('')}
-            <button type="button" class="tpl-add-btn tpl-row-add" onclick='AYC_addListIndex(${attrJson(path)})'>+ Ajouter</button>
-          </div>`;
-      }
-      if (field.type === 'table') return renderTable(field, path);
-      if (field.type === 'repeatable_group') return renderRepeatableGroup(field, path);
-      if (field.type === 'section') return renderSectionNode(field, path, Math.max(path.length - 1, 0));
-      return '';
-    }
-
-    function renderTable(field, path) {
-      const rows = jsonArray(getAtPath(currentPayload, path));
-      const cols = jsonArray(field.columns);
-      return `
-        <div class="tpl-field">
-          <label>${esc(labelWithNumber(field))}</label>
-          ${field.note ? `<p class="tpl-field-note">${esc(field.note)}</p>` : ''}
-          <div class="tpl-table-wrap">
-            <table class="tpl-table">
-              <thead><tr>${cols.map(c => `<th>${esc(c.label)}</th>`).join('')}<th></th></tr></thead>
-              <tbody>
-                ${rows.map((row, i) => `
-                  <tr>
-                    ${cols.map(c => `<td><textarea oninput='AYC_setTableCell(${attrJson(path)}, ${i}, ${attrJson(c.key)}, this.value)'>${esc(row?.[c.key] || '')}</textarea></td>`).join('')}
-                    <td><button type="button" class="tpl-row-remove" onclick='AYC_removeTableRow(${attrJson(path)}, ${i})'>Retirer</button></td>
-                  </tr>
-                `).join('')}
-                ${!rows.length ? `<tr><td colspan="${cols.length + 1}" style="color:#9aa4ba;font-size:.78rem;padding:12px">Aucune ligne. Ajoute la première ci-dessous.</td></tr>` : ''}
-              </tbody>
-            </table>
-          </div>
-          <button type="button" class="tpl-add-btn tpl-row-add" onclick='AYC_addTableRow(${attrJson(path)}, ${attrJson(cols.map(c => c.key))})'>+ Ajouter une ligne</button>
-        </div>`;
-    }
-
-    function renderRepeatableGroup(field, path) {
-      const items = jsonArray(getAtPath(currentPayload, path));
-      const itemFields = jsonArray(field.itemFields);
-      return `
-        <div class="tpl-field">
-          <label>${esc(labelWithNumber(field))}</label>
-          ${items.map((item, i) => `
-            <div class="tpl-group-item">
-              <button type="button" class="tpl-row-remove" onclick='AYC_removeGroupItem(${attrJson(path)}, ${i})'>Retirer</button>
-              <div class="tpl-group-item-label">${esc(field.label)} #${i + 1}</div>
-              ${itemFields.map(f => renderField(f, [...path, i, f.key])).join('')}
-            </div>
-          `).join('')}
-          ${!items.length ? '<p class="tpl-field-note">Aucune entrée. Ajoute la première ci-dessous.</p>' : ''}
-          <button type="button" class="tpl-add-btn tpl-row-add" onclick='AYC_addGroupItem(${attrJson(path)})'>+ Ajouter ${esc(field.label.toLowerCase())}</button>
-        </div>`;
-    }
-
-    function renderSectionNode(node, path, depth) {
-      const d = Math.min(depth, 3);
-      const HTag = ['h3', 'h4', 'h5', 'h6'][d];
-      return `
-        <div class="tpl-section depth-${d}">
-          <div class="tpl-section-head"><${HTag}>${esc(labelWithNumber(node))}</${HTag}></div>
-          ${node.note ? `<p class="tpl-section-note">${esc(node.note)}</p>` : ''}
-          ${jsonArray(node.children).map(child => renderField(child, [...path, child.key])).join('')}
-        </div>`;
-    }
-
+    // ---- dynamic sections ------------------------------------------------
     function renderSections(payload) {
-      const container = byId('dynamic-sections');
-      const schema = current?.schema_json;
-
-      if (schema && jsonArray(schema.sections).length) {
-        currentPayload = payload && typeof payload === 'object' ? JSON.parse(JSON.stringify(payload)) : {};
-        container.innerHTML = schema.sections.map(section => renderField(section, [section.key])).join('');
-        return;
-      }
-
-      // Legacy flat fallback for templates without schema_json.
       const sections = jsonArray(current?.required_sections);
       const data = payload || {};
-      currentPayload = JSON.parse(JSON.stringify(data));
+      const container = byId('dynamic-sections');
       if (!sections.length) {
         container.innerHTML = `
-          <div class="tpl-field">
+          <div class="section-block">
             <label for="section-notes">Contenu du rapport</label>
             <textarea id="section-notes" data-section="notes" placeholder="Ce modèle n’impose pas de sections : rédige le contenu ici.">${esc(data.notes || '')}</textarea>
           </div>`;
         return;
       }
       container.innerHTML = sections.map((section, index) => `
-        <div class="tpl-field">
+        <div class="section-block">
           <label for="section-${index}">${esc(humanSection(section))}</label>
           <textarea id="section-${index}" data-section="${esc(section)}" placeholder="${esc(humanSection(section))}…">${esc(data[section] || '')}</textarea>
         </div>
       `).join('');
     }
 
-    // ---- structured-field mutation helpers (called from inline handlers) --
-    window.AYC_setField = (path, value) => { setAtPath(currentPayload, path, value); };
-    window.AYC_toggleListItem = (path, option, checked) => {
-      const current = jsonArray(getAtPath(currentPayload, path)).slice();
-      const next = checked ? Array.from(new Set([...current, option])) : current.filter(v => v !== option);
-      setAtPath(currentPayload, path, next);
-    };
-    window.AYC_setListIndex = (path, index, value) => {
-      const arr = jsonArray(getAtPath(currentPayload, path)).slice();
-      arr[index] = value;
-      setAtPath(currentPayload, path, arr);
-    };
-    window.AYC_addListIndex = (path) => {
-      const arr = jsonArray(getAtPath(currentPayload, path)).slice();
-      arr.push('');
-      setAtPath(currentPayload, path, arr);
-      renderSections(currentPayload);
-    };
-    window.AYC_removeListIndex = (path, index) => {
-      const arr = jsonArray(getAtPath(currentPayload, path)).slice();
-      arr.splice(index, 1);
-      setAtPath(currentPayload, path, arr);
-      renderSections(currentPayload);
-    };
-    window.AYC_setTableCell = (path, rowIndex, colKey, value) => {
-      const rows = jsonArray(getAtPath(currentPayload, path)).slice();
-      rows[rowIndex] = { ...(rows[rowIndex] || {}), [colKey]: value };
-      setAtPath(currentPayload, path, rows);
-    };
-    window.AYC_addTableRow = (path, colKeys) => {
-      const rows = jsonArray(getAtPath(currentPayload, path)).slice();
-      const blank = {};
-      colKeys.forEach(k => { blank[k] = ''; });
-      rows.push(blank);
-      setAtPath(currentPayload, path, rows);
-      renderSections(currentPayload);
-    };
-    window.AYC_removeTableRow = (path, rowIndex) => {
-      const rows = jsonArray(getAtPath(currentPayload, path)).slice();
-      rows.splice(rowIndex, 1);
-      setAtPath(currentPayload, path, rows);
-      renderSections(currentPayload);
-    };
-    window.AYC_addGroupItem = (path) => {
-      const items = jsonArray(getAtPath(currentPayload, path)).slice();
-      items.push({});
-      setAtPath(currentPayload, path, items);
-      renderSections(currentPayload);
-    };
-    window.AYC_removeGroupItem = (path, index) => {
-      const items = jsonArray(getAtPath(currentPayload, path)).slice();
-      items.splice(index, 1);
-      setAtPath(currentPayload, path, items);
-      renderSections(currentPayload);
-    };
-
     function collectPayload() {
-      if (current?.schema_json && jsonArray(current.schema_json.sections).length) {
-        return currentPayload;
-      }
       const out = {};
       document.querySelectorAll('#dynamic-sections textarea[data-section]').forEach(el => {
         const value = el.value.trim();
@@ -719,24 +238,12 @@
     function renderMeta() {
       if (!current) { byId('meta-strip').innerHTML = ''; return; }
       const departments = jsonArray(current.validator_departments);
-      const users = jsonArray(current.utilise_par);
       const chips = [];
       if (current.recipient) chips.push(`<span class="meta-chip">Destinataire : ${esc(current.recipient)}</span>`);
       if (current.deadline_rule) chips.push(`<span class="meta-chip warn">Échéance : ${esc(current.deadline_rule)}</span>`);
       if (departments.length) chips.push(`<span class="meta-chip">Validation : ${esc(departments.map(d => DEPARTMENT_LABELS[d] || d).join(' + '))}</span>`);
       if (current.owner_role) chips.push(`<span class="meta-chip">Poste responsable : ${esc(ROLE_LABELS[current.owner_role] || current.owner_role)}</span>`);
-      if (users.length) chips.push(`<span class="meta-chip">Rédigé par : ${esc(users.join(' / '))}</span>`);
       byId('meta-strip').innerHTML = chips.join('');
-      document.getElementById('scope-notice')?.remove();
-      const isNational = (current.scope || 'local') === 'national';
-      if (isNational) {
-        const notice = document.createElement('div');
-        notice.className = 'review-note';
-        notice.id = 'scope-notice';
-        notice.style.cssText = 'border-left-color:#b27b00;background:#fff8e6;color:#7a5800';
-        notice.innerHTML = `<strong>Document de niveau national.</strong> Ce modèle suit la structure officielle de l'Annexe du système de mise à jour, mais est normalement rédigé au niveau national${current.is_form ? ' via un formulaire dédié' : ''}. Tu peux t'en servir comme référence ou le remplir si ta fonction te le demande explicitement.`;
-        byId('review-feedback').insertAdjacentElement('beforebegin', notice);
-      }
     }
 
     function renderReviewFeedback() {
@@ -751,6 +258,9 @@
     }
 
     // Prefill the échéance from the template rule when the field is empty.
+    // A negative default_due_days means the deadline falls BEFORE the event
+    // (that is the convention already used by the seeded templates), so we
+    // anchor on the action date whenever the user has given one.
     function suggestDueDate() {
       if (!current || byId('reportDueAt').value) return;
       const days = Number(current.default_due_days);
@@ -768,6 +278,18 @@
     function syncSubAxes(selected) {
       const axis = axes.find(a => a.slug === byId('reportAxis').value);
       byId('reportSubAxis').innerHTML = '<option value="">À préciser</option>' + jsonArray(axis?.sub_axes).map(s => `<option value="${esc(s.slug)}"${s.slug === selected ? ' selected' : ''}>${esc(s.name)}</option>`).join('');
+    }
+
+    function selectTemplate(slug, payload) {
+      current = templates.find(t => t.slug === slug) || null;
+      if (!current) return;
+      byId('form-card').hidden = false;
+      byId('form-heading').textContent = current.name;
+      if (!editing && !byId('reportRecipient').value && current.recipient) byId('reportRecipient').value = current.recipient;
+      renderPicker();
+      renderMeta();
+      renderSections(payload);
+      suggestDueDate();
     }
 
     async function save(status) {
@@ -792,33 +314,15 @@
       const result = await AYCPortal.api('reports', { method: 'POST', body });
       if (status === 'draft') {
         // Staying on the page is the point of a draft: adopt the returned
-        // id so the next save updates instead of creating a duplicate, and
-        // reflect it in the URL so a reload/bookmark returns to this report.
+        // id so the next save updates instead of creating a duplicate.
         editing = { ...(editing || {}), ...(result.report || {}), reviews: jsonArray(editing?.reviews) };
-        const url = new URL(location.href);
-        url.searchParams.delete('template');
-        url.searchParams.set('id', editing.id);
-        history.replaceState(null, '', url);
-        editingId = editing.id;
         byId('save-hint').textContent = 'Brouillon enregistré à ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '.';
-        setSaveState('is-saved', 'Brouillon enregistré');
+        byId('form-status').textContent = STATUS_LABELS.draft;
         notice.innerHTML = '<div class="alert alert-success">Brouillon enregistré.</div>';
-        dirty = false;
       } else {
-        setSaveState('is-saved', 'Soumis pour validation');
-        notice.innerHTML = '<div class="alert alert-success">Rapport soumis pour validation. Tu peux fermer cet onglet.</div>';
-        dirty = false;
-        byId('submit-report').disabled = true;
-        byId('save-draft').disabled = true;
+        location.href = 'reports';
       }
     }
-
-    // Warn before an accidental close/reload if there is unsaved work.
-    window.addEventListener('beforeunload', (e) => {
-      if (!dirty) return;
-      e.preventDefault();
-      e.returnValue = '';
-    });
 
     // ---- boot ------------------------------------------------------------
     try {
@@ -830,6 +334,7 @@
         byId('editor-restricted').hidden = false;
         return;
       }
+      byId('editor-workspace').hidden = false;
 
       const [tplRes, projRes, axesRes] = await Promise.all([
         AYCPortal.api('report_templates'),
@@ -841,20 +346,37 @@
       axes = axesRes.axes || [];
 
       byId('reportProject').innerHTML = '<option value="">Aucun projet associé</option>' + projects.map(p => `<option value="${p.id}">${esc(p.title)}</option>`).join('');
+      fillAxis('reportAxis', 'À préciser', null);
+      syncSubAxes(null);
+      renderPicker();
 
+      // Editing an existing report: pull it from the club's report list
+      // (the same payload reports.html uses) and hydrate every field.
       if (editingId) {
-        await loadReportById(editingId);
+        const reportsRes = await AYCPortal.api('reports');
+        editing = (reportsRes.reports || []).find(r => String(r.id) === String(editingId)) || null;
+        if (!editing) throw new Error('Rapport introuvable ou hors de ton périmètre.');
+        byId('editor-title').textContent = 'Reprendre un rapport';
+        byId('editor-subtitle').textContent = 'Corrige le dossier puis soumets-le de nouveau à la validation.';
+        byId('form-status').textContent = STATUS_LABELS[editing.status] || editing.status || '';
+        byId('reportTitle').value = editing.title || '';
+        byId('reportRecipient').value = editing.recipient || '';
+        byId('reportProject').value = editing.project_id || '';
+        fillAxis('reportAxis', 'À préciser', editing.axis_slug || null);
+        syncSubAxes(editing.sub_axis_slug || null);
+        byId('reportEventDate').value = toDateInput(editing.event_date);
+        byId('reportDueAt').value = toDateTimeInput(editing.due_at);
+        byId('reportDescription').value = editing.description || '';
+        renderReviewFeedback();
+        selectTemplate(editing.template_slug || editing.report_type, editing.payload || {});
+        byId('picker-card').hidden = true;
       } else if (presetTemplate) {
-        current = templates.find(t => t.slug === presetTemplate) || null;
-        if (!current) throw new Error('Modèle de rapport introuvable.');
-        openDocument();
-      } else {
-        openPicker();
+        selectTemplate(presetTemplate, null);
       }
 
       byId('tpl-picker').addEventListener('click', e => {
         const card = e.target.closest('[data-tpl]');
-        if (card) chooseTemplate(card.dataset.tpl);
+        if (card) selectTemplate(card.dataset.tpl, collectPayload());
       });
       byId('scope-filters').addEventListener('click', e => {
         const btn = e.target.closest('[data-scope]');
@@ -866,9 +388,6 @@
       });
       byId('reportAxis').addEventListener('change', () => syncSubAxes(null));
       byId('reportEventDate').addEventListener('change', suggestDueDate);
-      byId('report-form').addEventListener('input', onFormChanged);
-      byId('report-form').addEventListener('change', onFormChanged);
-      byId('dynamic-sections').addEventListener('click', e => { if (e.target.closest('button')) onFormChanged(); });
       byId('save-draft').addEventListener('click', async () => { try { await save('draft'); } catch (err) { showError(err); } });
       byId('report-form').addEventListener('submit', async e => {
         e.preventDefault();
@@ -879,6 +398,5 @@
     }
   })();
   </script>
-<script type="module" src="../smooth-scroll.js"></script>
 </body>
 </html>

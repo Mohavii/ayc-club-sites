@@ -1,178 +1,131 @@
 /* ==========================================================================
-   Smooth scrolling — ported from the RBP portfolio's SmoothScroll React
-   component (components/layout/smooth-scroll.tsx), same Lenis version
-   (1.3.23) and same options/behavior on desktop.
+   Smooth anchor scrolling with a real cubic-bezier easing curve.
 
-    FIX (rev. 2): Lenis now runs on ALL devices, including touch/mobile.
-   The previous version skipped Lenis entirely on coarse-pointer devices
-   because its synthetic scroll loop was fighting native touch scroll and
-   causing jank. With canvas performance fixes (cached hero rect, CSS-sized
-   canvas) that lightened the main-thread workload, Lenis's smoothTouch
-   mode cooperates with native touch momentum instead of fighting it.
-   touchMultiplier is kept conservative (1.5) so the synthetic scroll
-   doesn't over-amplify finger velocity on phones.
+   Native `scroll-behavior:smooth` (used previously in theme.css) is animated
+   by the browser itself, and most browsers use a roughly linear/ease-out
+   curve that can't be customized — it always feels a bit mechanical.
 
-   If mobile Lenis needs to be reverted, restore the isTouchDevice guard
-   in init() — the rest of the file doesn't need to change.
-
-   DESKTOP "LAG WHEN SCROLLING STOPS" FIX: the actual cause wasn't Lenis
-   itself, it was pages driving heavy per-tick work (canvas redraw + several
-   DOM style writes) directly off raw native `scroll` events via
-   requestAnimationFrame. While the wheel is moving, Lenis's synthetic
-   scroll events fire at a smooth, even cadence, so that work rides along
-   fine. The instant the gesture stops, Lenis's easing tail produces its
-   last few scroll events at an uneven cadence (and any scroll-linked work
-   still queued lands right as layout/paint are also settling), which reads
-   as a stutter right at the stop.
-   GSAP's ScrollTrigger fixes this because it doesn't react to raw scroll
-   events at all — it samples scroll position once per tick from GSAP's own
-   ticker (already rAF-synced) and hands out an interpolated progress value,
-   decoupling scroll-linked animation from the raw event stream entirely.
-   This file now loads GSAP + ScrollTrigger alongside Lenis and wires them
-   together (Lenis drives the actual scroll, ScrollTrigger reads position
-   through it and drives the ticker), and exposes both on `window` so that
-   page-level scripts can build their own ScrollTrigger instances instead
-   of listening to `scroll` directly.
+   This replaces it with a rAF-driven scroll that eases with the same
+   cubic-bezier curve already used for the site's other motion
+   (--ease: cubic-bezier(.22,1,.36,1)), so anchor-link scrolling feels
+   consistent with the rest of the UI: a quick start and a soft, gradual
+   settle at the end instead of a constant speed.
    ========================================================================== */
-(function () {
-  var LENIS_OPTIONS = {
-    duration: 1.6,
-    easing: function (t) {
-      return Math.min(1, 1.001 - Math.pow(2, -10 * t));
-    },
-    orientation: "vertical",
-    gestureOrientation: "vertical",
-    smoothWheel: true,
-    wheelMultiplier: 1,
-    // FIX: Lenis is now enabled on mobile too (was previously skipped
-    // entirely for touch devices). smoothTouch lets Lenis's lerp cooperate
-    // with native touch momentum instead of fighting it, and the lower
-    // touchMultiplier keeps the synthetic scroll from over-amplifying
-    // finger velocity on phones. Combined with the canvas performance
-    // fixes (cached hero rect, CSS-sized canvas) that lightened the
-    // main thread, the Lenis loop no longer causes the per-tick scroll
-    // storm that made mobile lag before. Easily reversible: just set
-    // smoothTouch back to false and re-add the isTouchDevice guard.
-    smoothTouch: true,
-    touchMultiplier: 1.5,
-  };
+(function(){
+  // Respect reduced-motion preference — jump instantly, no animation.
+  var prefersReducedMotion = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Loads GSAP core + ScrollTrigger from the same CDN family as Lenis.
-  // Returns a promise resolving to { gsap, ScrollTrigger }, or null if it
-  // fails to load (page-level scripts fall back to their own raw-scroll
-  // logic in that case, same as before this fix).
-  function loadGSAP() {
-    return Promise.all([
-      import("https://cdn.jsdelivr.net/npm/gsap@3.12.5/+esm"),
-      import("https://cdn.jsdelivr.net/npm/gsap@3.12.5/ScrollTrigger/+esm"),
-    ])
-      .then(function (mods) {
-        var gsap = mods[0].gsap;
-        var ScrollTrigger = mods[1].ScrollTrigger;
-        gsap.registerPlugin(ScrollTrigger);
-        return { gsap: gsap, ScrollTrigger: ScrollTrigger };
-      })
-      .catch(function (err) {
-        console.error("GSAP/ScrollTrigger failed to load.", err);
-        return null;
-      });
+  // Disable the browser's native smooth scroll so it doesn't fight with ours.
+  document.documentElement.style.scrollBehavior = 'auto';
+
+  // cubic-bezier(.22,1,.36,1) — same curve as --ease in theme.css.
+  function cubicBezier(p1x, p1y, p2x, p2y){
+    function a(a1,a2){ return 1.0 - 3.0*a2 + 3.0*a1; }
+    function b(a1,a2){ return 3.0*a2 - 6.0*a1; }
+    function c(a1){ return 3.0*a1; }
+
+    function calcBezier(t, a1, a2){
+      return ((a(a1,a2)*t + b(a1,a2))*t + c(a1))*t;
+    }
+    function calcSlope(t, a1, a2){
+      return 3.0*a(a1,a2)*t*t + 2.0*b(a1,a2)*t + c(a1);
+    }
+    function getTForX(x){
+      var t = x;
+      for (var i = 0; i < 8; i++){
+        var slope = calcSlope(t, p1x, p2x);
+        if (Math.abs(slope) < 1e-6) break;
+        var xEst = calcBezier(t, p1x, p2x) - x;
+        t -= xEst / slope;
+      }
+      return t;
+    }
+    return function(x){
+      if (x <= 0) return 0;
+      if (x >= 1) return 1;
+      return calcBezier(getTForX(x), p1y, p2y);
+    };
   }
 
-  function initLenis(Lenis, gsapBundle) {
-    var lenis = new Lenis(LENIS_OPTIONS);
-    var rafId;
+  var ease = cubicBezier(0.22, 1, 0.36, 1);
 
-    // With GSAP available, let GSAP's ticker (already rAF-synced) drive
-    // Lenis, and tell ScrollTrigger to read scroll position through Lenis
-    // instead of the native scrollTop — this is what lets ScrollTrigger's
-    // sampled/interpolated progress stay decoupled from Lenis's raw
-    // synthetic scroll-event cadence, which is the actual source of the
-    // "stutter right when scrolling stops" symptom.
-    if (gsapBundle) {
-      var gsap = gsapBundle.gsap;
-      var ScrollTrigger = gsapBundle.ScrollTrigger;
+  function getScrollPaddingTop(){
+    var val = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+    return val;
+  }
 
-      lenis.on("scroll", ScrollTrigger.update);
+  function smoothScrollTo(targetY, duration){
+    duration = duration || 700;
+    var startY = window.pageYOffset;
+    var distance = targetY - startY;
+    var startTime = null;
 
-      gsap.ticker.add(function (time) {
-        lenis.raf(time * 1000);
-      });
-      gsap.ticker.lagSmoothing(0);
-
-      // On touch devices, tell ScrollTrigger to ignore the resize events
-      // that mobile browsers fire when the address bar shows/hides during
-      // scroll — these cause unnecessary ScrollTrigger.refresh() calls
-      // that briefly freeze the animation mid-swipe.
-      var isTouchDevice =
-        window.matchMedia &&
-        window.matchMedia("(pointer: coarse) and (hover: none)").matches;
-      if (isTouchDevice) {
-        ScrollTrigger.config({ ignoreMobileResize: true });
-      }
-
-      window.__lenis = lenis;
-      window.__gsap = gsap;
-      window.__ScrollTrigger = ScrollTrigger;
-      document.dispatchEvent(new CustomEvent("lenis-gsap-ready", {
-        detail: { lenis: lenis, gsap: gsap, ScrollTrigger: ScrollTrigger },
-      }));
-    } else {
-      function raf(time) {
-        lenis.raf(time);
-        rafId = requestAnimationFrame(raf);
-      }
-      rafId = requestAnimationFrame(raf);
-      window.__lenis = lenis;
+    if (prefersReducedMotion){
+      window.scrollTo(0, targetY);
+      return;
     }
 
-    function handleAnchorClick(e) {
-      var target = e.target;
-      var anchor = target.closest && target.closest('a[href^="#"]');
-      if (!anchor) return;
-
-      var href = anchor.getAttribute("href");
-      if (!href || href === "#") return;
-
-      var element = document.querySelector(href);
-      if (!element) return;
-
-      e.preventDefault();
-      lenis.scrollTo(element, { offset: -100 });
+    function step(timestamp){
+      if (startTime === null) startTime = timestamp;
+      var elapsed = timestamp - startTime;
+      var progress = Math.min(elapsed / duration, 1);
+      var eased = ease(progress);
+      window.scrollTo(0, startY + distance * eased);
+      if (progress < 1){
+        requestAnimationFrame(step);
+      }
     }
-
-    document.addEventListener("click", handleAnchorClick);
-
-    window.addEventListener("beforeunload", function () {
-      document.removeEventListener("click", handleAnchorClick);
-      if (rafId) cancelAnimationFrame(rafId);
-      lenis.destroy();
-    });
+    requestAnimationFrame(step);
   }
 
-  function init() {
-    var prefersReducedMotion =
-      window.matchMedia &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (prefersReducedMotion) return;
-
-    // FIX: Lenis now runs on ALL devices (including touch). The old
-    // isTouchDevice guard that skipped Lenis on mobile has been removed.
-    // With smoothTouch: true and a conservative touchMultiplier, Lenis's
-    // lerp cooperates with native touch momentum instead of fighting it.
-    // If this feels wrong on mobile, restore the guard:
-    //   var isTouchDevice = window.matchMedia &&
-    //     window.matchMedia("(pointer: coarse) and (hover: none)").matches;
-    //   if (isTouchDevice) { initNativeAnchorScroll(); loadGSAP()...; return; }
-    Promise.all([
-      import("https://cdn.jsdelivr.net/npm/lenis@1.3.23/+esm"),
-      loadGSAP(),
-    ]).then(function (results) {
-      initLenis(results[0].default, results[1]);
-    }).catch(function (err) {
-      console.error("Lenis failed to load, falling back to native scroll.", err);
-    });
+  function resolveTargetY(hash){
+    if (!hash || hash === '#') return 0;
+    var el;
+    try {
+      el = document.getElementById(decodeURIComponent(hash.slice(1)));
+    } catch(e) {
+      el = document.getElementById(hash.slice(1));
+    }
+    if (!el) return null;
+    var rect = el.getBoundingClientRect();
+    var absoluteY = rect.top + window.pageYOffset;
+    var scrollMarginTop = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+    var offset = scrollMarginTop || getScrollPaddingTop();
+    return absoluteY - offset;
   }
 
-  init();
+  document.addEventListener('click', function(e){
+    var link = e.target.closest && e.target.closest('a[href*="#"]');
+    if (!link) return;
+
+    var url;
+    try { url = new URL(link.href, window.location.href); }
+    catch(e) { return; }
+
+    // Only handle same-page anchor links.
+    if (url.pathname !== window.location.pathname || url.origin !== window.location.origin) return;
+    if (!url.hash) return;
+
+    var targetY = resolveTargetY(url.hash);
+    if (targetY === null) return; // target not found on this page — let default happen
+
+    e.preventDefault();
+    smoothScrollTo(Math.max(targetY, 0));
+    if (history.pushState){
+      history.pushState(null, '', url.hash);
+    }
+  }, false);
+
+  // Handle direct loads / refresh with a hash already in the URL.
+  if (window.location.hash){
+    window.addEventListener('load', function(){
+      var targetY = resolveTargetY(window.location.hash);
+      if (targetY !== null){
+        // Jump instantly on load (matches prior native behavior), then
+        // future clicks use the eased animation.
+        window.scrollTo(0, Math.max(targetY, 0));
+      }
+    });
+  }
 })();

@@ -25,7 +25,7 @@ const ALLOWED_PREFIXES = ["/portal", "/api"];
 // Static assets the portal pages themselves depend on (icons, fonts,
 // shared images referenced with a root-relative /assets/... path).
 // Keep this narrow — the goal is "portal works", not "everything works".
-const ALLOWED_EXTRA_EXACT = new Set(["/favicon.ico"]);
+const ALLOWED_EXTRA_EXACT = new Set(["/favicon.ico", "/theme.css"]);
 const ALLOWED_EXTRA_PREFIXES = ["/assets"];
 
 function isAllowed(pathname) {
@@ -39,9 +39,10 @@ function isAllowed(pathname) {
 export default function middleware(request) {
   const target = (process.env.DEPLOY_TARGET ?? process.env.deploy_target ?? "").trim();
 
-  // Only the internes-facing deployment is locked down. Everything else
-  // (local dev, bot, service projects) passes through unmodified.
-  if (target !== "portal-auth") {
+  // Only the internes-facing deployments are locked down: "portal-edge" (owns
+  // the real domain) and "portal-auth". Everything else (local dev, bot,
+  // other service projects) passes through unmodified.
+  if (target !== "portal-edge" && target !== "portal-auth") {
     return;
   }
 

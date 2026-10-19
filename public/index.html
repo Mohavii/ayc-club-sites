@@ -1,355 +1,566 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Association YOUTH CLUBs · Éduquer, impliquer, faire grandir la jeunesse tunisienne</title>
-<meta name="description" content="L'Association YOUTH CLUBs (AYCs) fédère un réseau de clubs de jeunes dans les collèges, lycées et universités de Tunisie, autour de l'éducation, la santé, la citoyenneté et la vie active.">
-<link rel="icon" type="image/png" href="assets/favicon-32.png" sizes="32x32">
-<link rel="icon" type="image/png" href="assets/favicon-16.png" sizes="16x16">
-<link rel="icon" type="image/png" href="assets/favicon-192.png" sizes="192x192">
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-<link rel="shortcut icon" href="assets/favicon.ico">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="Association YOUTH CLUBs">
-<meta property="og:title" content="Association YOUTH CLUBs · Éduquer, impliquer, faire grandir la jeunesse tunisienne">
-<meta property="og:description" content="L'Association YOUTH CLUBs (AYCs) fédère un réseau de clubs de jeunes dans les collèges, lycées et universités de Tunisie.">
-<meta property="og:image" content="assets/og-image.jpg">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:locale" content="fr_FR">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Association YOUTH CLUBs">
-<meta name="twitter:description" content="Un réseau de clubs de jeunes dans les collèges, lycées et universités de Tunisie.">
-<meta name="twitter:image" content="assets/og-image.jpg">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css">
-<link rel="stylesheet" href="home.css">
-<link rel="stylesheet" href="specular-button.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Youth Impact · Association YOUTH CLUBs</title>
+  <meta name="description" content="Des lycéens identifient les besoins de leur école, créent des événements et transforment les fonds collectés en projets qui comptent vraiment.">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#042668">
+  <meta property="og:title" content="Youth Impact · Association YOUTH CLUBs">
+  <meta property="og:description" content="Des idées aux actions, des actions à l’impact. Par les lycéens, pour leurs lycées.">
+  <meta property="og:image" content="assets/img/og.jpg">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/FunnelDisplay.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/FunnelSans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/impact.css">
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<symbol id="i-movie-night" viewBox="0 0 256 256"><path d="M216,104H102.09L210,75.51a8,8,0,0,0,5.68-9.84l-8.16-30a15.93,15.93,0,0,0-19.42-11.13L35.81,64.74a15.75,15.75,0,0,0-9.7,7.4,15.51,15.51,0,0,0-1.55,12L32,111.56c0,.14,0,.29,0,.44v88a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V112A8,8,0,0,0,216,104ZM192.16,40l6,22.07-22.62,6L147.42,51.83Zm-66.69,17.6,28.12,16.24-36.94,9.75L88.53,67.37Zm-79.4,44.62-6-22.08,26.5-7L94.69,89.4ZM208,200H48V120H208v80Z"/></symbol>
+<symbol id="i-soiree-musicale" viewBox="0 0 256 256"><path d="M212.92,17.69a8,8,0,0,0-6.86-1.45l-128,32A8,8,0,0,0,72,56V166.08A36,36,0,1,0,88,196V110.25l112-28v51.83A36,36,0,1,0,216,164V24A8,8,0,0,0,212.92,17.69ZM52,216a20,20,0,1,1,20-20A20,20,0,0,1,52,216ZM88,93.75V62.25l112-28v31.5ZM180,184a20,20,0,1,1,20-20A20,20,0,0,1,180,184Z"/></symbol>
+<symbol id="i-tournoi" viewBox="0 0 256 256"><path d="M232,64H208V48a8,8,0,0,0-8-8H56a8,8,0,0,0-8,8V64H24A16,16,0,0,0,8,80V96a40,40,0,0,0,40,40h3.65A80.13,80.13,0,0,0,120,191.61V216H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H136V191.58c31.94-3.23,58.44-25.64,68.08-55.58H208a40,40,0,0,0,40-40V80A16,16,0,0,0,232,64ZM48,120A24,24,0,0,1,24,96V80H48v32q0,4,.39,8Zm144-8.9c0,35.52-29,64.64-64,64.9a64,64,0,0,1-64-64V56H192ZM232,96a24,24,0,0,1-24,24h-.5a81.81,81.81,0,0,0,.5-8.9V80h24Z"/></symbol>
+<symbol id="i-football" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm76.52,147.42H170.9l-9.26-12.76,12.63-36.78,15-4.89,26.24,20.13A87.38,87.38,0,0,1,204.52,171.42Zm-164-34.3L66.71,117l15,4.89,12.63,36.78L85.1,171.42H51.48A87.38,87.38,0,0,1,40.47,137.12Zm10-50.64,5.51,18.6L40.71,116.77A87.33,87.33,0,0,1,50.43,86.48ZM109,152,97.54,118.65,128,97.71l30.46,20.94L147,152Zm91.07-46.92,5.51-18.6a87.33,87.33,0,0,1,9.72,30.29Zm-6.2-35.38-9.51,32.08-15.07,4.89L136,83.79V68.21l29.09-20A88.58,88.58,0,0,1,193.86,69.7ZM146.07,41.87,128,54.29,109.93,41.87a88.24,88.24,0,0,1,36.14,0ZM90.91,48.21l29.09,20V83.79L86.72,106.67l-15.07-4.89L62.14,69.7A88.58,88.58,0,0,1,90.91,48.21ZM63.15,187.42H83.52l7.17,20.27A88.4,88.4,0,0,1,63.15,187.42ZM110,214.13,98.12,180.71,107.35,168h41.3l9.23,12.71-11.83,33.42a88,88,0,0,1-36.1,0Zm55.36-6.44,7.17-20.27h20.37A88.4,88.4,0,0,1,165.31,207.69Z"/></symbol>
+<symbol id="i-micro" viewBox="0 0 256 256"><path d="M128,176a48.05,48.05,0,0,0,48-48V64a48,48,0,0,0-96,0v64A48.05,48.05,0,0,0,128,176ZM96,64a32,32,0,0,1,64,0v64a32,32,0,0,1-64,0Zm40,143.6V240a8,8,0,0,1-16,0V207.6A80.11,80.11,0,0,1,48,128a8,8,0,0,1,16,0,64,64,0,0,0,128,0,8,8,0,0,1,16,0A80.11,80.11,0,0,1,136,207.6Z"/></symbol>
+<symbol id="i-guitare" viewBox="0 0 256 256"><path d="M249.66,46.34l-40-40a8,8,0,0,0-11.31,11.32L200.69,20,140.52,80.16C117.73,68.3,92.21,69.29,76.75,84.74a42.27,42.27,0,0,0-9.39,14.37A8.24,8.24,0,0,1,59.81,104c-14.59.49-27.26,5.72-36.65,15.11C11.08,131.22,6,148.6,8.74,168.07,11.4,186.7,21.07,205.15,36,220s33.34,24.56,52,27.22A71.13,71.13,0,0,0,98.1,248c15.32,0,28.83-5.23,38.76-15.16,9.39-9.39,14.62-22.06,15.11-36.65a8.24,8.24,0,0,1,4.92-7.55,42.12,42.12,0,0,0,14.37-9.39c15.45-15.46,16.44-41,4.58-63.77L236,55.31l2.34,2.34a8,8,0,1,0,11.32-11.31ZM160,167.93a26.12,26.12,0,0,1-8.95,5.83,24.24,24.24,0,0,0-15,21.89c-.36,10.46-4,19.41-10.43,25.88-8.44,8.43-21,11.95-35.36,9.89C75,229.25,59.73,221.19,47.27,208.73S26.75,181,24.58,165.81c-2-14.37,1.46-26.92,9.89-35.36C40.94,124,49.89,120.37,60.35,120h0a24.22,24.22,0,0,0,21.89-15,26.12,26.12,0,0,1,5.83-9c5.49-5.49,13-8.13,21.38-8.13a49.38,49.38,0,0,1,19.13,4.19L108.5,112.19a32,32,0,1,0,35.31,35.31l20.08-20.08C170.41,142.71,169.47,158.41,160,167.93Zm-10.4-61.48a72.9,72.9,0,0,1,5.93,6.75l-15.42,15.42a32.22,32.22,0,0,0-12.68-12.68l15.42-15.43A73,73,0,0,1,149.55,106.45ZM112,128a16,16,0,0,1,16,16h0a16,16,0,1,1-16-16Zm48.85-32.85a86.94,86.94,0,0,0-6.68-6L176,67.31,188.69,80l-21.83,21.82A86.94,86.94,0,0,0,160.86,95.14ZM200,68.68,187.32,56,212,31.31,224.69,44ZM93.66,194.33a8,8,0,0,1-11.31,11.32l-32-32a8,8,0,0,1,11.32-11.31Z"/></symbol>
+<symbol id="i-date" viewBox="0 0 256 256"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></symbol>
+<symbol id="i-lieu" viewBox="0 0 256 256"><path d="M128,64a40,40,0,1,0,40,40A40,40,0,0,0,128,64Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,128Zm0-112a88.1,88.1,0,0,0-88,88c0,31.4,14.51,64.68,42,96.25a254.19,254.19,0,0,0,41.45,38.3,8,8,0,0,0,9.18,0A254.19,254.19,0,0,0,174,200.25c27.45-31.57,42-64.85,42-96.25A88.1,88.1,0,0,0,128,16Zm0,206c-16.53-13-72-60.75-72-118a72,72,0,0,1,144,0C200,161.23,144.53,209,128,222Z"/></symbol>
+<symbol id="i-billet" viewBox="0 0 256 256"><path d="M232,104a8,8,0,0,0,8-8V64a16,16,0,0,0-16-16H32A16,16,0,0,0,16,64V96a8,8,0,0,0,8,8,24,24,0,0,1,0,48,8,8,0,0,0-8,8v32a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V160a8,8,0,0,0-8-8,24,24,0,0,1,0-48ZM32,167.2a40,40,0,0,0,0-78.4V64H88V192H32Zm192,0V192H104V64H224V88.8a40,40,0,0,0,0,78.4Z"/></symbol>
+<symbol id="i-lyceen" viewBox="0 0 256 256"><path d="M226.53,56.41l-96-32a8,8,0,0,0-5.06,0l-96,32A8,8,0,0,0,24,64v80a8,8,0,0,0,16,0V75.1L73.59,86.29a64,64,0,0,0,20.65,88.05c-18,7.06-33.56,19.83-44.94,37.29a8,8,0,1,0,13.4,8.74C77.77,197.25,101.57,184,128,184s50.23,13.25,65.3,36.37a8,8,0,0,0,13.4-8.74c-11.38-17.46-27-30.23-44.94-37.29a64,64,0,0,0,20.65-88l44.12-14.7a8,8,0,0,0,0-15.18ZM176,120A48,48,0,1,1,89.35,91.55l36.12,12a8,8,0,0,0,5.06,0l36.12-12A47.89,47.89,0,0,1,176,120ZM128,87.57,57.3,64,128,40.43,198.7,64Z"/></symbol>
+<symbol id="i-email" viewBox="0 0 256 256"><path d="M224,48H32a8,8,0,0,0-8,8V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A8,8,0,0,0,224,48ZM203.43,64,128,133.15,52.57,64ZM216,192H40V74.19l82.59,75.71a8,8,0,0,0,10.82,0L216,74.19V192Z"/></symbol>
+<symbol id="i-bibliotheque" viewBox="0 0 256 256"><path d="M231.65,194.55,198.46,36.75a16,16,0,0,0-19-12.39L132.65,34.42a16.08,16.08,0,0,0-12.3,19l33.19,157.8A16,16,0,0,0,169.16,224a16.25,16.25,0,0,0,3.38-.36l46.81-10.06A16.09,16.09,0,0,0,231.65,194.55ZM136,50.15c0-.06,0-.09,0-.09l46.8-10,3.33,15.87L139.33,66Zm6.62,31.47,46.82-10.05,3.34,15.9L146,97.53Zm6.64,31.57,46.82-10.06,13.3,63.24-46.82,10.06ZM216,197.94l-46.8,10-3.33-15.87L212.67,182,216,197.85C216,197.91,216,197.94,216,197.94ZM104,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V48A16,16,0,0,0,104,32ZM56,48h48V64H56Zm0,32h48v96H56Zm48,128H56V192h48v16Z"/></symbol>
+<symbol id="i-ecologie" viewBox="0 0 256 256"><path d="M223.45,40.07a8,8,0,0,0-7.52-7.52C139.8,28.08,78.82,51,52.82,94a87.09,87.09,0,0,0-12.76,49c.57,15.92,5.21,32,13.79,47.85l-19.51,19.5a8,8,0,0,0,11.32,11.32l19.5-19.51C81,210.73,97.09,215.37,113,215.94q1.67.06,3.33.06A86.93,86.93,0,0,0,162,203.18C205,177.18,227.93,116.21,223.45,40.07ZM153.75,189.5c-22.75,13.78-49.68,14-76.71.77l88.63-88.62a8,8,0,0,0-11.32-11.32L65.73,179c-13.19-27-13-54,.77-76.71,22.09-36.47,74.6-56.44,141.31-54.06C210.2,114.89,190.22,167.41,153.75,189.5Z"/></symbol>
+<symbol id="i-professeur" viewBox="0 0 256 256"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H53.39a8,8,0,0,0,7.23-4.57,48,48,0,0,1,86.76,0,8,8,0,0,0,7.23,4.57H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM80,144a24,24,0,1,1,24,24A24,24,0,0,1,80,144Zm136,56H159.43a64.39,64.39,0,0,0-28.83-26.16,40,40,0,1,0-53.2,0A64.39,64.39,0,0,0,48.57,200H40V56H216ZM56,96V80a8,8,0,0,1,8-8H192a8,8,0,0,1,8,8v96a8,8,0,0,1-8,8H176a8,8,0,0,1,0-16h8V88H72v8a8,8,0,0,1-16,0Z"/></symbol>
+<symbol id="i-info" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-40a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176ZM112,84a12,12,0,1,1,12,12A12,12,0,0,1,112,84Z"/></symbol>
+</svg>
+<a class="skip" href="#contenu">Aller au contenu</a>
 
-<div class="pattern-veil"></div>
-
-<header class="topbar">
-  <div class="topbar-inner">
-    <div class="brand">
-      <img src="assets/logo-primary-blue.png" alt="Association YOUTH CLUBs" class="brand-logo">
-      <div class="brand-divider"></div>
-      <div class="brand-tag">Association YOUTH CLUBs</div>
-    </div>
-    <div class="menu" data-menu>
-      <button type="button" class="menu-btn" data-menu-btn aria-haspopup="true" aria-expanded="false">
-        <span class="menu-btn-label">Accueil</span>
-        <span class="menu-btn-icon">
-          <svg class="icon-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-          <svg class="icon-close" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </span>
-      </button>
-      <nav class="menu-panel" data-menu-panel aria-label="Navigation principale">
-      <a href="index" class="is-active">Accueil</a>
-      <a href="a-propos">À propos</a>
-      <a href="valeurs">Nos Valeurs</a>
-      <a href="strategie">Notre Stratégie</a>
-      <a href="evenements">Nos Projets</a>
-      <a href="gouvernance">Notre Équipe</a>
-      <a href="partenaires">Nos Partenaires</a>
-      <a href="rejoindre">Rejoindre</a>
-      <a href="contact">Contact</a>
-      <a href="https://internes.associationyouthclubs.org/portal/login" class="nav-portal-link">Espace membres</a>
-      </nav>
-    </div>
+<!-- ============ EN-TÊTE ============ -->
+<header class="site-header">
+  <div class="site-header__bar wrap">
+    <a class="brand" href="#accueil" aria-label="Youth Impact, retour à l’accueil">
+      <img src="assets/logos/youthimpact-logotype-fonce.svg" alt="Youth Impact" width="136" height="54">
+    </a>
+    <nav id="nav" class="nav" aria-label="Navigation principale">
+      <ul>
+        <li><a href="#accueil" data-spy="accueil">Accueil</a></li>
+        <li><a href="#projet" data-spy="projet">Le projet</a></li>
+        <li><a href="#clubs" data-spy="clubs">Nos clubs</a></li>
+        <li><a href="#impacts" data-spy="impacts">Nos impacts</a></li>
+        <li><a href="#equipe" data-spy="equipe">Équipe</a></li>
+        <li><a href="#partenaires" data-spy="partenaires">Partenaires</a></li>
+        <li><a href="#contact" data-spy="contact">Contact</a></li>
+      </ul>
+    </nav>
+    <a class="btn btn--light btn--sm nav-cta" href="#clubs">Les événements</a>
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav" aria-label="Ouvrir le menu">
+      <svg class="menu-btn__open" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      <svg class="menu-btn__close" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
   </div>
 </header>
 
-<main class="stage">
+<main id="contenu">
 
-  <!-- ===================== HERO ===================== -->
-  <section class="hero">
-    <div class="hero-copy">
-      <h1 class="hero-title">Une jeunesse qui <span>façonne</span> son éducation</h1>
-      <p class="hero-sub">L'Association YOUTH CLUBs fédère un réseau de clubs de jeunes dans les collèges, lycées et universités de Tunisie. Depuis 2013, nous outillons les apprenants pour qu'ils deviennent acteurs de leur scolarité, de leur santé et de leur avenir, plutôt que simples spectateurs.</p>
-      <div class="hero-actions">
-        <a href="strategie" class="btn btn-primary">Découvrir notre stratégie</a>
-        <a href="evenements" class="btn btn-secondary">Voir les événements</a>
+  <!-- ============ ACCUEIL ============ -->
+  <section class="hero" id="accueil">
+    <div class="hero__inner wrap">
+      <div class="hero__copy">
+        <p class="hero__kicker">Association YOUTH CLUBs présente</p>
+        <h1>Des idées aux actions, des actions à <span class="beam">l’impact.</span></h1>
+        <p class="hero__desc">Des lycéens identifient les besoins de leur école, créent des événements et transforment les fonds collectés en projets qui comptent vraiment.</p>
+        <div class="hero__actions">
+          <a class="btn btn--light" href="#projet">Découvrir le projet</a>
+          <a class="btn btn--ghost" href="#clubs">Découvrir les événements</a>
+        </div>
+        <p class="hero__slogan"><i class="nails" aria-hidden="true"></i>Par les lycéens, pour leurs lycées.</p>
       </div>
-      <div class="hero-stats">
-        <div class="hero-stat"><b>2013</b><span>Année de naissance</span></div>
-        <div class="hero-stat"><b>15+</b><span>Clubs à travers le pays</span></div>
-        <div class="hero-stat"><b>5</b><span>Axes stratégiques</span></div>
+
+      <div class="doors">
+        <figure class="door door--1" style="--i:0;--h:76%">
+          <img src="assets/img/hero-parole.jpg" alt="Une lycéenne prend la parole" width="600" height="1000">
+        </figure>
+        <div class="door door--lit" style="--i:1;--h:100%">
+          <strong class="door__num"><!-- IMPACT_COUNT_START -->06<!-- IMPACT_COUNT_END --></strong>
+          <span class="door__label">clubs<br>participants</span>
+        </div>
+        <figure class="door door--3" style="--i:2;--h:86%">
+          <img src="assets/img/hero-moment.jpg" alt="Un lycéen concentré, assis par terre avec son équipe" width="600" height="1000">
+        </figure>
+        <figure class="door door--4" style="--i:3;--h:64%">
+          <img src="assets/img/hero-equipe.jpg" alt="Des lycéens debout, réunis en cercle" width="600" height="1000">
+        </figure>
       </div>
     </div>
-    <div class="hero-visual">
-      <div class="hero-visual-bg"></div>
-      <div class="hero-visual-tint"></div>
-      <div class="hero-visual-content">
-        <img src="assets/logo-primary-white.png" alt="" class="hero-visual-mark">
-        <div>
-          <p class="hero-visual-quote">« Une éducation de qualité qui implique activement les jeunes. »</p>
-          <div class="hero-visual-tag">Notre vision, en une phrase</div>
+    <p class="scroll-cue" aria-hidden="true">Défiler<span class="nails nails--v"></span></p>
+  </section>
+
+  <!-- ============ TROIS ÉTAPES ============ -->
+  <section class="concepts" aria-label="Les trois grandes étapes">
+    <div class="wrap concepts__grid">
+      <article class="concept">
+        <span class="concept__num">01</span>
+        <h3>Identifier</h3>
+        <p>Écouter les élèves et comprendre les vrais besoins du lycée.</p>
+      </article>
+      <article class="concept">
+        <span class="concept__num">02</span>
+        <h3>Mobiliser</h3>
+        <p>Imaginer des événements capables de fédérer toute une communauté.</p>
+      </article>
+      <article class="concept">
+        <span class="concept__num">03</span>
+        <h3>Transformer</h3>
+        <p>Investir les fonds dans un projet utile, visible et durable.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ LE PROJET ============ -->
+  <section class="mission section" id="projet">
+    <div class="wrap mission__grid">
+      <div class="mission__art">
+        <div class="porte">
+          <figure class="arch">
+            <img src="assets/img/mission-echange.jpg" alt="Une lycéenne prend la parole au milieu d’un groupe" width="640" height="800" loading="lazy">
+          </figure>
+          <p class="tag">Ideas → impact</p>
+        </div>
+        <figure class="arch arch--small">
+          <img src="assets/img/mission-scene.jpg" alt="Une lycéenne s’exprime au micro" width="480" height="800" loading="lazy">
+        </figure>
+      </div>
+
+      <div class="mission__copy">
+        <div class="sh">
+          <p class="eyebrow">Notre mission</p>
+          <h2>Donner aux lycéens le pouvoir d’agir.</h2>
+          <p class="lede">Youth Impact transforme les élèves en acteurs de leur environnement. Ils observent, décident, organisent et rendent visible le changement qu’ils ont créé.</p>
+        </div>
+        <blockquote class="quote">
+          <p>Une initiative pensée par les jeunes, menée par les jeunes et ancrée dans les besoins réels de leur école.</p>
+        </blockquote>
+        <a class="text-link" href="assets/youth-impact-media-kit.pdf" target="_blank" rel="noreferrer">Consulter le media kit</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LA MÉTHODE ============ -->
+  <section class="journey section">
+    <div class="wrap">
+      <div class="sh sh--wide">
+        <p class="eyebrow">La méthode Youth Impact</p>
+        <h2>Une idée. Trois phases. Un impact réel.</h2>
+        <p class="lede">Un parcours simple, piloté localement par chaque club et documenté à chaque étape.</p>
+      </div>
+
+      <div class="journey__track">
+        <article class="door-card">
+          <div class="door-card__dome"><span class="door-card__label">Phase</span><strong class="door-card__num">01</strong></div>
+          <h3>Identifier les besoins</h3>
+          <p>Enquêtes, écoute des élèves, analyse des problèmes et choix d’un objectif commun.</p>
+          <ul class="triad"><li>Observer</li><li>Écouter</li><li>Choisir</li></ul>
+        </article>
+        <article class="door-card">
+          <div class="door-card__dome"><span class="door-card__label">Phase</span><strong class="door-card__num">02</strong></div>
+          <h3>Organiser et mobiliser</h3>
+          <p>Choix du format, campagne, préparation et accueil des participants pour lever des fonds.</p>
+          <ul class="triad"><li>Créer</li><li>Communiquer</li><li>Réunir</li></ul>
+        </article>
+        <article class="door-card door-card--lit">
+          <div class="door-card__dome"><span class="door-card__label">Phase</span><strong class="door-card__num">03</strong></div>
+          <h3>Investir et mesurer</h3>
+          <p>Financement du projet retenu, documentation des résultats et partage de l’impact.</p>
+          <ul class="triad"><li>Investir</li><li>Mesurer</li><li>Partager</li></ul>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LE RÉCIT ============ -->
+  <section class="story">
+    <div class="story__head wrap section">
+      <div class="sh sh--light sh--wide">
+        <p class="eyebrow">Le récit du projet</p>
+        <h2>Quatre temps pour rendre l’action visible.</h2>
+        <p class="lede">Les trois phases de projet sont accompagnées par quatre étapes de communication distinctes.</p>
+      </div>
+    </div>
+    <ol class="story__band">
+      <li class="phase phase--1">
+        <h3 class="phase__pill"><b>1</b>Enquêtes &amp; Équipe</h3>
+        <figure class="arch"><img src="assets/img/phase-1.jpg" alt="Une lycéenne présente ses idées devant un tableau" width="640" height="800" loading="lazy"></figure>
+      </li>
+      <li class="phase phase--2">
+        <h3 class="phase__pill"><b>2</b>Campagne de l’événement</h3>
+        <figure class="arch"><img src="assets/img/phase-2.jpg" alt="Des lycéens réunis, debout en cercle" width="640" height="800" loading="lazy"></figure>
+      </li>
+      <li class="phase phase--3">
+        <h3 class="phase__pill"><b>3</b>Jour J</h3>
+        <figure class="arch"><img src="assets/img/phase-3.jpg" alt="Une salle pleine de lycéens" width="640" height="800" loading="lazy"></figure>
+      </li>
+      <li class="phase phase--4">
+        <h3 class="phase__pill"><b>4</b>L’impact réel</h3>
+        <figure class="arch"><img src="assets/patterns/faisceau-post.jpg" alt="Une porte lumineuse qui projette sa lumière au sol" width="864" height="1080" loading="lazy"></figure>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ============ LES ÉVÉNEMENTS ============ -->
+  <section class="events section">
+    <div class="wrap">
+      <div class="sh sh--wide">
+        <p class="eyebrow">Des événements qui rassemblent</p>
+        <h2>Créer l’énergie. Financer le changement.</h2>
+        <p class="lede">Chaque club choisit un format qui lui ressemble pour attirer, engager et mobiliser.</p>
+      </div>
+
+      <div class="formats">
+        <article class="format format--cine">
+          <svg class="format__icon" aria-hidden="true"><use href="#i-movie-night"/></svg>
+          <p class="format__cat">Cinéma</p>
+          <h3 class="format__name">Movie Night</h3>
+          <p class="format__text">Une projection, une communauté réunie.</p>
+        </article>
+        <article class="format format--music">
+          <svg class="format__icon" aria-hidden="true"><use href="#i-soiree-musicale"/></svg>
+          <p class="format__cat">Musique &amp; arts</p>
+          <h3 class="format__name">Scène ouverte</h3>
+          <p class="format__text">Des talents locaux au service d’une idée.</p>
+        </article>
+        <article class="format format--sport">
+          <svg class="format__icon" aria-hidden="true"><use href="#i-tournoi"/></svg>
+          <p class="format__cat">Sport</p>
+          <h3 class="format__name">Tournoi</h3>
+          <p class="format__text">L’esprit d’équipe transformé en impact.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ NOS CLUBS ============ -->
+  <section class="clubs section" id="clubs">
+    <div class="wrap">
+      <div class="clubs__head">
+        <div class="sh">
+          <p class="eyebrow">Nos Youth Clubs</p>
+          <h2><!-- IMPACT_TITLE_START -->Six clubs. Six projets. Une même ambition.<!-- IMPACT_TITLE_END --></h2>
+          <p class="lede">Découvrez les initiatives portées par les lycéens dans chaque établissement participant.</p>
+        </div>
+        <p class="data-note"><svg aria-hidden="true"><use href="#i-info"/></svg>Les informations non fournies sont clairement indiquées.</p>
+      </div>
+
+      <div class="tickets">
+<!-- IMPACT_TICKETS_START -->
+        <article class="ticket ticket--nuit" data-club="sakiet-ezzit" data-school="Lycée Pilote Sakiet Ezzit" data-event="Movie Night" data-category="Cinéma &amp; Divertissement" data-icon="movie-night" data-desc="Une soirée cinéma imaginée par les lycéens pour rassembler leur communauté autour d’un objectif concret." data-date="" data-place="" data-price="" data-lead="" data-objective="" data-status="Statut à confirmer" data-instagram="" data-ticket="">
+          <div class="ticket__top">
+            <p class="ticket__cat">Cinéma &amp; Divertissement</p>
+            <svg class="ticket__icon" aria-hidden="true"><use href="#i-movie-night"/></svg>
+            <h3 class="ticket__event">Movie Night</h3>
+          </div>
+          <div class="ticket__perf" aria-hidden="true"></div>
+          <div class="ticket__body">
+            <div class="lockup"><img src="assets/logos/youthimpact-logomark-clair.svg" alt="" width="34" height="44"><span class="lockup__rule"></span><p class="lockup__text"><strong>Club Youth</strong><span>Lycée Pilote Sakiet Ezzit</span></p></div>
+            <p class="ticket__desc">Une soirée cinéma imaginée par les lycéens pour rassembler leur communauté autour d’un objectif concret.</p>
+            <button class="ticket__link" type="button" aria-haspopup="dialog">Découvrir le projet<span class="sr-only"> : Lycée Pilote Sakiet Ezzit</span></button>
+          </div>
+        </article>
+
+        <article class="ticket ticket--impact" data-club="mannouba" data-school="Lycée Pilote Mannouba" data-event="Manouba Tghanni" data-category="Événement musical" data-icon="soiree-musicale" data-desc="Un rendez-vous musical porté par les jeunes talents du lycée au service d’un projet collectif." data-date="" data-place="" data-price="" data-lead="" data-objective="" data-status="Statut à confirmer" data-instagram="" data-ticket="">
+          <div class="ticket__top">
+            <p class="ticket__cat">Événement musical</p>
+            <svg class="ticket__icon" aria-hidden="true"><use href="#i-soiree-musicale"/></svg>
+            <h3 class="ticket__event">Manouba Tghanni</h3>
+          </div>
+          <div class="ticket__perf" aria-hidden="true"></div>
+          <div class="ticket__body">
+            <div class="lockup"><img src="assets/logos/youthimpact-logomark-clair.svg" alt="" width="34" height="44"><span class="lockup__rule"></span><p class="lockup__text"><strong>Club Youth</strong><span>Lycée Pilote Mannouba</span></p></div>
+            <p class="ticket__desc">Un rendez-vous musical porté par les jeunes talents du lycée au service d’un projet collectif.</p>
+            <button class="ticket__link" type="button" aria-haspopup="dialog">Découvrir le projet<span class="sr-only"> : Lycée Pilote Mannouba</span></button>
+          </div>
+        </article>
+
+        <article class="ticket ticket--nuit" data-club="borj-baccouche" data-school="Lycée Pilote Borj Baccouche" data-event="Tournoi sportif" data-category="Sport &amp; Compétition" data-icon="football" data-desc="Une compétition conviviale qui transforme l’énergie sportive en ressources pour le lycée." data-date="" data-place="" data-price="" data-lead="" data-objective="" data-status="Statut à confirmer" data-instagram="" data-ticket="">
+          <div class="ticket__top">
+            <p class="ticket__cat">Sport &amp; Compétition</p>
+            <svg class="ticket__icon" aria-hidden="true"><use href="#i-football"/></svg>
+            <h3 class="ticket__event">Tournoi sportif</h3>
+          </div>
+          <div class="ticket__perf" aria-hidden="true"></div>
+          <div class="ticket__body">
+            <div class="lockup"><img src="assets/logos/youthimpact-logomark-clair.svg" alt="" width="34" height="44"><span class="lockup__rule"></span><p class="lockup__text"><strong>Club Youth</strong><span>Lycée Pilote Borj Baccouche</span></p></div>
+            <p class="ticket__desc">Une compétition conviviale qui transforme l’énergie sportive en ressources pour le lycée.</p>
+            <button class="ticket__link" type="button" aria-haspopup="dialog">Découvrir le projet<span class="sr-only"> : Lycée Pilote Borj Baccouche</span></button>
+          </div>
+        </article>
+
+        <article class="ticket ticket--impact" data-club="ibn-abi-dhiaf" data-school="Lycée Ibn Abi Dhiaf Mannouba" data-event="Événement d’opéra" data-category="Culture &amp; Arts" data-icon="micro" data-desc="Une expérience culturelle singulière conçue pour mobiliser le public et soutenir l’établissement." data-date="" data-place="" data-price="" data-lead="" data-objective="" data-status="Statut à confirmer" data-instagram="" data-ticket="">
+          <div class="ticket__top">
+            <p class="ticket__cat">Culture &amp; Arts</p>
+            <svg class="ticket__icon" aria-hidden="true"><use href="#i-micro"/></svg>
+            <h3 class="ticket__event">Événement d’opéra</h3>
+          </div>
+          <div class="ticket__perf" aria-hidden="true"></div>
+          <div class="ticket__body">
+            <div class="lockup"><img src="assets/logos/youthimpact-logomark-clair.svg" alt="" width="34" height="44"><span class="lockup__rule"></span><p class="lockup__text"><strong>Club Youth</strong><span>Lycée Ibn Abi Dhiaf Mannouba</span></p></div>
+            <p class="ticket__desc">Une expérience culturelle singulière conçue pour mobiliser le public et soutenir l’établissement.</p>
+            <button class="ticket__link" type="button" aria-haspopup="dialog">Découvrir le projet<span class="sr-only"> : Lycée Ibn Abi Dhiaf Mannouba</span></button>
+          </div>
+        </article>
+
+        <article class="ticket ticket--nuit" data-club="menzah-9" data-school="Lycée Menzah 9" data-event="Tournoi sportif" data-category="Sport &amp; Compétition" data-icon="tournoi" data-desc="Le sport devient un levier d’engagement, de cohésion et d’amélioration de la vie scolaire." data-date="" data-place="" data-price="" data-lead="" data-objective="" data-status="Statut à confirmer" data-instagram="" data-ticket="">
+          <div class="ticket__top">
+            <p class="ticket__cat">Sport &amp; Compétition</p>
+            <svg class="ticket__icon" aria-hidden="true"><use href="#i-tournoi"/></svg>
+            <h3 class="ticket__event">Tournoi sportif</h3>
+          </div>
+          <div class="ticket__perf" aria-hidden="true"></div>
+          <div class="ticket__body">
+            <div class="lockup"><img src="assets/logos/youthimpact-logomark-clair.svg" alt="" width="34" height="44"><span class="lockup__rule"></span><p class="lockup__text"><strong>Club Youth</strong><span>Lycée Menzah 9</span></p></div>
+            <p class="ticket__desc">Le sport devient un levier d’engagement, de cohésion et d’amélioration de la vie scolaire.</p>
+            <button class="ticket__link" type="button" aria-haspopup="dialog">Découvrir le projet<span class="sr-only"> : Lycée Menzah 9</span></button>
+          </div>
+        </article>
+
+        <article class="ticket ticket--impact" data-club="hrairia-2" data-school="Lycée Hrairia 2" data-event="Événement musical" data-category="Musique &amp; Spectacle" data-icon="guitare" data-desc="Une scène ouverte et fédératrice pour créer ensemble un impact durable au sein du lycée." data-date="" data-place="" data-price="" data-lead="" data-objective="" data-status="Statut à confirmer" data-instagram="" data-ticket="">
+          <div class="ticket__top">
+            <p class="ticket__cat">Musique &amp; Spectacle</p>
+            <svg class="ticket__icon" aria-hidden="true"><use href="#i-guitare"/></svg>
+            <h3 class="ticket__event">Événement musical</h3>
+          </div>
+          <div class="ticket__perf" aria-hidden="true"></div>
+          <div class="ticket__body">
+            <div class="lockup"><img src="assets/logos/youthimpact-logomark-clair.svg" alt="" width="34" height="44"><span class="lockup__rule"></span><p class="lockup__text"><strong>Club Youth</strong><span>Lycée Hrairia 2</span></p></div>
+            <p class="ticket__desc">Une scène ouverte et fédératrice pour créer ensemble un impact durable au sein du lycée.</p>
+            <button class="ticket__link" type="button" aria-haspopup="dialog">Découvrir le projet<span class="sr-only"> : Lycée Hrairia 2</span></button>
+          </div>
+        </article>
+<!-- IMPACT_TICKETS_END -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ NOS IMPACTS ============ -->
+  <section class="impact section" id="impacts">
+    <div class="wrap">
+      <div class="impact__head">
+        <div class="sh sh--light">
+          <p class="eyebrow">Nos impacts</p>
+          <h2>L’événement est un début. L’impact reste.</h2>
+          <p class="lede">Les fonds collectés sont destinés à des investissements créatifs qui améliorent durablement la vie scolaire.</p>
+        </div>
+        <div class="porte porte--impact">
+          <figure class="arch"><img src="assets/img/impact-porte.jpg" alt="Une lycéenne assise, pensive" width="640" height="800" loading="lazy"></figure>
         </div>
       </div>
-    </div>
-  </section>
 
-  <!-- ===================== QUI SOMMES-NOUS (teaser) ===================== -->
-  <section class="section" id="about">
-    <div class="section-head">
-      <h2>Une association née d'une conférence, devenue un réseau national</h2>
-      <p>L'Association YOUTH CLUBs (AYCs) est une organisation tunisienne à but non lucratif, reconnue par l'État, qui regroupe des adhérents à des YOUTH CLUBs implantés dans leurs établissements éducatifs. Elle coordonne ces clubs et réglemente leur organisation sur des principes de transparence et de démocratie, avec une vision axée sur la scolarité, l'éducation formelle, la santé, la citoyenneté et la vie active.</p>
-      <div class="hero-actions" style="margin-top:20px">
-        <a href="a-propos" class="btn btn-primary">Notre histoire et notre vision</a>
-        <a href="gouvernance" class="btn btn-primary">Découvrir le Bureau Exécutif National</a>
+      <div class="impact__cards">
+        <article class="door-card door-card--icon">
+          <div class="door-card__dome"><svg class="door-card__icon" aria-hidden="true"><use href="#i-professeur"/></svg></div>
+          <h3>Tableau éducatif numérique</h3>
+          <p>Enrichir les supports de cours et favoriser des apprentissages interactifs.</p>
+          <p class="status"><span class="status__dot"></span>Statut&nbsp;: à confirmer</p>
+        </article>
+        <article class="door-card door-card--icon">
+          <div class="door-card__dome"><svg class="door-card__icon" aria-hidden="true"><use href="#i-bibliotheque"/></svg></div>
+          <h3>Bibliothèque de classe</h3>
+          <p>Créer un espace accessible qui donne envie de lire, chercher et partager.</p>
+          <p class="status"><span class="status__dot"></span>Statut&nbsp;: à confirmer</p>
+        </article>
+        <article class="door-card door-card--icon">
+          <div class="door-card__dome"><svg class="door-card__icon" aria-hidden="true"><use href="#i-ecologie"/></svg></div>
+          <h3>Jardin scolaire</h3>
+          <p>Faire grandir un lieu vivant, collectif et propice au bien-être.</p>
+          <p class="status"><span class="status__dot"></span>Statut&nbsp;: à confirmer</p>
+        </article>
+      </div>
+
+      <div class="receipt">
+        <div class="receipt__title">
+          <p class="eyebrow">Rapport d’impact</p>
+          <h3>Des résultats transparents, club par club.</h3>
+        </div>
+        <dl class="receipt__rows">
+          <div><dt>Événement organisé</dt><dd>—</dd></div>
+          <div><dt>Montant collecté</dt><dd>—</dd></div>
+          <div><dt>Investissement réalisé</dt><dd>—</dd></div>
+          <div><dt>Bénéficiaires</dt><dd>—</dd></div>
+        </dl>
+        <p class="receipt__note">Données, photos avant/après et témoignages à publier après vérification.</p>
       </div>
     </div>
   </section>
 
-  <!-- ===================== CTA FINAL ===================== -->
-  <section class="section">
-    <div class="cta-band">
-      <div class="cta-band-tint"></div>
-      <div class="cta-band-content">
-        <h2>Envie de rejoindre l'aventure ?</h2>
-        <p>Chaque mandat, l'association ouvre ses portes à de nouveaux membres à travers tout le réseau de clubs. Contacte-nous pour savoir comment rejoindre un YOUTH CLUB près de chez toi.</p>
-        <a href="mailto:contact@youthclubs.tn" class="btn btn-third">Nous contacter</a>
+  <!-- ============ ÉQUIPE ============ -->
+  <section class="team section" id="equipe">
+    <div class="wrap">
+      <div class="sh sh--wide">
+        <p class="eyebrow">Équipe nationale</p>
+        <h2>Une équipe au service des idées des jeunes.</h2>
+        <p class="lede">Les profils de coordination seront publiés dès validation par l’Association YOUTH CLUBs.</p>
+      </div>
+      <div class="team__grid">
+        <article class="profile">
+          <div class="profile__photo"><svg aria-hidden="true"><use href="#i-lyceen"/></svg></div>
+          <p class="profile__hint">Profil à compléter</p>
+          <h3>Nom et prénom</h3>
+          <p class="profile__role">Rôle national à renseigner</p>
+        </article>
+        <article class="profile">
+          <div class="profile__photo"><svg aria-hidden="true"><use href="#i-lyceen"/></svg></div>
+          <p class="profile__hint">Profil à compléter</p>
+          <h3>Nom et prénom</h3>
+          <p class="profile__role">Rôle national à renseigner</p>
+        </article>
+        <article class="profile">
+          <div class="profile__photo"><svg aria-hidden="true"><use href="#i-lyceen"/></svg></div>
+          <p class="profile__hint">Profil à compléter</p>
+          <h3>Nom et prénom</h3>
+          <p class="profile__role">Rôle national à renseigner</p>
+        </article>
       </div>
     </div>
   </section>
 
+  <!-- ============ PARTENAIRES ============ -->
+  <section class="partners section" id="partenaires">
+    <div class="wrap partners__grid">
+      <div class="partners__copy">
+        <div class="sh">
+          <p class="eyebrow">Partenaires &amp; sponsors</p>
+          <h2>Faire grandir l’impact, ensemble.</h2>
+          <p class="lede">Entreprises, institutions et organisations peuvent apporter leurs expertises, leurs ressources et leur soutien aux initiatives des lycéens.</p>
+        </div>
+        <a class="btn btn--impact" href="#contact">Devenir partenaire</a>
+      </div>
+
+      <div class="board">
+        <div class="board__primary">
+          <div class="board__logos">
+            <img src="assets/logos/association-vertical-couleur.svg" alt="Association YOUTH CLUBs" width="80" height="84" loading="lazy">
+            <span class="board__rule"></span>
+            <img src="assets/logos/youthimpact-logotype-clair.svg" alt="Youth Impact" width="212" height="84" loading="lazy">
+          </div>
+          <p class="board__label">Initiative officielle</p>
+        </div>
+        <div class="board__slot"><span>Logo partenaire</span><small>à ajouter</small></div>
+        <div class="board__slot"><span>Logo partenaire</span><small>à ajouter</small></div>
+        <div class="board__slot"><span>Logo partenaire</span><small>à ajouter</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CONTACT ============ -->
+  <section class="contact" id="contact">
+    <div class="contact__doors" aria-hidden="true"></div>
+    <div class="wrap contact__grid section">
+      <div class="contact__copy">
+        <p class="eyebrow">Construisons la suite</p>
+        <h2>Une idée à partager&nbsp;? <span class="beam">Parlons-en.</span></h2>
+        <p class="lede">Vous êtes un lycée, un élève, une organisation ou un partenaire potentiel&nbsp;? Écrivez à l’équipe nationale Youth Impact.</p>
+        <div class="pending">
+          <svg aria-hidden="true"><use href="#i-email"/></svg>
+          <div><span>Contact officiel</span><strong>Adresse à renseigner</strong></div>
+        </div>
+        <p class="hashtags">#YOUTHCLUBS&nbsp; #YouthImpact<br>#YouthEmpowerment&nbsp; #Youth_in_action<br>#Youth_in_motion</p>
+      </div>
+
+      <form class="form" id="contact-form" novalidate>
+        <div class="form__row">
+          <label>Nom complet<input name="name" placeholder="Votre nom" autocomplete="name" required></label>
+          <label>E-mail<input name="email" type="email" placeholder="vous@exemple.com" autocomplete="email" required></label>
+        </div>
+        <label>Sujet<input name="subject" placeholder="Comment pouvons-nous vous aider ?" required></label>
+        <label>Message<textarea name="message" rows="5" placeholder="Parlez-nous de votre projet..." required></textarea></label>
+        <button class="btn btn--primary" type="submit">Vérifier mon message</button>
+        <p class="form__status form__status--error" id="form-error" role="alert" hidden>Merci de compléter correctement tous les champs.</p>
+        <p class="form__status form__status--ready" id="form-ready" role="status" hidden>Votre message est prêt. L’envoi en ligne sera activé dès qu’une adresse officielle sera connectée.</p>
+      </form>
+    </div>
+  </section>
 </main>
 
-<footer class="page-footer">
-  <div class="footer-affiliation">
-    <span class="footer-affiliation-label">Association</span>
-    <img src="assets/logo-secondary-color.png" alt="Association YOUTH CLUBs" class="footer-logo">
+<!-- ============ PIED DE PAGE ============ -->
+<footer class="site-footer">
+  <div class="wrap footer__grid">
+    <div class="footer__brand">
+      <img src="assets/logos/association-horizontal-blanc.svg" alt="Youth Impact, Association YOUTH CLUBs" width="260" height="106" loading="lazy">
+      <p>Des idées aux actions, des actions à l’impact.</p>
+      <strong>Par les lycéens, pour leurs lycées.</strong>
+    </div>
+    <div class="footer__col">
+      <p class="footer__title">Navigation</p>
+      <a href="#accueil">Accueil</a>
+      <a href="#projet">Le projet</a>
+      <a href="#clubs">Nos clubs</a>
+      <a href="#impacts">Nos impacts</a>
+      <a href="#equipe">Équipe</a>
+      <a href="#partenaires">Partenaires</a>
+    </div>
+    <div class="footer__col">
+      <p class="footer__title">Suivre le mouvement</p>
+      <span>Instagram — lien à ajouter</span>
+      <span>Facebook — lien à ajouter</span>
+      <a href="#contact">Nous contacter</a>
+      <a href="legacy-index">Association YOUTH CLUBs</a>
+      <a href="https://internes.associationyouthclubs.org/portal/login" rel="noopener">Espace membres</a>
+    </div>
   </div>
-  <span class="footer-meta">Bureau 1.2, Immeuble Chebil, avenue Farhat Hached, Megrine, Ben Arous, 2033</span>
+  <div class="wrap footer__bottom">
+    <span>© Youth Impact — Association YOUTH CLUBs</span>
+    <span>Fait en Tunisie, avec et pour les jeunes.</span>
+  </div>
 </footer>
 
-<script>
-(function(){
-  "use strict";
-  /* ---------- Header menu (button + dropdown panel) ---------- */
-  var menuRoot = document.querySelector('[data-menu]');
-  if (menuRoot){
-    var menuBtn = menuRoot.querySelector('[data-menu-btn]');
-    var menuPanel = menuRoot.querySelector('[data-menu-panel]');
+<!-- ============ FICHE ÉVÉNEMENT ============ -->
+<dialog id="club-dialog" class="event" aria-labelledby="event-title">
+  <button class="event__close" type="button" aria-label="Fermer">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+  </button>
+  <div class="event__hero">
+    <div class="event__hero-copy">
+      <button class="event__back" type="button"><span aria-hidden="true">←</span> Retour aux clubs</button>
+      <div class="lockup lockup--dark">
+        <img src="assets/logos/youthimpact-logomark-fonce.svg" alt="" width="34" height="44">
+        <span class="lockup__rule"></span>
+        <p class="lockup__text"><strong>Club Youth</strong><span data-slot="school"></span></p>
+      </div>
+      <p class="event__category" data-slot="category"></p>
+      <h2 id="event-title" data-slot="event"></h2>
+      <p class="event__desc" data-slot="desc"></p>
+    </div>
+    <div class="event__poster">
+      <svg aria-hidden="true"><use data-slot="icon" href="#i-movie-night"/></svg>
+      <strong>Affiche de l’événement</strong>
+      <span>Visuel à ajouter</span>
+    </div>
+  </div>
+  <div class="event__body">
+    <div class="event__main">
+      <p class="eyebrow">L’événement</p>
+      <h3>Une idée qui finance un changement concret</h3>
+      <p>Les élèves conçoivent et organisent cet événement afin de mobiliser leur communauté. L’objectif d’investissement sera défini à partir des besoins identifiés dans le lycée.</p>
+      <div class="objective">
+        <span>Objectif d’investissement</span>
+        <strong data-slot="objective">À renseigner avec le club</strong>
+        <p>Le montant collecté et son affectation seront publiés dès validation.</p>
+      </div>
+      <h3>Après l’événement</h3>
+      <p>Les résultats, les photos d’impact et les témoignages seront documentés ici une fois les informations vérifiées.</p>
+    </div>
+    <aside class="event__side">
+      <div class="info"><svg aria-hidden="true"><use href="#i-date"/></svg><div><span>Date &amp; heure</span><strong data-slot="date">À confirmer</strong></div></div>
+      <div class="info"><svg aria-hidden="true"><use href="#i-lieu"/></svg><div><span>Lieu</span><strong data-slot="place">À confirmer</strong></div></div>
+      <div class="info"><svg aria-hidden="true"><use href="#i-billet"/></svg><div><span>Tarif</span><strong data-slot="price">À confirmer</strong></div></div>
+      <div class="info"><svg aria-hidden="true"><use href="#i-lyceen"/></svg><div><span>Responsable</span><strong data-slot="lead">À renseigner</strong></div></div>
+      <p class="status"><span class="status__dot"></span><span data-slot="status">Statut à confirmer</span></p>
+      <a class="btn btn--impact" data-slot="ticket" target="_blank" rel="noopener noreferrer" hidden>Réserver ma place</a>
+      <button class="btn btn--disabled" data-slot="noticket" type="button" disabled>Billetterie bientôt disponible</button>
+      <p class="event__note" data-slot="note">Instagram et lien d’inscription à ajouter.</p>
+    </aside>
+  </div>
+</dialog>
 
-    function closeMenu(){
-      menuRoot.classList.remove('is-open');
-      menuBtn.setAttribute('aria-expanded', 'false');
-    }
-    function openMenu(){
-      menuRoot.classList.add('is-open');
-      menuBtn.setAttribute('aria-expanded', 'true');
-    }
-    function toggleMenu(){
-      if (menuRoot.classList.contains('is-open')) closeMenu(); else openMenu();
-    }
-
-    menuBtn.addEventListener('click', function(e){
-      e.stopPropagation();
-      toggleMenu();
-    });
-    document.addEventListener('click', function(e){
-      if (!menuRoot.contains(e.target)) closeMenu();
-    });
-    document.addEventListener('keydown', function(e){
-      if (e.key === 'Escape') closeMenu();
-    });
-    menuPanel.querySelectorAll('a').forEach(function(a){
-      a.addEventListener('click', closeMenu);
-    });
-  }
-
-
-  /* Hero visual: subtle pointer-driven parallax tilt (desktop only) */
-  var heroVisual = document.querySelector('.hero-visual');
-  if (heroVisual && window.matchMedia('(hover:hover) and (pointer:fine)').matches){
-    var rafId = null;
-    heroVisual.addEventListener('mousemove', function(e){
-      if (rafId) return;
-      rafId = requestAnimationFrame(function(){
-        var r = heroVisual.getBoundingClientRect();
-        var px = (e.clientX - r.left) / r.width - 0.5;
-        var py = (e.clientY - r.top) / r.height - 0.5;
-        heroVisual.style.transform = 'translateY(-2px) rotateX(' + (py * -2.5) + 'deg) rotateY(' + (px * 3) + 'deg)';
-        rafId = null;
-      });
-    });
-    heroVisual.addEventListener('mouseleave', function(){
-      heroVisual.style.transform = '';
-    });
-  }
-
-  /* ---------- Scroll reveal ---------- */
-  var revealTargets = document.querySelectorAll(
-    '.section-head, .gov-card:not(.reveal-on-scroll), .history-timeline, .cta-band'
-  );
-  revealTargets.forEach(function(el){ el.classList.add('reveal-on-scroll'); });
-
-  var io = new IntersectionObserver(function(entries){
-    entries.forEach(function(entry){
-      if (entry.isIntersecting){
-        entry.target.classList.add('is-visible');
-        io.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.16, rootMargin: '0px 0px -40px 0px' });
-
-  document.querySelectorAll('.reveal-on-scroll').forEach(function(el){ io.observe(el); });
-
-  /* Rail-wraps (carousels) cascade their cards in once in view */
-  var railWraps = document.querySelectorAll('.rail-wrap');
-  var railIo = new IntersectionObserver(function(entries){
-    entries.forEach(function(entry){
-      if (entry.isIntersecting){
-        entry.target.classList.add('is-visible');
-        railIo.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
-  railWraps.forEach(function(el){ railIo.observe(el); });
-
-  /* Axis icons: draw themselves in once their card enters the viewport.
-     Each path's stroke-dasharray is set to its own measured length via
-     getTotalLength(), so the line draws smoothly with no gaps/snapping
-     regardless of how long or short the path actually is. */
-  document.querySelectorAll('[data-axis-icon] .axis-draw').forEach(function(path){
-    var len = Math.ceil(path.getTotalLength());
-    path.style.strokeDasharray = len;
-    path.style.strokeDashoffset = len;
-    path.style.setProperty('--len', len);
-  });
-  var axisCards = document.querySelectorAll('.axis-card');
-  var axisIo = new IntersectionObserver(function(entries){
-    entries.forEach(function(entry){
-      if (entry.isIntersecting){
-        entry.target.classList.add('is-drawn');
-        entry.target.querySelectorAll('.axis-draw').forEach(function(path){
-          path.style.strokeDashoffset = 0;
-        });
-        axisIo.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.4 });
-  axisCards.forEach(function(el){ axisIo.observe(el); });
-
-  /* History timeline items reveal individually + trigger the connecting line */
-  var hItems = document.querySelectorAll('.h-item');
-  var hIo = new IntersectionObserver(function(entries){
-    entries.forEach(function(entry){
-      if (entry.isIntersecting){
-        entry.target.classList.add('is-visible');
-        hIo.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.2 });
-  hItems.forEach(function(el){ hIo.observe(el); });
-
-  /* ---------- Carousels (5H, Axes, BEN, Events) ---------- */
-  var carousels = document.querySelectorAll('[data-carousel]');
-
-  carousels.forEach(function(root){
-    var viewport = root.querySelector('[data-rail-viewport]');
-    var track = root.querySelector('[data-rail-track]');
-    var prevBtn = root.querySelector('[data-rail-prev]');
-    var nextBtn = root.querySelector('[data-rail-next]');
-    var progressBar = root.querySelector('[data-rail-progress]');
-    var currentEl = root.querySelector('[data-rail-current]');
-    var totalEl = root.querySelector('[data-rail-total]');
-    var cards = Array.prototype.slice.call(track.children);
-    if (totalEl) totalEl.textContent = cards.length;
-    cards.forEach(function(card, i){ card.style.setProperty('--card-i', i); });
-
-    function cardStep(){
-      if (!cards.length) return 0;
-      var style = window.getComputedStyle(track);
-      var gap = parseFloat(style.columnGap || style.gap || 0) || 0;
-      return cards[0].getBoundingClientRect().width + gap;
-    }
-
-    function activeIndex(){
-      var step = cardStep();
-      if (!step) return 0;
-      return Math.round(viewport.scrollLeft / step);
-    }
-
-    function updateUI(){
-      var step = cardStep();
-      var idx = Math.min(cards.length - 1, Math.max(0, activeIndex()));
-      var maxScroll = track.scrollWidth - viewport.clientWidth;
-
-      if (currentEl) currentEl.textContent = idx + 1;
-      if (progressBar){
-        var pct = maxScroll > 0 ? (viewport.scrollLeft / maxScroll) * 100 : 100;
-        pct = Math.max(6, Math.min(100, pct));
-        progressBar.style.width = pct + '%';
-      }
-      if (prevBtn) prevBtn.disabled = viewport.scrollLeft <= 2;
-      if (nextBtn) nextBtn.disabled = viewport.scrollLeft >= maxScroll - 2;
-    }
-
-    function goTo(index){
-      var step = cardStep();
-      index = Math.min(cards.length - 1, Math.max(0, index));
-      viewport.scrollTo({ left: index * step, behavior: 'smooth' });
-    }
-
-    if (prevBtn) prevBtn.addEventListener('click', function(){ goTo(activeIndex() - 1); });
-    if (nextBtn) nextBtn.addEventListener('click', function(){ goTo(activeIndex() + 1); });
-
-    var scrollTimer = null;
-    viewport.addEventListener('scroll', function(){
-      if (scrollTimer) window.cancelAnimationFrame(scrollTimer);
-      scrollTimer = window.requestAnimationFrame(updateUI);
-    }, { passive: true });
-
-    window.addEventListener('resize', updateUI);
-
-    /* Drag-to-scroll (mouse) with momentum-friendly native scroll */
-    var isDown = false, startX = 0, startScroll = 0, moved = false;
-
-    viewport.addEventListener('mousedown', function(e){
-      isDown = true; moved = false;
-      viewport.classList.add('is-dragging');
-      startX = e.pageX;
-      startScroll = viewport.scrollLeft;
-    });
-    window.addEventListener('mouseup', function(){
-      if (!isDown) return;
-      isDown = false;
-      viewport.classList.remove('is-dragging');
-      updateUI();
-    });
-    window.addEventListener('mousemove', function(e){
-      if (!isDown) return;
-      var dx = e.pageX - startX;
-      if (Math.abs(dx) > 4) moved = true;
-      viewport.scrollLeft = startScroll - dx;
-    });
-    /* Prevent accidental link/card click after a real drag */
-    viewport.addEventListener('click', function(e){
-      if (moved){ e.preventDefault(); e.stopPropagation(); }
-    }, true);
-
-    /* Keyboard support when the rail itself is focused */
-    viewport.addEventListener('keydown', function(e){
-      if (e.key === 'ArrowRight'){ e.preventDefault(); goTo(activeIndex() + 1); }
-      if (e.key === 'ArrowLeft'){ e.preventDefault(); goTo(activeIndex() - 1); }
-    });
-
-    updateUI();
-  });
-
-})();
-</script>
-
-<link rel="stylesheet" href="chat-widget.css">
-<script src="chat-widget.js" defer></script>
-<script src="smooth-scroll.js" defer></script>
-<script type="module" src="specular-button.js"></script>
+<script src="js/impact.js"></script>
 </body>
 </html>

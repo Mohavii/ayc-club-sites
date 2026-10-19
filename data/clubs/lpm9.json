@@ -1,0 +1,47 @@
+{
+  "slug": "lpm9",
+  "status": "live",
+  "name": "Lycée Menzah 9",
+  "city": "Tunis",
+  "founded": 2019,
+  "memberCount": 0,
+  "about": "",
+  "heroImage": null,
+  "logo": null,
+  "officers": [
+    "746843897350848514"
+  ],
+  "events": [],
+  "bel": [],
+  "partners": [],
+  "forms": {
+    "join": {
+      "enabled": false,
+      "title": "Rejoindre le club",
+      "fields": []
+    },
+    "team_communication": {
+      "enabled": false,
+      "title": "Équipe Communication",
+      "fields": []
+    },
+    "team_logistique": {
+      "enabled": false,
+      "title": "Équipe Logistique",
+      "fields": []
+    },
+    "team_sponsoring": {
+      "enabled": false,
+      "title": "Équipe Sponsoring",
+      "fields": []
+    }
+  },
+  "vpcRoleId": "1542468883473244230",
+  "formWebhooks": {
+    "join": "https://discord.com/api/webhooks/1542468887562420286/_FkXxrdqhHfBpEf73K3O3AXmCnd63vOdB0ZhPZZAxC8fK4m8LDicHiC0ydqLW8NhiwOe",
+    "team_communication": "https://discord.com/api/webhooks/1542468889202393119/W4RbM8qWkoLottwMJVi7IrSs8TaOwewthOWB9Re3cllU0IvM4jqX_ENHfScpmIE64Zz2",
+    "team_logistique": "https://discord.com/api/webhooks/1542468891169529886/OxRIj7bkMBVIaTDimsJDKnfylQv2W1ksxV0rzVlxX8vxdomdb9o8X-HpVTGVEQjuN1Vq",
+    "team_sponsoring": "https://discord.com/api/webhooks/1542468894516711434/noSeXAWhbf_8wOa_y7rQwzBlVFZhZy4IRAbDe5VdJL2k3Yz6_jAFMhdMbnmKftbRjTt3"
+  },
+  "controlRoomChannelId": "1542468885708677171"
+}

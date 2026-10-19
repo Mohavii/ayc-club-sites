@@ -25,6 +25,7 @@ const TARGETS = {
     "api/admin/members/pending.js",
     "api/admin/members/set-admin.js",
     "api/admin/roles.js",
+    "api/admin/impact.js",
   ],
 
   bot: ["api/chat.js", "api/interactions.js", "api/submit-form.js", "api/session.js"],
@@ -55,6 +56,7 @@ const TARGETS = {
     "api/admin/members/pending.js",
     "api/admin/members/set-admin.js",
     "api/admin/roles.js",
+    "api/admin/impact.js",
   ],
 };
 

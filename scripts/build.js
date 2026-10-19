@@ -9,10 +9,13 @@
 const fs = require("fs");
 const path = require("path");
 const { renderClubPage, renderSchoolCard, renderFormPage } = require("./render-club");
+const impact = require("../api/_lib/impact");
 
 const CLUBS_DIR = path.join(__dirname, "..", "data", "clubs");
 const OUTPUT_DIR = path.join(__dirname, "..", "public", "clubs");
-const REJOINDRE_FILE = path.join(__dirname, "..", "public", "rejoindre.html");
+const IMPACT_DATA = path.join(__dirname, "..", "data", "impact-events.json");
+const IMPACT_PAGE = path.join(__dirname, "..", "public", "index.html");
+const REJOINDRE_FILE = path.join(__dirname, "..", "public", "legacy-rejoindre.html");
 
 // The bot's own Vercel URL — form pages need this to know where to POST
 // submissions (GitHub Pages only serves static files, it can't receive
@@ -29,6 +32,8 @@ const FORM_PATHS = {
 };
 
 function main() {
+  updateImpactPage();
+
   if (!fs.existsSync(CLUBS_DIR)) {
     console.log("No data/clubs directory found — nothing to build.");
     return;
@@ -98,7 +103,7 @@ function main() {
 
 function updateRejoindrePage(liveClubs) {
   if (!fs.existsSync(REJOINDRE_FILE)) {
-    console.log("rejoindre.html not found — skipping club directory update.");
+    console.log("legacy-rejoindre.html not found — skipping club directory update.");
     return;
   }
 
@@ -109,7 +114,7 @@ function updateRejoindrePage(liveClubs) {
   const endIdx = html.indexOf(endMarker);
 
   if (startIdx === -1 || endIdx === -1) {
-    console.log("Club card markers not found in rejoindre.html — skipping directory update.");
+    console.log("Club card markers not found in legacy-rejoindre.html — skipping directory update.");
     return;
   }
 
@@ -129,7 +134,36 @@ function updateRejoindrePage(liveClubs) {
   html = `${before}\n${cardsHtml}\n${after}`;
 
   fs.writeFileSync(REJOINDRE_FILE, html, "utf8");
-  console.log(`Updated rejoindre.html with ${sorted.length} club(s).`);
+  console.log(`Updated legacy-rejoindre.html with ${sorted.length} club(s).`);
+}
+
+// Replaces what sits between <!-- NAME_START --> and <!-- NAME_END --> in html.
+function replaceBetween(html, name, content) {
+  const start = `<!-- ${name}_START -->`;
+  const end = `<!-- ${name}_END -->`;
+  const a = html.indexOf(start);
+  const b = html.indexOf(end);
+  if (a === -1 || b === -1) throw new Error(`Marker ${name} not found in public/index.html`);
+  return html.slice(0, a + start.length) + content + html.slice(b);
+}
+
+// Youth Impact home page (public/index.html): the club tickets, the title and
+// the counter are generated from data/impact-events.json — the file the
+// internes dashboard edits.
+function updateImpactPage() {
+  if (!fs.existsSync(IMPACT_DATA) || !fs.existsSync(IMPACT_PAGE)) {
+    console.log("impact-events.json or public/index.html missing — skipping Youth Impact page.");
+    return;
+  }
+  const { events } = impact.clean(JSON.parse(fs.readFileSync(IMPACT_DATA, "utf8")));
+  const shown = events.filter((e) => e.visible);
+
+  let html = fs.readFileSync(IMPACT_PAGE, "utf8");
+  html = replaceBetween(html, "IMPACT_TICKETS", "\n" + shown.map(impact.renderTicket).join("\n\n") + "\n");
+  html = replaceBetween(html, "IMPACT_TITLE", impact.renderTitle(shown.length));
+  html = replaceBetween(html, "IMPACT_COUNT", String(shown.length).padStart(2, "0"));
+  fs.writeFileSync(IMPACT_PAGE, html, "utf8");
+  console.log(`Updated index.html with ${shown.length} Youth Impact event(s).`);
 }
 
 main();

@@ -50,6 +50,9 @@
     if (access.canReviewSupervision || member?.isNationalAdmin) {
       groups.push({ label: "Gouvernance", items: [["supervision", "⚖", "Supervision"]] });
     }
+    if (member?.isNationalAdmin) {
+      groups.push({ label: "Site public", items: [["impact-admin", "★", "Événements Youth Impact"]] });
+    }
     return groups;
   };
 
@@ -80,9 +83,9 @@
             <span class="brand-tag">Association YOUTH CLUBs</span>
           </a>
           <nav class="public-nav" aria-label="Navigation principale">
-            <a href="https://associationyouthclubs.org/index">Actualité</a>
-            <a href="https://associationyouthclubs.org/strategie">Stratégie</a>
-            <a href="https://associationyouthclubs.org/contact">Contact</a>
+            <a href="https://associationyouthclubs.org/">Actualité</a>
+            <a href="https://associationyouthclubs.org/legacy-strategie">Stratégie</a>
+            <a href="https://associationyouthclubs.org/legacy-contact">Contact</a>
           </nav>
           <div class="account-slot">
             ${member ? `${avatar}<span class="account-name">${escapeHtml(member.displayName || member.username)}</span><button class="btn-logout" id="logout-btn" type="button">Se déconnecter</button>` : `<a class="btn btn-primary" href="/api/auth/google/start">Se connecter</a>`}
@@ -104,7 +107,7 @@
 
     const navAdmin = document.getElementById("admin-links");
     if (navAdmin && (member?.isNationalAdmin || member?.canReviewMembership)) {
-      navAdmin.innerHTML = `<a class="list-item" href="admin-review"><span class="list-item-title">Demandes d’adhésion</span><span class="list-item-meta">${member?.isNationalAdmin ? "Vue nationale" : "Demandes de ton club"}</span></a>${member?.isNationalAdmin ? `<a class="list-item" href="admin-roles"><span class="list-item-title">Rôles et permissions</span><span class="list-item-meta">Administration nationale</span></a>` : ""}`;
+      navAdmin.innerHTML = `<a class="list-item" href="admin-review"><span class="list-item-title">Demandes d’adhésion</span><span class="list-item-meta">${member?.isNationalAdmin ? "Vue nationale" : "Demandes de ton club"}</span></a>${member?.isNationalAdmin ? `<a class="list-item" href="admin-roles"><span class="list-item-title">Rôles et permissions</span><span class="list-item-meta">Administration nationale</span></a>` : ""}${member?.isNationalAdmin ? `<a class="list-item" href="impact-admin"><span class="list-item-title">Événements Youth Impact</span><span class="list-item-meta">Dates, lieux, tarifs, billetterie du site public</span></a>` : ""}`;
     }
 
     const logout = document.getElementById("logout-btn");

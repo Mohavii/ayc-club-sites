@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Événements Youth Impact · Portail YOUTHCLUBber</title><link rel="icon" href="../assets/favicon-32.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet"><link rel="stylesheet" href="../theme.css"><link rel="stylesheet" href="portal.css">
+<style>
+  .ev-card{margin-bottom:18px}
+  .ev-card.is-hidden{opacity:.6}
+  .ev-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .ev-head h2{margin:0;font-size:1.05rem}
+  .ev-head label{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:.8rem}
+  .ev-bar{position:sticky;bottom:0;z-index:15;background:#fff;border-top:1px solid #edf0f6;padding:12px 0;margin-top:8px;display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+  .ev-msg{margin-right:auto;font-size:.85rem}
+  .ev-msg.ok{color:#1E6B3E}.ev-msg.err{color:#B23A3A}
+</style></head>
+<body><div id="topbar-root"></div><div class="workspace"><div id="sidebar-root"></div><main class="portal-content">
+  <div class="portal-heading"><div>
+    <p class="eyebrow">Site public · Youth Impact</p>
+    <h1>Événements des clubs</h1>
+    <p>Ce que tu modifies ici apparaît sur la page d’accueil du site, dans la fiche de chaque événement. Après l’enregistrement, compte 1 à 2 minutes avant la mise en ligne. Champ vide = « à confirmer » sur le site.</p>
+  </div></div>
+  <div id="ev-error"></div>
+  <div id="ev-list"></div>
+  <div class="ev-bar">
+    <span class="ev-msg" id="ev-msg" role="status"></span>
+    <button class="btn btn-secondary" id="ev-add" type="button">+ Ajouter un événement</button>
+    <button class="btn btn-primary" id="ev-save" type="button">Enregistrer</button>
+  </div>
+</main></div>
+<script src="portal-common.js"></script>
+<script>
+(async () => {
+  const P = window.AYCPortal;
+  const member = await P.initPortalShell({ requireActive: true });
+  if (!member) return;
+  if (!member.isNationalAdmin) { location.href = "home"; return; }
+
+  // Même liste que api/_lib/impact.js (le serveur revérifie tout).
+  const ICONS = { "movie-night": "Cinéma", "soiree-musicale": "Soirée musicale", tournoi: "Tournoi / trophée", football: "Football", micro: "Micro / opéra", guitare: "Guitare / concert" };
+  const STATUSES = { "a-confirmer": "Statut à confirmer", ouvert: "Inscriptions ouvertes", complet: "Complet", termine: "Terminé" };
+  // [clé, libellé, type, pleine largeur]
+  const FIELDS = [
+    ["school", "Lycée", "text"], ["event", "Nom de l’événement", "text"],
+    ["category", "Catégorie (ex. Sport & Compétition)", "text"], ["icon", "Icône", ICONS],
+    ["date", "Date & heure (texte libre)", "text"], ["place", "Lieu", "text"],
+    ["price", "Tarif", "text"], ["lead", "Responsable", "text"],
+    ["status", "Statut", STATUSES], ["objective", "Objectif d’investissement", "text"],
+    ["instagram", "Lien Instagram (https://…)", "text"], ["ticketUrl", "Lien d’inscription / billetterie (https://…)", "text"],
+    ["desc", "Description courte", "area", true],
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  let events = [], sha = null;
+
+  const msg = (text, kind = "") => { $("ev-msg").textContent = text; $("ev-msg").className = "ev-msg " + kind; };
+
+  async function call(method, body) {
+    const res = await fetch("/api/admin/impact", {
+      method, credentials: "same-origin",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Erreur " + res.status);
+    return data;
+  }
+
+  function field([key, label, type, full], i) {
+    const id = `f-${i}-${key}`;
+    const value = events[i][key] ?? "";
+    let control;
+    if (type === "area") control = `<textarea id="${id}" data-i="${i}" data-k="${key}" maxlength="400">${P.escapeHtml(value)}</textarea>`;
+    else if (typeof type === "object") control = `<select id="${id}" data-i="${i}" data-k="${key}">${Object.entries(type).map(([v, l]) => `<option value="${v}"${v === value ? " selected" : ""}>${P.escapeHtml(l)}</option>`).join("")}</select>`;
+    else control = `<input id="${id}" type="text" data-i="${i}" data-k="${key}" value="${P.escapeHtml(value)}">`;
+    return `<div class="form-field${full ? " full" : ""}"><label for="${id}">${label}</label>${control}</div>`;
+  }
+
+  function render() {
+    $("ev-list").innerHTML = events.length ? events.map((e, i) => `
+      <section class="portal-card ev-card${e.visible === false ? " is-hidden" : ""}">
+        <div class="ev-head">
+          <h2>${P.escapeHtml(e.event || "Nouvel événement")} <span class="list-item-meta">· ${P.escapeHtml(e.school || "")}</span></h2>
+          <div>
+            <label><input type="checkbox" data-i="${i}" data-k="visible"${e.visible === false ? "" : " checked"}> Visible sur le site</label>
+            <button class="btn btn-danger btn-sm" type="button" data-del="${i}">Supprimer</button>
+          </div>
+        </div>
+        <div class="form-grid">${FIELDS.map((f) => field(f, i)).join("")}</div>
+      </section>`).join("") : P.renderEmpty("Aucun événement. Ajoutes-en un.");
+  }
+
+  // Un seul écouteur : met à jour le tableau à chaque frappe.
+  $("ev-list").addEventListener("input", (ev) => {
+    const t = ev.target, i = t.dataset.i;
+    if (i === undefined) return;
+    events[i][t.dataset.k] = t.type === "checkbox" ? t.checked : t.value;
+    if (t.type === "checkbox") t.closest(".ev-card").classList.toggle("is-hidden", !t.checked);
+  });
+  $("ev-list").addEventListener("click", (ev) => {
+    const i = ev.target.dataset.del;
+    if (i === undefined || !confirm("Supprimer cet événement du site ?")) return;
+    events.splice(i, 1); render();
+  });
+  $("ev-add").addEventListener("click", () => {
+    events.push({ visible: true, school: "", event: "", category: "", icon: "movie-night", desc: "", date: "", place: "", price: "", lead: "", status: "a-confirmer", objective: "", instagram: "", ticketUrl: "" });
+    render(); $("ev-list").lastElementChild.scrollIntoView({ behavior: "smooth" });
+  });
+
+  async function load() {
+    const data = await call("GET");
+    events = data.events; sha = data.sha; render();
+  }
+
+  $("ev-save").addEventListener("click", async () => {
+    $("ev-save").disabled = true; msg("Enregistrement…");
+    try {
+      await call("POST", { events, sha });
+      await load();
+      msg("Enregistré. Le site se met à jour dans 1 à 2 minutes.", "ok");
+    } catch (e) { msg(e.message, "err"); }
+    $("ev-save").disabled = false;
+  });
+
+  try { await load(); } catch (e) { P.renderError($("ev-error"), e); }
+})();
+</script></body></html>
