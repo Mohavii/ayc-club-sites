@@ -2751,6 +2751,7 @@ module.exports = async (req, res) => {
   if (body === null) return json(res, 400, { error: "Corps JSON invalide." });
   const action = String(req.query?.action || body.action || "dashboard");
   try {
+    if (action === "impact_ticket") return require("./_lib/impact-ticket").issueTicket(res, member);
     if (action === "profile") return json(res, 200, await profile(member));
     if (action === "update_profile") return updateProfile(req, res, member, body);
     if (action === "dashboard") return json(res, 200, await dashboard(member));

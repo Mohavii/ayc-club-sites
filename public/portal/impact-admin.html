@@ -53,14 +53,25 @@
 
   const msg = (text, kind = "") => { $("ev-msg").textContent = text; $("ev-msg").className = "ev-msg " + kind; };
 
+  // Les données sont enregistrées par le projet Vercel du bot (il a déjà l'accès GitHub).
+  // Adresse = celle du bot, la même que dans chat-widget.js.
+  const BOT_API = "https://ayc-club-sites.vercel.app";
+
+  // 1) un ticket de 15 min délivré par le portail (cookie), 2) appel du bot avec ce ticket.
   async function call(method, body) {
-    const res = await fetch("/api/admin/impact", {
-      method, credentials: "same-origin",
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    const { token } = await P.api("impact_ticket", { method: "POST" });
+    let res;
+    try {
+      res = await fetch(BOT_API + "/api/impact", {
+        method,
+        headers: { Authorization: "Bearer " + token, ...(body ? { "Content-Type": "application/json" } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch {
+      throw new Error("Impossible de joindre le bot (" + BOT_API + "). Vérifie l'adresse BOT_API en haut du script de cette page.");
+    }
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || "Erreur " + res.status);
+    if (!res.ok) throw new Error(data.error || "Erreur " + res.status + " — /api/impact introuvable sur le projet du bot (redéployé ?)");
     return data;
   }
 

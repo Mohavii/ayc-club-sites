@@ -69,27 +69,44 @@ Empty field = "À confirmer" on the site. A ticket link turns the disabled
 **How it works (the whole thing):**
 
 ```
-dashboard  →  POST /api/admin/impact  →  commit to data/impact-events.json
-          →  GitHub Action runs `npm run build`  →  scripts/build.js
-          →  rewrites the tickets in public/index.html  →  site updated (≈1–2 min)
+dashboard (internes)  →  asks the portal for a 15-min ticket (you're logged in, admin only)
+                      →  sends your edits + ticket to the DISCORD BOT project: /api/impact
+bot project           →  checks the ticket in the shared database, commits data/impact-events.json
+GitHub Action         →  `npm run build` → scripts/build.js → rewrites public/index.html (≈1–2 min)
 ```
 
-- Access: national admins only (same check as the rest of the portal).
-- Every save is a git commit named "Youth Impact : événements mis à jour par <username>",
+The writing to GitHub is done by the **Discord bot's Vercel project**, because it already has the
+GitHub token — so you don't have to copy or regenerate any token.
+
+- Access: national admins only. The ticket is stored hashed in the portal's existing `portal_sessions`
+  table (no new table), expires after 15 minutes and only works on `/api/impact`.
+- Every save is a git commit named "Youth Impact : mise à jour par <username>",
   so GitHub history is your audit log and your undo.
 - If two admins save at the same time, the second gets "reload the page" instead of
   overwriting the first.
-- No new database table, no new Vercel project. One new API route
-  (`api/admin/impact.js`), added to the `portal-admin` and `local` targets in
-  `scripts/deployment-targets.js` (portal-admin goes from 4 to 5 functions; the Hobby cap is 12).
+- One new Vercel function (`api/impact.js`), added to the `bot` target (4 → 5 functions, Hobby cap is 12).
+  Two small helpers in `api/_lib/` (`impact-ticket.js`, `impact-admin.js`) and one line in `api/portal.js`
+  (the `impact_ticket` action).
 - To add or remove an event or a team member one day, edit `data/impact-events.json` by hand on GitHub (copy an entry, give it a new `id`, keep the `id`s unique); the same build picks it up.
 
-### One thing to configure
-The function runs on the Vercel project that serves `/api/admin/*` (`ayc-portal-admin`).
-That project needs the same GitHub variables the bot project already has:
+### Nothing to configure — but check two things
+- The bot project must have `DATABASE_URL` (it should: the portal doc requires the same value on every project)
+  and it must already have the `GITHUB_*` variables (it does, it's how the bot saves clubs).
+- The dashboard calls the bot at `https://ayc-club-sites.vercel.app` (the same address as `chat-widget.js`).
+  If your bot project has another address, change `BOT_API` near the top of the script in
+  `public/portal/impact-admin.html`.
 
-| Variable | Value |
-|---|---|
+If something is off, the dashboard shows the reason (bot unreachable, session expired, missing variable…).
+
+---|---|
+| `GITHUB_TOKEN` | the token already used by the bot (scope `repo`) |
+| `GITHUB_OWNER` | your GitHub username/org |
+| `GITHUB_REPO` | `ayc-club-sites` |
+| `GITHUB_BRANCH` | `main` |
+
+Until then the dashboard shows a clear message naming the missing variables.
+
+---|---|
 | `GITHUB_TOKEN` | the token already used by the bot (scope `repo`) |
 | `GITHUB_OWNER` | your GitHub username/org |
 | `GITHUB_REPO` | `ayc-club-sites` |
@@ -105,8 +122,7 @@ dashboard shows a clear error naming the missing variables.
 1. Unzip over your local clone of the repo (this zip has no `.git` folder, so your history is untouched).
 2. `git add -A && git commit -m "Merge Youth Impact, add internes dashboard" && git push`
    (git will show the legacy files as renames).
-3. Add the 4 variables above to `ayc-portal-admin` and redeploy it.
-4. Sign in to the portal as a national admin and open the dashboard.
+3. Wait for the bot **and** portal projects to finish redeploying, then sign in to the portal as a national admin and open the dashboard.
 
 Nothing else changes: same GitHub Pages workflow, same Vercel projects, same DNS.
 
@@ -159,11 +175,11 @@ and `public/legacy-rejoindre.html` (club list) in place, as it did before for th
 **Wording:** "Club Youth" → "Youth Club" everywhere; "Lycée Pilote Borj Baccouche" → "Lycée Pilote Bourguiba Tunis" (event id `bourguiba-tunis`).
 
 **New:** `SETUP-YOUTH-IMPACT.md`, `data/impact-events.json`, `api/_lib/impact.js`,
-`api/admin/impact.js`, `public/portal/impact-admin.html`, `public/index.html` (Youth Impact),
+`api/impact.js`, `api/_lib/impact-ticket.js`, `api/_lib/impact-admin.js`, `public/portal/impact-admin.html`, `public/index.html` (Youth Impact),
 `public/css/impact.css`, `public/js/impact.js`, `public/favicon.svg`,
 `public/assets/{img,logos,patterns}/`, the Funnel/Unbounded fonts in `public/assets/fonts/`,
 `docs/youth-impact-addon-README.md`.
 
 **Changed:** the 9 renamed pages + `404.html` (links), `scripts/build.js`,
-`scripts/render-club.js` (2 links), `scripts/deployment-targets.js`, `middleware.js`,
+`scripts/render-club.js` (2 links), `api/portal.js` (one line: the `impact_ticket` action), `scripts/deployment-targets.js` (`api/impact.js` added to `bot`), `middleware.js`,
 `public/portal/portal-common.js`, `PROJECT-MAP.md`.
