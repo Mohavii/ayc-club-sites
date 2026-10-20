@@ -50,7 +50,7 @@ and **Espace membres** (→ internes portal), so the old site stays reachable.
 ## 2. The dashboard
 
 **URL:** `https://internes.associationyouthclubs.org/portal/impact-admin`
-(also in the portal sidebar under **Site public** and on the portal home, for national admins only).
+(also in the portal sidebar under **Site public** and on the portal home, for national admins and "Membre national" members only).
 
 What you can do on it, per event: show/hide, lycée, name, category, icon, date, place,
 price, responsible person, status (to confirm / registrations open / full / over),
@@ -69,7 +69,7 @@ Empty field = "À confirmer" on the site. A ticket link turns the disabled
 **How it works (the whole thing):**
 
 ```
-dashboard (internes)  →  asks the portal for a 15-min ticket (you're logged in, admin only)
+dashboard (internes)  →  asks the portal for a 15-min ticket (you're logged in; national members/admins only)
                       →  sends your edits + ticket to the DISCORD BOT project: /api/impact
 bot project           →  checks the ticket in the shared database, commits data/impact-events.json
 GitHub Action         →  `npm run build` → scripts/build.js → rewrites public/index.html (≈1–2 min)
@@ -78,7 +78,7 @@ GitHub Action         →  `npm run build` → scripts/build.js → rewrites pub
 The writing to GitHub is done by the **Discord bot's Vercel project**, because it already has the
 GitHub token — so you don't have to copy or regenerate any token.
 
-- Access: national admins only. The ticket is stored hashed in the portal's existing `portal_sessions`
+- Access: national admins **and every active member whose membership status is "Membre national"** (set per member on the portal's roles page, `admin-roles`). Nobody else. The ticket is stored hashed in the portal's existing `portal_sessions`
   table (no new table), expires after 15 minutes and only works on `/api/impact`.
 - Every save is a git commit named "Youth Impact : mise à jour par <username>",
   so GitHub history is your audit log and your undo.
@@ -181,5 +181,5 @@ and `public/legacy-rejoindre.html` (club list) in place, as it did before for th
 `docs/youth-impact-addon-README.md`.
 
 **Changed:** the 9 renamed pages + `404.html` (links), `scripts/build.js`,
-`scripts/render-club.js` (2 links), `api/portal.js` (one line: the `impact_ticket` action), `scripts/deployment-targets.js` (`api/impact.js` added to `bot`), `middleware.js`,
+`scripts/render-club.js` (2 links), `api/portal.js` (one line: the `impact_ticket` action), `api/session.js` (exposes `membershipStatus`), `scripts/deployment-targets.js` (`api/impact.js` added to `bot`), `middleware.js`,
 `public/portal/portal-common.js`, `PROJECT-MAP.md`.

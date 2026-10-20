@@ -32,7 +32,7 @@
   const P = window.AYCPortal;
   const member = await P.initPortalShell({ requireActive: true });
   if (!member) return;
-  if (!member.isNationalAdmin) { location.href = "home"; return; }
+  if (!member.isNationalAdmin && member.membershipStatus !== "membre_national") { location.href = "home"; return; }
 
   // Même liste que api/_lib/impact.js (le serveur revérifie tout).
   const ICONS = { "movie-night": "Cinéma", "soiree-musicale": "Soirée musicale", tournoi: "Tournoi / trophée", football: "Football", micro: "Micro / opéra", guitare: "Guitare / concert" };

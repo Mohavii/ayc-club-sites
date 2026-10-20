@@ -50,7 +50,7 @@
     if (access.canReviewSupervision || member?.isNationalAdmin) {
       groups.push({ label: "Gouvernance", items: [["supervision", "⚖", "Supervision"]] });
     }
-    if (member?.isNationalAdmin) {
+    if (member?.isNationalAdmin || member?.membershipStatus === "membre_national") {
       groups.push({ label: "Site public", items: [["impact-admin", "★", "Événements Youth Impact"]] });
     }
     return groups;
@@ -106,8 +106,12 @@
     }
 
     const navAdmin = document.getElementById("admin-links");
-    if (navAdmin && (member?.isNationalAdmin || member?.canReviewMembership)) {
-      navAdmin.innerHTML = `<a class="list-item" href="admin-review"><span class="list-item-title">Demandes d’adhésion</span><span class="list-item-meta">${member?.isNationalAdmin ? "Vue nationale" : "Demandes de ton club"}</span></a>${member?.isNationalAdmin ? `<a class="list-item" href="admin-roles"><span class="list-item-title">Rôles et permissions</span><span class="list-item-meta">Administration nationale</span></a>` : ""}${member?.isNationalAdmin ? `<a class="list-item" href="impact-admin"><span class="list-item-title">Événements Youth Impact</span><span class="list-item-meta">Dates, lieux, tarifs, billetterie du site public</span></a>` : ""}`;
+    const canEditImpact = member?.isNationalAdmin || member?.membershipStatus === "membre_national";
+    if (navAdmin && (member?.isNationalAdmin || member?.canReviewMembership || canEditImpact)) {
+      navAdmin.innerHTML =
+        (member?.isNationalAdmin || member?.canReviewMembership ? `<a class="list-item" href="admin-review"><span class="list-item-title">Demandes d’adhésion</span><span class="list-item-meta">${member?.isNationalAdmin ? "Vue nationale" : "Demandes de ton club"}</span></a>` : "") +
+        (member?.isNationalAdmin ? `<a class="list-item" href="admin-roles"><span class="list-item-title">Rôles et permissions</span><span class="list-item-meta">Administration nationale</span></a>` : "") +
+        (canEditImpact ? `<a class="list-item" href="impact-admin"><span class="list-item-title">Événements Youth Impact</span><span class="list-item-meta">Dates, lieux, tarifs, billetterie du site public</span></a>` : "");
     }
 
     const logout = document.getElementById("logout-btn");

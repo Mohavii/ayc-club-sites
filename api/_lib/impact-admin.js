@@ -7,7 +7,7 @@
 //   GET  → { events, team, sha }
 //   POST → body { events, team, sha } saves the file
 //
-// National admins only. A save is one git commit, which makes the GitHub Action
+// National members and admins only. A save is one git commit, which makes the GitHub Action
 // rebuild the public page (≈1–2 min). `sha` is the version the dashboard loaded:
 // if someone else saved in between, GitHub refuses and we ask the admin to reload.
 // Edit-only: existing events / team members can be changed, not added or removed.
@@ -16,12 +16,13 @@
 
 const { readJsonFile, writeJsonFile } = require("./store");
 const { clean } = require("./impact");
+const { canEditImpact } = require("./impact-ticket");
 
 const FILE = "data/impact-events.json";
 
 module.exports = async function impactAdmin(req, res, member, body) {
-  if (!member.is_national_admin) {
-    res.status(403).json({ error: "Réservé aux admins nationaux." });
+  if (!canEditImpact(member)) {
+    res.status(403).json({ error: "Réservé aux membres nationaux." });
     return;
   }
   if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_OWNER || !process.env.GITHUB_REPO) {

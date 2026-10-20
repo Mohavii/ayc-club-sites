@@ -31,6 +31,7 @@ module.exports = async (req, res) => {
         status: member.status,
         schoolId: member.school_id,
         isNationalAdmin: member.is_national_admin,
+        membershipStatus: member.membership_status,
         canReviewMembership,
         access,
         rejectionNote: member.rejection_note,
